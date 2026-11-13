@@ -2,8 +2,8 @@
 
 ## 現在の状況
 段階0（土台づくりと、エンジンの WASM 化・速度測定）の作業中。
-手元でのテストは合格。GitHub のリポジトリ（joban-tree）がまだ無いので、push・公開・エンジンのビルドは未実施。
-公開 URL（予定）：https://skiri7kenteki.github.io/joban-tree/ ／速度測定：https://skiri7kenteki.github.io/joban-tree/bench.html
+GitHub Actions でエンジンのビルド〜テスト〜公開まで通った（2026-11-13）。スマホ・iPad での速度測定の結果待ち。
+公開 URL：https://skiri7kenteki.github.io/joban-tree/ ／速度測定：https://skiri7kenteki.github.io/joban-tree/bench.html
 
 ## 完了したこと
 - 2026-11-13 着手前の確認（持ち主の回答）
