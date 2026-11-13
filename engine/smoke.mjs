@@ -22,14 +22,24 @@ const recent = [];
 // 失敗の理由を GitHub Actions の「注記（annotation）」にも出す。
 // ログは管理者しか読めないが、注記は誰でも見られるので原因を共有しやすい。
 function fail(message) {
-  const detail = [`[${pkg}] ${message}`, ...recent.slice(-15)].join('\n');
+  const detail = [`[${pkg}] ${message}`, ...recent.filter((l) => !l.startsWith('option name')).slice(-25)].join('\n');
   console.error(detail);
   const escaped = detail.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
   console.log(`::error title=エンジン単体の動作確認（${pkg}）::${escaped}`);
   process.exit(1);
 }
-process.on('uncaughtException', (e) => fail(`例外: ${e?.stack ?? e}`));
-process.on('unhandledRejection', (e) => fail(`例外: ${e?.stack ?? e}`));
+// 例外の中身を文字にする（Emscripten の終了通知 ExitStatus などは Error ではないので stack が無い）
+function describe(e) {
+  if (e instanceof Error) return e.stack ?? String(e);
+  if (e && typeof e === 'object') {
+    const props = {};
+    for (const k of Object.getOwnPropertyNames(e)) props[k] = String(e[k]);
+    return `${e.constructor?.name ?? 'Object'} ${JSON.stringify(props)}`;
+  }
+  return String(e);
+}
+process.on('uncaughtException', (e) => fail(`例外: ${describe(e)}`));
+process.on('unhandledRejection', (e) => fail(`例外: ${describe(e)}`));
 
 const TIMEOUT_MS = 180_000;
 const timer = setTimeout(() => fail(`${TIMEOUT_MS / 1000} 秒以内に終わりませんでした`), TIMEOUT_MS);
@@ -41,7 +51,13 @@ fs.writeFileSync(path.join(distDir, 'package.json'), '{ "type": "commonjs" }\n')
 const require = createRequire(import.meta.url);
 const factory = require(path.resolve(distDir, `yaneuraou.${pkg}.js`));
 const t0 = Date.now();
-const engine = await factory();
+// エンジンのエラー出力（stderr）も手がかりとして残す
+const engine = await factory({
+  printErr: (line) => {
+    console.error(`! ${line}`);
+    recent.push(`! ${line}`);
+  },
+});
 console.log(`[smoke] モジュール読み込み ${Date.now() - t0}ms`);
 
 // 評価関数を仮想ファイルシステムの /eval/ に置く
@@ -66,6 +82,7 @@ engine.addMessageListener((line) => {
 
 function send(cmd) {
   console.log(`> ${cmd}`);
+  recent.push(`> ${cmd}`);
   engine.postMessage(cmd);
 }
 function waitFor(test) {
