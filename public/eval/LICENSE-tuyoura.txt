@@ -1,21 +1,30 @@
 評価関数ファイル（nn.bin / progress.bin）について
 
 このフォルダの下にある nn.bin と progress.bin は、やねうら王プロジェクトの評価関数
-「つようら王11micro」「つようら王11mini」です。MIT License で配布されており、
+「つようら王11micro」「つようら王11mini」です。MIT License で頒布されており、
 このアプリではそれを変更せずに再配布しています。
+
+  ライセンスの出典：
+    「つようら王11mini/microをMIT Licenseで公開しました」（やねうらお、2026-10-14）
+    https://yaneuraou.yaneu.com/2026/10/14/tsuyou-11-mini-micro-released-under-mit-license/
+    本文：「今回、これらをMIT Licenseで頒布します。」
+  配布元（記事の案内先）：
+    https://yaneurao.fanbox.cc/posts/12761272
 
   つようら王11micro（SFNN_ka2_2048_8_64_progress8, epoch0010, 2026-10-01）
     https://storage.yaneu.com/yaneuraou/TuyouraOu11micro-SFNN_ka2_2048_8_64_progress8-epoch0010-20261001.7z
   つようら王11mini（SFNN_ka2_4096_8_64_progress8, epoch0010, 2026-10-03）
     https://storage.yaneu.com/yaneuraou/TuyouraOu11mini-SFNN_ka2_4096_8_64_progress8-epoch0010-20261003.7z
-  作者：やねうら王プロジェクト（https://yaneurao.fanbox.cc/）
 
+配布物（.7z）にはライセンス文書が含まれていなかったため、上の記事にもとづいて
+MIT License の本文を下に記載しています。記事に著作権者の名義の記載は無いため、
+記事の著者名（やねうらお）で表記しています。
 各フォルダの tag.json は配布物に含まれていた説明ファイルです（変更していません）。
 
 ----------------------------------------------------------------------
 MIT License
 
-Copyright (c) やねうら王プロジェクト
+Copyright (c) 2026 やねうらお（やねうら王プロジェクト）
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

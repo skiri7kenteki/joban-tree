@@ -56,19 +56,20 @@ GitHub Actions でエンジンのビルド〜テスト〜公開まで通った�
     エンジンの 2 項目は、手元にエンジンが無いので省略（GitHub Actions で実行される）
   - `npm audit`：ビルド時だけ使う部品（vite-plugin-pwa → workbox-build）に注意 6 件。公開されるアプリには含まれないので様子見
 
-- 2026-11-13 実機 1 台目（Safari 26.6、UA は Macintosh＝iPad の可能性が高い。CPU 数 8、isolated: true、ハッシュ 32MB、11micro）
+- 2026-11-13 評価関数のライセンス：持ち主が出典を確認（やねうら王公式サイト 2026-10-14 の記事「今回、これらをMIT Licenseで頒布します。」）。
+  `LICENSE-tuyoura.txt` に出典を書き、名義を「やねうらお（やねうら王プロジェクト）」にした
+- 2026-11-13 実機 1 台目：**iPad**（Safari 26.6。UA は Macintosh と名乗る。CPU 数 8、isolated: true、ハッシュ 32MB、11micro）
   - **Safari でも service worker のヘッダ付け足しで cross-origin isolated になった**。エンジンも動いた
   - 読み込み：エンジン 755ms／評価関数 1232ms／isready 248ms
   - 1 スレッド：MultiPV1・500ms で深さ 18〜21・約 32〜42 万 nps、MultiPV3・400ms で深さ 15〜18・約 40〜50 万 nps
   - 4 スレッド：MultiPV1・500ms で深さ 19〜21・約 139〜150 万 nps、MultiPV3・400ms で深さ 16〜19・約 160〜210 万 nps（1 スレッドの約 4 倍）
 
 ## 実機で未確認のこと
-- 公開済み。実機（スマホ・iPad）ではまだ何も確認していない
-- iPhone / iPad の Safari で、service worker によるヘッダの付け足しで cross-origin isolated になるか
-- スマホでエンジンが答えを返すか、速さはどれくらいか（速度測定ページの数値）
+- Android（Chrome）で cross-origin isolated になるか（iPad の Safari では確認済み）
+- Android でエンジンが答えを返すか、速さはどれくらいか（速度測定ページの数値）
+- 11mini の速さ（iPad・Android）
 
 ## 次にやること
-1. 持ち主：GitHub で空の公開リポジトリ `joban-tree` を作り、Settings → Pages → Source を「GitHub Actions」にする
-2. push して、GitHub Actions でエンジンのビルドが通るか確認（通らなければ原因の切り分けと選択肢を報告）
-3. 持ち主：スマホと iPad で速度測定ページを開き、「結果をコピー」で数値を報告
-4. 測定結果でプリセット（さっと・ふつう・じっくり）の値を見直す
+1. 持ち主：Android で速度測定ページを開き、「結果をコピー」で数値を報告（できれば 11mini も）
+2. 測定結果でプリセット（さっと・ふつう・じっくり）の値を見直す
+3. 段階0の完了報告 → 了承を得てから段階1へ
