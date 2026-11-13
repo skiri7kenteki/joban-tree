@@ -64,10 +64,15 @@ GitHub Actions でエンジンのビルド〜テスト〜公開まで通った�
   - 1 スレッド：MultiPV1・500ms で深さ 18〜21・約 32〜42 万 nps、MultiPV3・400ms で深さ 15〜18・約 40〜50 万 nps
   - 4 スレッド：MultiPV1・500ms で深さ 19〜21・約 139〜150 万 nps、MultiPV3・400ms で深さ 16〜19・約 160〜210 万 nps（1 スレッドの約 4 倍）
 
+- 2026-11-13 実機 2 台目：**Android**（Chrome 157。機種は UA から分からない。CPU 数 8、isolated: true、ハッシュ 32MB、11micro）
+  - **Android の Chrome でも cross-origin isolated になり、エンジンが動いた**
+  - 読み込み：エンジン 1275ms／評価関数 1275ms／isready 612ms
+  - 1 スレッド：MultiPV1・500ms で深さ 12〜15・約 5 万 nps、MultiPV3・400ms で深さ 11〜14・約 7 万 nps（iPad の約 1/7）
+  - 4 スレッド：MultiPV1・500ms で深さ 14〜16・約 15〜16 万 nps、MultiPV3・400ms で深さ 9〜13・約 17〜23 万 nps（1 スレッドの約 3 倍）
+  - 4 スレッド・MultiPV3 で深さが 1 スレッドより浅く出た局面がある（短時間の並列探索で、報告される深さがぶれるため。nps は伸びている）
+
 ## 実機で未確認のこと
-- Android（Chrome）で cross-origin isolated になるか（iPad の Safari では確認済み）
-- Android でエンジンが答えを返すか、速さはどれくらいか（速度測定ページの数値）
-- 11mini の速さ（iPad・Android）
+- 11mini の速さ（iPad・Android）。評価関数が大きいぶん、11micro より遅いはず
 
 ## 次にやること
 1. 持ち主：Android で速度測定ページを開き、「結果をコピー」で数値を報告（できれば 11mini も）
