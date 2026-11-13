@@ -40,6 +40,18 @@ describe('UsiEngine', () => {
     expect(fake.received.indexOf('usi')).toBeLessThan(fake.received.indexOf('isready'));
   });
 
+  it('USI_Hash を Threads より先に送る（初期値 1024MB のまま置換表を作り直させない）', async () => {
+    const fake = new FakeEngine();
+    const engine = new UsiEngine(fake);
+    await engine.start({ threads: 2, hashMB: 16 });
+    await engine.reconfigure({ threads: 1, hashMB: 32 });
+    const hashes = fake.received.flatMap((l, i) => (l.startsWith('setoption name USI_Hash') ? [i] : []));
+    const threads = fake.received.flatMap((l, i) => (l.startsWith('setoption name Threads') ? [i] : []));
+    expect(hashes).toHaveLength(2);
+    expect(hashes[0]).toBeLessThan(threads[0]);
+    expect(hashes[1]).toBeLessThan(threads[1]);
+  });
+
   it('analyze は各候補の最後の読み筋を返す', async () => {
     const fake = new FakeEngine();
     const engine = new UsiEngine(fake);

@@ -104,8 +104,7 @@ export class UsiEngine implements AnalysisEngine {
     return this.enqueue(async () => {
       this.transport.send('usi');
       await this.waitFor((l) => l === 'usiok');
-      this.transport.send(`setoption name Threads value ${settings.threads}`);
-      this.transport.send(`setoption name USI_Hash value ${settings.hashMB}`);
+      this.sendHashAndThreads(settings);
       this.transport.send('setoption name EvalDir value eval');
       this.transport.send('setoption name FV_SCALE value 24');
       // 定跡は使わない（研究したい局面そのものを調べるため）
@@ -121,11 +120,21 @@ export class UsiEngine implements AnalysisEngine {
   /** スレッド数などを変える（isready まで待つ） */
   reconfigure(settings: EngineSettings): Promise<void> {
     return this.enqueue(async () => {
-      this.transport.send(`setoption name Threads value ${settings.threads}`);
-      this.transport.send(`setoption name USI_Hash value ${settings.hashMB}`);
+      this.sendHashAndThreads(settings);
       this.transport.send('isready');
       await this.waitFor((l) => l === 'readyok');
     });
+  }
+
+  /**
+   * ハッシュの大きさとスレッド数を送る。**必ず USI_Hash が先**。
+   * やねうら王は Threads を変えるとその時点の USI_Hash（初期値 1024MB）で置換表を作り直すが、
+   * WASM 版はメモリの上限を 1GB にしているので、先に Threads を送ると確保に失敗してエンジンが終了する
+   * （GitHub Actions の単体確認で実際に起きた）。
+   */
+  private sendHashAndThreads(settings: EngineSettings): void {
+    this.transport.send(`setoption name USI_Hash value ${settings.hashMB}`);
+    this.transport.send(`setoption name Threads value ${settings.threads}`);
   }
 
   analyze(position: string, options: AnalyzeOptions): Promise<AnalysisResult> {

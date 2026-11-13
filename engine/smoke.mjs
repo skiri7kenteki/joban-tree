@@ -91,8 +91,9 @@ function waitFor(test) {
 
 send('usi');
 await waitFor((l) => l === 'usiok');
-send('setoption name Threads value 1');
+// USI_Hash を先に（初期値 1024MB のまま Threads を送ると、置換表を確保できずエンジンが終了する）
 send('setoption name USI_Hash value 16');
+send('setoption name Threads value 1');
 send('setoption name EvalDir value eval');
 send('setoption name FV_SCALE value 24');
 send('setoption name MultiPV value 1');

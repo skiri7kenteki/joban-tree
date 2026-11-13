@@ -55,6 +55,9 @@
 - エンジンは Web Worker の中で動かし、画面を固まらせない。USI の送受信は `src/engine/` のモジュールにまとめ、コマンドを順番待ちさせる
 - `info ... multipv k ... score ... pv ...` は、各候補について**最後に出た行**を採用する
 - スマホのメモリを圧迫しないよう、USI_Hash は 16〜64MB にする
+  - **`setoption` は USI_Hash を Threads より先に送る**。Threads を変えるとその時点の USI_Hash（初期値 1024MB）で置換表を作り直し、
+    メモリ上限 1GB の WASM 版では確保に失敗してエンジンが終了する
+- ビルド時の `ENGINE_OPTIONS "FV_SCALE=24"` は `usi` の応答の default には反映されない（default 16 と出る）。必ず `setoption` で 24 を送る
 - iOS Safari は画面が消える・裏に回ると計算が止まる。生成中は Wake Lock で画面を点けたままにし、止まっても途中までのツリーを失わない
 
 ## service worker（`src/sw.ts`）

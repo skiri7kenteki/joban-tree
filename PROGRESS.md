@@ -39,6 +39,9 @@
     Emscripten が出す CommonJS 形式の .js が ES モジュールとして読まれ、関数として取り出せなかった（手元で再現）
   - 対処：smoke.mjs が engine-dist に `{"type":"commonjs"}` の package.json を置いてから読み込む。
     失敗理由を GitHub の注記（誰でも見られる）にも出すようにした。公開用フォルダにはエンジンのファイルだけコピーする
+  - 次の失敗：`usi` → `usiok` までは正常。`setoption name Threads` で「Failed to allocate 1024MB for transposition table」→ exit(1)。
+    USI_Hash の初期値 1024MB のまま置換表を作り直したため（メモリ上限 1GB）。
+    → USI_Hash を Threads より先に送るよう、smoke.mjs とエンジンを包むモジュールを修正（Vitest に順番のテストを追加）
 
 ## テスト結果
 - 2026-11-13 手元（Windows）
