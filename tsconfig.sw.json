@@ -1,0 +1,15 @@
+{
+  "//": "service worker（src/sw.ts）だけは画面とは別の型（WebWorker）で調べる",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "WebWorker"],
+    "strict": true,
+    "isolatedModules": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "types": []
+  },
+  "include": ["src/sw.ts"]
+}

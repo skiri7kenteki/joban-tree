@@ -1,0 +1,113 @@
+# push すると「エンジンのビルド → テスト → アプリのビルド → 画面の確認 → GitHub Pages へ公開」を自動で行う。
+# どこかで失敗したら公開しない。
+name: ビルド・テスト・公開
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# 公開が重ならないようにする（途中のものは取り消さず、順番に）
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+
+      # やねうら王のコミット・パッチ・ビルド手順の中身からキーを作る。変わらなければビルドを省略する
+      - name: エンジンのキーを計算
+        id: engine
+        run: |
+          id=$(cat engine/yaneuraou.commit engine/patches/*.patch engine/build.sh | sha256sum | cut -c1-12)
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+          echo "エンジンのキー: $id"
+
+      - name: エンジンのキャッシュを探す
+        id: engine-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: engine-dist
+          key: yaneuraou-wasm-${{ steps.engine.outputs.id }}
+
+      - name: エンジンをビルド（キャッシュが無いときだけ。数十分かかる）
+        if: steps.engine-cache.outputs.cache-hit != 'true'
+        run: bash engine/build.sh
+
+      # ビルドできた時点で保存する（後のテストが失敗しても、次回はビルドを省略できるように）
+      - name: エンジンをキャッシュに保存
+        if: steps.engine-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: engine-dist
+          key: yaneuraou-wasm-${{ steps.engine.outputs.id }}
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: エンジン単体の動作確認（Node.js で usi → isready → go）
+        run: |
+          node engine/smoke.mjs engine-dist sfnn_ka2_2048.noeval public/eval/tuyoura11micro-20261001
+          node engine/smoke.mjs engine-dist sfnn_ka2_4096.noeval public/eval/tuyoura11mini-20261003
+
+      - name: 部品のインストール
+        run: npm ci
+
+      - name: エンジンを公開用のフォルダへ
+        run: |
+          mkdir -p "public/engine/${{ steps.engine.outputs.id }}"
+          cp engine-dist/* "public/engine/${{ steps.engine.outputs.id }}/"
+
+      - name: 型チェック
+        run: npm run typecheck
+
+      - name: ロジックのテスト（Vitest）
+        run: npm test
+
+      - name: アプリのビルド
+        run: npm run build
+        env:
+          VITE_ENGINE_ID: ${{ steps.engine.outputs.id }}
+
+      - name: Playwright の準備
+        run: npx playwright install --with-deps chromium
+
+      - name: 画面の通し確認（Playwright）
+        run: npx playwright test
+        env:
+          ENGINE_AVAILABLE: '1'
+
+      - name: 失敗したときの記録を残す
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report
+          retention-days: 7
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

@@ -1,0 +1,4 @@
+# 改行は LF にそろえる（パッチやシェルスクリプトが Linux の GitHub Actions で正しく動くように）
+* text=auto eol=lf
+*.bin binary
+*.png binary

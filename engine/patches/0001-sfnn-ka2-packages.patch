@@ -1,0 +1,48 @@
+diff --git a/source/Makefile b/source/Makefile
+index f64c01c..a52942c 100644
+--- a/source/Makefile
++++ b/source/Makefile
+@@ -256,10 +256,13 @@ else
+ 		LDFLAGS += --pre-js wasm_pre.js
+ 		# LDFLAGS += --preload-file eval/nn.bin
+ 		LDFLAGS += -s MODULARIZE=1 -s EXPORT_NAME="$(EM_EXPORT_NAME)" -s ENVIRONMENT=web,worker,node
+-		LDFLAGS += -s PTHREAD_POOL_SIZE=32
++		# joban-tree: スマホ向けにスレッドプールと最大メモリを make 変数で変えられるようにする
++		EM_PTHREAD_POOL_SIZE ?= 32
++		EM_MAXIMUM_MEMORY_SIZE ?= 4294967296
++		LDFLAGS += -s PTHREAD_POOL_SIZE=$(EM_PTHREAD_POOL_SIZE)
+ 		# -s PTHREAD_POOL_SIZE_STRICT=32
+ 		LDFLAGS += -s FILESYSTEM=1 -s EXIT_RUNTIME=0 -s "EXPORTED_RUNTIME_METHODS=['FS','ccall']"
+-		LDFLAGS += -s ALLOW_MEMORY_GROWTH=1 -s INITIAL_MEMORY=$(EM_INITIAL_MEMORY_SIZE) -s MAXIMUM_MEMORY=4294967296
++		LDFLAGS += -s ALLOW_MEMORY_GROWTH=1 -s INITIAL_MEMORY=$(EM_INITIAL_MEMORY_SIZE) -s MAXIMUM_MEMORY=$(EM_MAXIMUM_MEMORY_SIZE)
+ 		LDFLAGS += -s STACK_SIZE=67108864
+ 		# LDFLAGS += -s PROXY_TO_PTHREAD
+ 		# LDFLAGS += -s ALLOW_UNIMPLEMENTED_SYSCALLS
+diff --git a/tools/build/wasm_build.js b/tools/build/wasm_build.js
+index 3db5c7d..c09c077 100755
+--- a/tools/build/wasm_build.js
++++ b/tools/build/wasm_build.js
+@@ -7,6 +7,23 @@ const process = require("process");
+ const zlib = require("zlib");
+ 
+ const pkgobjs = [
++  // joban-tree: つようら王11micro / 11mini 用（SFNN_ka2 + progress8、評価関数は埋め込まない）
++  //   nn.bin と progress.bin は JS 側から仮想FSの EvalDir に書き込んでから isready を送る。
++  //   スマホのメモリ事情に合わせ、スレッドプールは 8、最大メモリは 1GB に抑える。
++  {
++    name: "sfnn_ka2_2048.noeval",
++    edition: "SFNN_ka2_2048_8_64_progress8",
++    exportname: "YaneuraOu_SFNN_ka2_2048",
++    extra: "PYTHON=python3 EM_INITIAL_MEMORY_SIZE=268435456 EM_MAXIMUM_MEMORY_SIZE=1073741824 EM_PTHREAD_POOL_SIZE=8 EXTRA_CPPFLAGS='-DENGINE_OPTIONS=\\\"\"FV_SCALE=24\\\"\"'",
++    evalfile: true,
++  },
++  {
++    name: "sfnn_ka2_4096.noeval",
++    edition: "SFNN_ka2_4096_8_64_progress8",
++    exportname: "YaneuraOu_SFNN_ka2_4096",
++    extra: "PYTHON=python3 EM_INITIAL_MEMORY_SIZE=268435456 EM_MAXIMUM_MEMORY_SIZE=1073741824 EM_PTHREAD_POOL_SIZE=8 EXTRA_CPPFLAGS='-DENGINE_OPTIONS=\\\"\"FV_SCALE=24\\\"\"'",
++    evalfile: true,
++  },
+   {
+     name: "halfkp",
+     edition: "YANEURAOU_ENGINE_NNUE",

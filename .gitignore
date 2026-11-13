@@ -1,0 +1,10 @@
+node_modules/
+dist/
+dev-dist/
+# エンジンのビルド作業場所と成果物（GitHub Actions が作る）
+engine-work/
+engine-dist/
+public/engine/
+# Playwright の記録
+playwright-report/
+test-results/

@@ -1,0 +1,51 @@
+/* 見た目の変数（DESIGN.md の表と同じ値）。色はここ以外に直接書かない */
+:root {
+  --color-bg: #f6f5f2;
+  --color-surface: #ffffff;
+  --color-text: #1f2328;
+  --color-text-muted: #5f6670;
+  --color-border: #d9d6cf;
+  --color-accent: #2f5d8a;
+  --color-accent-text: #ffffff;
+  --color-danger: #c0392b;
+  --color-ok: #1e7a3c;
+
+  --color-board: #e8c98a;
+  --color-board-line: #5a4320;
+  --color-piece: #f7e7bf;
+  --color-piece-edge: #8a6a33;
+  --color-piece-text: #1a1a1a;
+  --color-piece-promoted: #c0261b;
+  --color-last-move: rgba(214, 96, 40, 0.28);
+
+  --color-eval-good: #1f5fae;
+  --color-eval-bad: #c0392b;
+  --color-eval-even: #1f2328;
+
+  --chip-main-bg: #e6e6e6;
+  --chip-main-text: #333333;
+  --chip-good-bg: #dceafe;
+  --chip-good-text: #1d4f91;
+  --chip-dubious-bg: #ff8c1a;
+  --chip-dubious-text: #ffffff;
+  --color-unverified: #8a8f98;
+
+  --font-sans: system-ui, -apple-system, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic UI', 'Meiryo', sans-serif;
+  --font-mono: ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
+  --font-size-body: 16px;
+  --font-size-small: 13px;
+  --font-size-heading: 18px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+
+  --radius-button: 8px;
+  --radius-card: 12px;
+  --radius-chip: 999px;
+
+  --touch-min: 44px;
+  --row-min: 48px;
+}
