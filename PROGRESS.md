@@ -2,7 +2,7 @@
 
 ## 現在の状況
 **段階2（使い勝手と共有）の作業中**（2026-11-13 着手。段階1は持ち主の了承済み）。
-段階2の機能をすべて実装。GitHub Actions での通し確認と、実機での確認待ち。
+段階2の機能をすべて実装し、GitHub Actions で合格・公開済み（v0.3.0）。実機での確認待ち。
 公開 URL：https://skiri7kenteki.github.io/joban-tree/ ／速度測定：https://skiri7kenteki.github.io/joban-tree/bench.html
 
 ## 完了したこと
@@ -62,6 +62,7 @@
   - ビルド時の `ENGINE_OPTIONS "FV_SCALE=24"` は `usi` の default に出ない。必ず `setoption` で 24 を送る
 
 ## テスト結果
+- 2026-11-13 GitHub Actions（段階2、v0.3.0）：すべて合格して公開。**本物のエンジンでの「この手を検証」「ここから展開」を含む通し確認も合格**
 - 2026-11-13 手元（Windows）段階2（v0.3.0）
   - 型チェック：合格
   - Vitest：53 項目すべて合格（新しく：検証・ここから展開 5、KIF・JSON 5、設定 3）
