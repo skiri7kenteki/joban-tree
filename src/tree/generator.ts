@@ -161,6 +161,35 @@ export class TreeGenerator {
     return this.stopped ? 'stopped' : 'completed';
   }
 
+  /**
+   * 「この手を検証」：自分ノードを 1 局面だけ、MultiPV=1 で調べ直す。
+   * 最善手を「確定した自分の対応」として先頭に置く。読み筋から取った手（未検証）が別の手だったときは、
+   * その枝も消さずに残す（その先のツリーを失わないため）。
+   */
+  async verify(key: string, movetimeMs: number): Promise<FinishReason> {
+    this.startedAt = this.now();
+    const node = this.tree.nodes[key];
+    if (!node || node.terminal || isOpponentNode(this.tree, node)) return 'completed';
+    let result: AnalysisResult;
+    try {
+      result = await this.engine.analyze(positionCommand(node.sfen), { movetimeMs, multiPV: 1 });
+    } catch (error) {
+      this.errorMessage = error instanceof Error ? error.message : String(error);
+      return 'error';
+    }
+    node.searched = { movetimeMs, multiPV: 1, depth: result.depth, nodes: result.nodes };
+    this.expandMine(node, result);
+    this.searched++;
+    this.tree.updatedAt = this.now();
+    this.hooks.onChange?.({
+      elapsedMs: this.now() - this.startedAt,
+      searched: this.searched,
+      nodeCount: Object.keys(this.tree.nodes).length,
+      round: Math.max(1, node.round + 1),
+    });
+    return this.stopped ? 'stopped' : 'completed';
+  }
+
   /** startKey から既存の枝をたどり、まだ調べていない局面を待ち行列に入れる */
   private collectFrontier(startKey: string): void {
     const seen = new Set<string>();

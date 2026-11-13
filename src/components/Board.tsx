@@ -1,6 +1,6 @@
 // 将棋盤（SVG で描く。画像ファイルは使わない）と持ち駒。
-// - 自分が後手のときは盤をひっくり返し、自分の側が下に来るようにする
-// - 下側でない駒（＝相手の駒）は 180 度回転させる
+// - 盤の向きは**常に先手が手前（下）**（持ち主の判断 2026-11-13。自分が後手でも盤はひっくり返さない）
+// - 後手の駒は 180 度回転させる
 // - 最終手のマスを薄く塗る。タップで指すとき用に、選んだマスも塗る
 
 import { Color, PieceType, Position, Square, parseUSIMove, pieceTypeToStringForBoard } from 'tsshogi';
@@ -46,8 +46,6 @@ export type Selection = { kind: 'square'; file: number; rank: number } | { kind:
 
 interface BoardProps {
   sfen: string;
-  /** 下側に来る側（ふつうは自分の側） */
-  bottom: Side;
   /** 最終手（USI 形式）。行き先のマスを塗る */
   lastMove?: string;
   selection?: Selection;
@@ -57,17 +55,17 @@ interface BoardProps {
   onHand?: (side: Side, pieceType: PieceType) => void;
 }
 
-export function Board({ sfen, bottom, lastMove, selection, onSquare, onHand }: BoardProps) {
+export function Board({ sfen, lastMove, selection, onSquare, onHand }: BoardProps) {
   const position = Position.newBySFEN(sfen);
   if (!position) return <p class="muted">局面を表示できません</p>;
-  const flipped = bottom === 'white';
-  const top: Side = flipped ? 'black' : 'white';
+  // 持ち駒を選んでいるときは、手番の側の列だけ選択の色を付ける
+  const turn: Side = position.color === Color.BLACK ? 'black' : 'white';
   const last = lastMove ? parseUSIMove(lastMove) : null;
 
-  // 画面上の列・行（左上が 0,0）と、筋・段の対応
+  // 画面上の列・行（左上が 0,0）と、筋・段の対応（先手が手前なので、左上が 9 一）
   const toXY = (file: number, rank: number) => {
-    const col = flipped ? file - 1 : 9 - file;
-    const row = flipped ? 9 - rank : rank - 1;
+    const col = 9 - file;
+    const row = rank - 1;
     return { x: MARGIN_LEFT + col * CELL_W, y: MARGIN_TOP + row * CELL_H };
   };
 
@@ -91,7 +89,7 @@ export function Board({ sfen, bottom, lastMove, selection, onSquare, onHand }: B
               cx={x + CELL_W / 2}
               cy={y + CELL_H / 2}
               type={piece.type}
-              upsideDown={(piece.color === Color.BLACK ? 'black' : 'white') !== bottom}
+              upsideDown={piece.color === Color.WHITE}
             />
           )}
         </g>,
@@ -112,13 +110,13 @@ export function Board({ sfen, bottom, lastMove, selection, onSquare, onHand }: B
   // 筋（上）と段（右）の数字
   const labels = [];
   for (let i = 0; i < 9; i++) {
-    const file = flipped ? i + 1 : 9 - i;
+    const file = 9 - i;
     labels.push(
       <text key={`f${i}`} x={MARGIN_LEFT + i * CELL_W + CELL_W / 2} y={MARGIN_TOP - 6} class="board-coord">
         {file}
       </text>,
     );
-    const rank = flipped ? 9 - i : i + 1;
+    const rank = i + 1;
     labels.push(
       <text key={`r${i}`} x={MARGIN_LEFT + BOARD_W + MARGIN_RIGHT / 2} y={MARGIN_TOP + i * CELL_H + CELL_H / 2} class="board-coord" dominant-baseline="central">
         {RANK_KANJI[rank - 1]}
@@ -128,7 +126,7 @@ export function Board({ sfen, bottom, lastMove, selection, onSquare, onHand }: B
 
   return (
     <div class="board-wrap">
-      <HandRow position={position} side={top} selection={null} onHand={onHand} />
+      <HandRow position={position} side="white" selection={turn === 'white' ? (selection ?? null) : null} onHand={onHand} />
       <svg class="board" viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} role="img" aria-label="将棋盤" data-testid="board" data-sfen={sfen}>
         <rect x={MARGIN_LEFT} y={MARGIN_TOP} width={BOARD_W} height={BOARD_H} class="board-bg" />
         {squares}
@@ -136,7 +134,7 @@ export function Board({ sfen, bottom, lastMove, selection, onSquare, onHand }: B
         {stars}
         {labels}
       </svg>
-      <HandRow position={position} side={bottom} selection={selection ?? null} onHand={onHand} />
+      <HandRow position={position} side="black" selection={turn === 'black' ? (selection ?? null) : null} onHand={onHand} />
     </div>
   );
 }

@@ -69,3 +69,9 @@ export async function listTrees(): Promise<TreeSummary[]> {
 export function newTreeId(): string {
   return crypto.randomUUID();
 }
+
+/** ツリーを消す（画面で確認を出してから呼ぶ） */
+export async function deleteTree(id: string): Promise<void> {
+  const db = await openDb();
+  await done(db.transaction(STORE, 'readwrite').objectStore(STORE).delete(id));
+}

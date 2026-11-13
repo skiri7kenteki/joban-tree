@@ -79,7 +79,9 @@ async function handle(request: Request, url: URL): Promise<Response> {
   if (path.startsWith('engine/') || path.startsWith('eval/')) {
     return cacheFirst(request, BIG_CACHE);
   }
-  const cached = await caches.match(request, { cacheName: APP_CACHE });
+  // ignoreVary：保存した応答の Vary ヘッダ（Origin・Accept-Encoding など）が、ページからの読み込みと食い違っても使う。
+  // URL にハッシュ（版）が入っているので、URL が同じなら中身も同じ。これが無いとオフラインで JS/CSS が読めなかった
+  const cached = await caches.match(request, { cacheName: APP_CACHE, ignoreVary: true });
   return cached ?? fetch(request);
 }
 
@@ -95,7 +97,7 @@ async function networkFirst(url: URL, path: string): Promise<Response> {
     }
     return response;
   } catch (error) {
-    const cached = await caches.match(key, { ignoreSearch: true });
+    const cached = await caches.match(key, { ignoreSearch: true, ignoreVary: true });
     if (cached) return cached;
     throw error;
   }
@@ -104,7 +106,7 @@ async function networkFirst(url: URL, path: string): Promise<Response> {
 /** 大きいファイル：キャッシュ優先。無ければ取ってきて保存 */
 async function cacheFirst(request: Request, cacheName: string): Promise<Response> {
   const cache = await caches.open(cacheName);
-  const cached = await cache.match(request);
+  const cached = await cache.match(request, { ignoreVary: true });
   if (cached) return cached;
   const response = await fetch(request);
   if (response.ok) await cache.put(request, response.clone());

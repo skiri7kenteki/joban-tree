@@ -39,7 +39,7 @@ test('盤をタップして指せる（駒を選んで行き先をタップ）',
   await page.locator('[data-square="77"]').click();
   await page.locator('[data-square="76"]').click();
   await expect(page.getByTestId('input-position')).toHaveText('1手目 ▲７六歩');
-  // 自分は後手（盤は後手が下）。後手の 3 三の歩を 3 四へ
+  // 後手の番。後手の 3 三の歩を 3 四へ（盤は常に先手が手前）
   await page.locator('[data-square="33"]').click();
   await page.locator('[data-square="34"]').click();
   await expect(page.getByTestId('input-position')).toHaveText('2手目 △３四歩');
@@ -81,6 +81,27 @@ test.describe('エンジンを使う通し確認', () => {
     const stop = page.getByTestId('gen-stop');
     if (await stop.isVisible()) await stop.click();
     await expect(page.getByTestId('gen-status')).toHaveAttribute('data-phase', 'done', { timeout: 30_000 });
+
+    // この手を検証：相手の応手の後（自分の手番）で、自分の対応を調べ直して確定する
+    await page.getByTestId('candidate').first().click();
+    await expect(page.getByTestId('verify-here')).toBeVisible();
+    await page.getByTestId('verify-here').click();
+    await expect(page.getByTestId('gen-status')).toHaveAttribute('data-kind', 'verify');
+    await expect(page.getByTestId('gen-status')).toHaveAttribute('data-phase', 'done', { timeout: 30_000 });
+    await expect(page.getByTestId('candidate').first()).toContainText('検証済み');
+    await expect(page.getByTestId('verify-here')).toHaveCount(0);
+
+    // ここから展開：確定した手の先を、さっとで広げる（途中で止める）
+    await page.getByTestId('candidate').first().click();
+    await page.getByTestId('expand-here').click();
+    await page.getByTestId('expand-quick').click();
+    await expect(page.getByTestId('gen-status')).toHaveAttribute('data-kind', 'generate');
+    await expect(page.getByTestId('candidate').first()).toBeVisible({ timeout: 60_000 });
+    if (await stop.isVisible()) await stop.click();
+    await expect(page.getByTestId('gen-status')).toHaveAttribute('data-phase', 'done', { timeout: 30_000 });
+    await expect(page.getByTestId('gen-status')).toContainText('途中の局面から');
+    await page.getByTestId('nav-back').click();
+    await page.getByTestId('nav-back').click();
 
     // 一覧に保存されている
     await page.goto('./');

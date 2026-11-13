@@ -2,14 +2,16 @@
 //   #/           … 一覧（トップ）
 //   #/new        … 新しいツリー（局面の入力）
 //   #/tree/<id>  … ツリーの閲覧
+//   #/settings   … 設定
 
 import { signal } from '@preact/signals';
 
-export type Route = { name: 'home' } | { name: 'new' } | { name: 'tree'; id: string };
+export type Route = { name: 'home' } | { name: 'new' } | { name: 'settings' } | { name: 'tree'; id: string };
 
 function parse(hash: string): Route {
   const path = hash.replace(/^#/, '');
   if (path === '/new') return { name: 'new' };
+  if (path === '/settings') return { name: 'settings' };
   const tree = /^\/tree\/([\w-]+)$/.exec(path);
   if (tree) return { name: 'tree', id: tree[1] };
   return { name: 'home' };

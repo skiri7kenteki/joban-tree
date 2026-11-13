@@ -48,6 +48,9 @@ export function engineUrls(evalId: EvalId, origin: string = location.href) {
   return {
     engineDir,
     engineJs: `${engineDir}yaneuraou.${info.pkg}.js`,
+    /** importScripts の後に Emscripten が読む 2 つ（スレッド用の JS と本体の WASM） */
+    engineWorker: `${engineDir}yaneuraou.${info.pkg}.worker.js`,
+    engineWasm: `${engineDir}yaneuraou.${info.pkg}.wasm`,
     nn: new URL(`${info.evalDir}nn.bin`, base).href,
     progress: new URL(`${info.evalDir}progress.bin`, base).href,
   };
@@ -72,5 +75,39 @@ export async function pruneOldBigFiles(): Promise<void> {
   for (const req of await cache.keys()) {
     const dir = new URL('.', req.url).href;
     if (!keep.has(dir)) await cache.delete(req);
+  }
+}
+
+/** オフラインで使うために端末に保存しておくファイル（エンジン 3 つ＋評価関数 2 つ） */
+export function offlineFiles(evalId: EvalId): string[] {
+  const u = engineUrls(evalId);
+  return [u.engineJs, u.engineWorker, u.engineWasm, u.nn, u.progress];
+}
+
+/** そのファイルがすべて端末に保存されているか */
+export async function isOfflineReady(evalId: EvalId): Promise<boolean> {
+  if (typeof caches === 'undefined') return false;
+  const cache = await caches.open(BIG_CACHE);
+  for (const url of offlineFiles(evalId)) {
+    if (!(await cache.match(url, { ignoreVary: true }))) return false;
+  }
+  return true;
+}
+
+/**
+ * オフライン用に、まとめて取ってくる（service worker が途中で受け取って保存する）。
+ * service worker が動いていないときに備えて、ここでも保存しておく。
+ */
+export async function prepareOffline(evalId: EvalId, onProgress: (done: number, total: number) => void = () => undefined): Promise<void> {
+  const files = offlineFiles(evalId);
+  const cache = await caches.open(BIG_CACHE);
+  let count = 0;
+  for (const url of files) {
+    if (!(await cache.match(url, { ignoreVary: true }))) {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error(`${new URL(url).pathname} を取得できませんでした（${response.status}）`);
+      await cache.put(url, response);
+    }
+    onProgress(++count, files.length);
   }
 }

@@ -350,3 +350,143 @@
 .home-links {
   margin-top: var(--space-6);
 }
+
+.spacer {
+  flex: 1;
+}
+
+/* 一覧の 1 行：ツリーを開くボタン＋操作（⋯）ボタン */
+.tree-row {
+  display: flex;
+  gap: var(--space-2);
+  align-items: stretch;
+}
+
+.tree-row .tree-item {
+  flex: 1;
+  min-width: 0;
+}
+
+.tree-menu-btn {
+  flex: 0 0 auto;
+  min-width: var(--row-min);
+  font-size: var(--font-size-heading);
+}
+
+.home-import {
+  margin-top: var(--space-4);
+}
+
+/* 入力画面のプリセットのボタン（縦に並べる。いちばん上が「さっと」） */
+.preset-buttons {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: var(--space-2);
+}
+
+/* 閲覧画面の局面ごとの操作 */
+.node-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-2) 0;
+}
+
+.node-actions .btn {
+  flex: 1 1 auto;
+  padding: 0 var(--space-3);
+}
+
+.chip-verified {
+  border: 1px solid var(--color-ok);
+  color: var(--color-ok);
+}
+
+/* 重ねて出す小窓 */
+.dialog {
+  width: min(92vw, 440px);
+  max-height: 85dvh;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.dialog::backdrop {
+  background: var(--color-backdrop);
+}
+
+.dialog-body {
+  padding: var(--space-3) var(--space-4) var(--space-4);
+}
+
+.dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.dialog-head h2 {
+  margin: 0;
+}
+
+.dialog-body input[type='text'] {
+  width: 100%;
+}
+
+.dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-3) 0;
+}
+
+.dialog-actions-column {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+/* 設定画面 */
+.settings-section h2 {
+  margin-top: 0;
+}
+
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
+}
+
+.form-field-number {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.form-field-input {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.form-field-input input {
+  width: 6.5em;
+  text-align: right;
+}
+
+.preset-field {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-button);
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+}
+
+.footer-feedback {
+  font-size: var(--font-size-small);
+  min-height: var(--touch-min);
+}

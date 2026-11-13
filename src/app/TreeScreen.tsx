@@ -1,17 +1,26 @@
 // ツリーの閲覧画面（中心となる画面）。
 // 上に盤面、下に「この局面の候補手リスト」。候補手をタップで 1 手進む。戻るボタン・左右スワイプで戻る/進む。
 // 生成中も、できた枝からたどれる。
+// 局面ごとの操作：「ここから展開」「この手を検証」「KIF をコピー」、ツリーの書き出し・共有。
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { Board } from '../components/Board';
+import { Dialog } from '../components/Dialog';
 import { formatScore, scoreToNumber, type Score } from '../engine/usi';
 import { moveText } from '../shogi/position';
 import { loadTree } from '../storage/trees';
+import { fileNameOf, treeToJson } from '../tree/backup';
 import { FINISH_TEXT, countParents, isOpponentNode } from '../tree/generator';
+import { pathToKif, treeToKif } from '../tree/kif';
 import { LABEL_TEXT, labelOf } from '../tree/labels';
+import type { PresetId } from '../tree/presets';
 import type { TreeData, TreeEdge } from '../tree/types';
-import { generation, openTree, stopGeneration, treeVersion } from './generation';
+import { generation, isGenerating, openTree, startGeneration, startVerify, stopGeneration, treeVersion } from './generation';
 import { go } from './router';
+import { generationSettingsFor, presetLabel, settings } from './settings';
+import { OUTCOME_TEXT, copyText, shareFile } from './share';
+
+const PRESET_IDS: PresetId[] = ['quick', 'normal', 'deep'];
 
 export function TreeScreen({ id }: { id: string }) {
   const [error, setError] = useState('');
@@ -39,7 +48,12 @@ function TreeView({ tree }: { tree: TreeData }) {
   const [path, setPath] = useState<string[]>([tree.rootKey]);
   /** 戻ったときに覚えておく「進む」先（スワイプで進む用） */
   const [forward, setForward] = useState<string[]>([]);
+  /** 開いている小窓（ここから展開・書き出し） */
+  const [dialog, setDialog] = useState<'expand' | 'export' | null>(null);
+  /** 操作の結果（「コピーしました」など） */
+  const [note, setNote] = useState('');
   const crumbsRef = useRef<HTMLDivElement>(null);
+  const thresholds = settings.value.thresholds;
 
   const key = path[path.length - 1];
   const node = tree.nodes[key];
@@ -47,6 +61,9 @@ function TreeView({ tree }: { tree: TreeData }) {
   const opp = isOpponentNode(tree, node);
   const incoming = path.length > 1 ? edgeBetween(tree, path[path.length - 2], key) : undefined;
   const gen = generation.value?.treeId === tree.id ? generation.value : null;
+  const busy = isGenerating();
+  // 「この手を検証」は、まだ調べていない自分の手番の局面だけ
+  const canVerify = !opp && !node.searched && !node.terminal;
 
   useEffect(() => {
     // パンくずリストは、今の局面が見えるよう右端までスクロール
@@ -57,11 +74,13 @@ function TreeView({ tree }: { tree: TreeData }) {
   function advance(edge: TreeEdge) {
     setPath([...path, edge.to]);
     setForward(forward[0] === edge.to ? forward.slice(1) : []);
+    setNote('');
   }
   function goBack() {
     if (path.length <= 1) return;
     setForward([key, ...forward]);
     setPath(path.slice(0, -1));
+    setNote('');
   }
   function goForward() {
     const next = forward[0] ?? node.edges[0]?.to;
@@ -73,6 +92,36 @@ function TreeView({ tree }: { tree: TreeData }) {
     if (length >= path.length) return;
     setForward([...path.slice(length), ...forward]);
     setPath(path.slice(0, length));
+    setNote('');
+  }
+
+  function expand(id: PresetId) {
+    setDialog(null);
+    setNote('');
+    void startGeneration(tree, generationSettingsFor(id), key);
+  }
+  function verify() {
+    setNote('');
+    void startVerify(tree, key, settings.value.verifyMs);
+  }
+  async function copyKif() {
+    const ok = await copyText(pathToKif(tree, path, thresholds));
+    setNote(ok ? 'この局面までの KIF をコピーしました。iShogi などの「クリップボードから読み込み」で貼り付けられます。' : 'コピーできませんでした');
+  }
+  async function exportAs(kind: 'tree-kif' | 'path-kif' | 'json') {
+    // 共有メニューは「押した直後」でないと出ないので、ファイルの中身はここで（待たずに）作る
+    const outcome =
+      kind === 'json'
+        ? await shareFile(fileNameOf(tree.name, 'json'), treeToJson(tree), 'application/json')
+        : await shareFile(
+            fileNameOf(kind === 'tree-kif' ? tree.name : `${tree.name}_手順`, 'kifu'),
+            kind === 'tree-kif' ? treeToKif(tree, thresholds) : pathToKif(tree, path, thresholds),
+            'text/plain',
+          );
+    if (outcome !== 'cancelled') {
+      setDialog(null);
+      setNote(OUTCOME_TEXT[outcome]);
+    }
   }
 
   // 左右スワイプ：右へ払うと 1 手戻る、左へ払うと 1 手進む
@@ -104,11 +153,11 @@ function TreeView({ tree }: { tree: TreeData }) {
         <h1 class="tree-title">{tree.name}</h1>
       </div>
 
-      {gen && <GenerationPanel />}
+      {gen && <GenerationPanel tree={tree} />}
 
       <div class="tree-layout">
         <div class="tree-board" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-          <Board sfen={node.sfen} bottom={tree.mySide} lastMove={incoming?.move} />
+          <Board sfen={node.sfen} lastMove={incoming?.move} />
         </div>
 
         <div class="tree-side">
@@ -148,7 +197,7 @@ function TreeView({ tree }: { tree: TreeData }) {
               <strong>{opp ? '相手の応手' : '自分の対応'}</strong>
               <span class="muted">評価値は自分（{sideText}）から見た値</span>
             </div>
-            {node.edges.length === 0 && <EmptyNote tree={tree} nodeKey={key} generating={gen !== null && gen.phase !== 'done'} />}
+            {node.edges.length === 0 && <EmptyNote tree={tree} nodeKey={key} generating={busy} />}
             <ul class="candidate-list">
               {node.edges.map((edge) => (
                 <li key={edge.move}>
@@ -156,8 +205,8 @@ function TreeView({ tree }: { tree: TreeData }) {
                     <span class="candidate-move">{moveText(node.sfen, edge.move, incoming?.move)}</span>
                     <ScoreText score={edge.score} />
                     <span class="candidate-tags">
-                      {edge.diff !== undefined && <LabelChip diff={edge.diff} />}
-                      {edge.unverified && <span class="chip chip-unverified">未検証</span>}
+                      {opp && edge.diff !== undefined && <LabelChip diff={edge.diff} />}
+                      {!opp && <MineChip verified={!edge.unverified} searched={node.searched !== undefined} />}
                       {(parents.get(edge.to) ?? 0) > 1 && <span class="chip chip-merge">合流</span>}
                     </span>
                   </button>
@@ -165,14 +214,69 @@ function TreeView({ tree }: { tree: TreeData }) {
               ))}
             </ul>
           </div>
+
+          {/* 局面ごとの操作（主役の候補手リストを先に見せるため、その下に置く） */}
+          <div class="node-actions">
+            <button type="button" class="btn" data-testid="expand-here" onClick={() => setDialog('expand')} disabled={busy || node.terminal}>
+              ここから展開
+            </button>
+            {canVerify && (
+              <button type="button" class="btn" data-testid="verify-here" onClick={verify} disabled={busy}>
+                この手を検証
+              </button>
+            )}
+            <button type="button" class="btn" data-testid="copy-kif" onClick={() => void copyKif()}>
+              KIFをコピー
+            </button>
+            <button type="button" class="btn" data-testid="export-open" onClick={() => setDialog('export')}>
+              書き出し・共有
+            </button>
+          </div>
+          {note && (
+            <p class="muted" role="status" data-testid="tree-note">
+              {note}
+            </p>
+          )}
         </div>
       </div>
+
+      {dialog === 'expand' && (
+        <Dialog title="ここから展開" onClose={() => setDialog(null)} testId="expand-dialog">
+          <p>この局面から先の、まだ調べていない枝を広げます。今あるツリーに枝を足します。</p>
+          <div class="dialog-actions dialog-actions-column">
+            {PRESET_IDS.map((id) => (
+              <button type="button" key={id} class="btn btn-primary" data-testid={`expand-${id}`} onClick={() => expand(id)}>
+                {presetLabel(id)}
+              </button>
+            ))}
+          </div>
+        </Dialog>
+      )}
+
+      {dialog === 'export' && (
+        <Dialog title="書き出し・共有" onClose={() => setDialog(null)} testId="export-dialog">
+          <div class="dialog-actions dialog-actions-column">
+            <button type="button" class="btn" data-testid="export-tree-kif" onClick={() => void exportAs('tree-kif')}>
+              分岐付き KIF（ツリー全体）
+            </button>
+            <button type="button" class="btn" data-testid="export-path-kif" onClick={() => void exportAs('path-kif')}>
+              この局面までの手順の KIF
+            </button>
+            <button type="button" class="btn" data-testid="export-json" onClick={() => void exportAs('json')}>
+              JSON（このアプリ用。仲間に渡す・バックアップ）
+            </button>
+          </div>
+          <p class="muted">
+            iPad では共有メニューの「"ファイル"に保存」で保存できます。共有メニューが出ない端末では、ファイルをダウンロードします。
+          </p>
+        </Dialog>
+      )}
     </>
   );
 }
 
 /** 生成の進み具合と停止ボタン */
-function GenerationPanel() {
+function GenerationPanel({ tree }: { tree: TreeData }) {
   const gen = generation.value!;
   const [, setTick] = useState(0);
   // 経過時間を 1 秒ごとに更新
@@ -182,13 +286,19 @@ function GenerationPanel() {
     return () => clearInterval(timer);
   }, [gen.phase]);
 
+  const where = gen.startKey === tree.rootKey ? '' : '（途中の局面から）';
+
   if (gen.phase === 'done') {
+    let text: string;
+    if (gen.kind === 'verify') {
+      text = gen.finish === 'completed' ? '検証しました（自分の対応のいちばん上が、確定した手です）' : FINISH_TEXT[gen.finish ?? 'stopped'];
+    } else {
+      text = `${gen.finish ? FINISH_TEXT[gen.finish] : '終わりました'}${where}`;
+      if (gen.progress) text += `（調べた局面 ${gen.progress.searched}・全部で ${gen.progress.nodeCount} 局面）`;
+    }
     return (
-      <div class={gen.error ? 'gen-panel gen-error' : 'gen-panel'} data-testid="gen-status" data-phase="done">
-        <span>
-          {gen.finish ? FINISH_TEXT[gen.finish] : '終わりました'}
-          {gen.progress && `（調べた局面 ${gen.progress.searched}・全部で ${gen.progress.nodeCount} 局面）`}
-        </span>
+      <div class={gen.error ? 'gen-panel gen-error' : 'gen-panel'} data-testid="gen-status" data-phase="done" data-kind={gen.kind}>
+        <span>{text}</span>
         {gen.error && <span class="gen-error-text">{gen.error}</span>}
       </div>
     );
@@ -196,13 +306,13 @@ function GenerationPanel() {
 
   const elapsed = gen.runStartedAt ? Math.floor((Date.now() - gen.runStartedAt) / 1000) : 0;
   const total = Math.round(gen.settings.totalMs / 1000);
+  let text: string;
+  if (gen.phase === 'engine') text = 'エンジンを準備中…';
+  else if (gen.kind === 'verify') text = `検証中（${total}秒）…`;
+  else text = `生成中${where} ${Math.min(elapsed, total)}秒／${total}秒・調べた局面 ${gen.progress?.searched ?? 0}・${gen.progress?.round ?? 1}往復目`;
   return (
-    <div class="gen-panel" data-testid="gen-status" data-phase={gen.phase}>
-      <span class="num">
-        {gen.phase === 'engine'
-          ? 'エンジンを準備中…'
-          : `生成中 ${Math.min(elapsed, total)}秒／${total}秒・調べた局面 ${gen.progress?.searched ?? 0}・${gen.progress?.round ?? 1}往復目`}
-      </span>
+    <div class="gen-panel" data-testid="gen-status" data-phase={gen.phase} data-kind={gen.kind}>
+      <span class="num">{text}</span>
       <button type="button" class="btn btn-danger" data-testid="gen-stop" onClick={stopGeneration}>
         停止
       </button>
@@ -214,7 +324,7 @@ function GenerationPanel() {
 /** 候補手が無いときの説明 */
 function EmptyNote({ tree, nodeKey, generating }: { tree: TreeData; nodeKey: string; generating: boolean }) {
   const node = tree.nodes[nodeKey];
-  let text = 'この局面はまだ調べていません。';
+  let text = 'この局面はまだ調べていません。「ここから展開」で調べられます。';
   if (node.terminal) text = '指せる手がありません（詰み・投了など）。';
   else if (generating) text = 'この局面はこれから調べます。';
   return <p class="muted">{text}</p>;
@@ -226,8 +336,15 @@ function ScoreText({ score }: { score: Score }) {
   return <span class={`candidate-score num ${cls}`}>{formatScore(score)}</span>;
 }
 
+/** 自分の対応の印：未検証／検証済み／検証前の手（検証で別の手が最善になった） */
+function MineChip({ verified, searched }: { verified: boolean; searched: boolean }) {
+  if (verified) return searched ? <span class="chip chip-verified">検証済み</span> : null;
+  if (searched) return <span class="chip chip-unverified">検証前の手</span>;
+  return <span class="chip chip-unverified">未検証</span>;
+}
+
 function LabelChip({ diff }: { diff: number }) {
-  const label = labelOf(diff);
+  const label = labelOf(diff, settings.value.thresholds);
   return <span class={`chip chip-${label}`}>{LABEL_TEXT[label]}</span>;
 }
 

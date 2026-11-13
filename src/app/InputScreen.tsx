@@ -1,5 +1,5 @@
 // 局面の入力画面：棋譜を貼り付ける／盤をタップして指す → 手順を前後して局面を選ぶ →
-// 自分が先手か後手かを選ぶ → 「さっと」で生成。
+// 自分が先手か後手かを選ぶ → プリセット（さっと・ふつう・じっくり）を選んで生成。
 
 import { useState } from 'preact/hooks';
 import { Position, Square, type Move, type PieceType } from 'tsshogi';
@@ -8,9 +8,10 @@ import { parseKifu, type LinePosition } from '../shogi/kifu';
 import { STARTPOS_SFEN, moveText, otherSide, sideOfColor, sideToMove, type Side } from '../shogi/position';
 import { saveTree, newTreeId } from '../storage/trees';
 import { createTree } from '../tree/generator';
-import { PRESETS } from '../tree/presets';
+import type { PresetId } from '../tree/presets';
 import { openTree, startGeneration, isGenerating } from './generation';
 import { go } from './router';
+import { generationSettingsFor, presetLabel } from './settings';
 
 const SIDE_TEXT: Record<Side, string> = { black: '☗先手', white: '☖後手' };
 
@@ -115,10 +116,10 @@ export function InputScreen() {
     else setSelection({ kind: 'hand', pieceType });
   }
 
-  async function start() {
+  async function start(presetId: PresetId) {
     if (busy || isGenerating()) return;
     setBusy(true);
-    const preset = PRESETS.quick;
+    const settings = generationSettingsFor(presetId);
     const where = index === 0 ? '開始局面' : `${current.text}まで`;
     const tree = createTree({
       id: newTreeId(),
@@ -126,7 +127,7 @@ export function InputScreen() {
       rootSfen: current.sfen,
       mySide,
       prefix: { initialSfen: line[0].sfen, moves: line.slice(1, index + 1).map((p) => p.usi!) },
-      settings: preset.settings,
+      settings,
       now: Date.now(),
     });
     try {
@@ -138,7 +139,7 @@ export function InputScreen() {
     }
     openTree.value = tree;
     go(`/tree/${tree.id}`);
-    void startGeneration(tree, preset.settings);
+    void startGeneration(tree, settings);
   }
 
   return (
@@ -176,7 +177,7 @@ export function InputScreen() {
       )}
 
       <p class="muted">盤の駒をタップ → 行き先をタップで指せます。</p>
-      <Board sfen={current.sfen} bottom={mySide} lastMove={current.usi} selection={selection} onSquare={onSquare} onHand={onHand} />
+      <Board sfen={current.sfen} lastMove={current.usi} selection={selection} onSquare={onSquare} onHand={onHand} />
 
       {promotion && (
         <div class="card promote-box">
@@ -244,9 +245,21 @@ export function InputScreen() {
             ? 'この局面は自分の手番です。まず自分の最善手を調べてから、相手の応手を広げます。'
             : 'この局面は相手の手番です。相手の応手と、それへの自分の対応を広げます。'}
         </p>
-        <button type="button" class="btn btn-primary btn-wide" data-testid="start-quick" onClick={start} disabled={busy}>
-          {PRESETS.quick.label}で作る
-        </button>
+        {isGenerating() && <p class="muted">ほかのツリーを生成中です。終わるか止めてから作ってください。</p>}
+        <div class="preset-buttons">
+          {(['quick', 'normal', 'deep'] as PresetId[]).map((id) => (
+            <button
+              type="button"
+              key={id}
+              class={id === 'quick' ? 'btn btn-primary' : 'btn'}
+              data-testid={`start-${id}`}
+              onClick={() => void start(id)}
+              disabled={busy || isGenerating()}
+            >
+              {presetLabel(id)}で作る
+            </button>
+          ))}
+        </div>
       </div>
     </>
   );

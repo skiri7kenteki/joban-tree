@@ -1,4 +1,5 @@
-// ツリーの生成を動かし、進み具合を画面に知らせ、こまめに自動保存する。
+// ツリーの生成（と「この手を検証」）を動かし、進み具合を画面に知らせ、こまめに自動保存する。
+// 生成中は Wake Lock で画面を点けたままにする（iOS は画面が消えると計算が止まるため）。
 
 import { signal } from '@preact/signals';
 import { saveTree } from '../storage/trees';
@@ -8,6 +9,10 @@ import { getEngine } from './engineService';
 
 export interface GenerationState {
   treeId: string;
+  /** generate：生成（ここから展開も同じ）、verify：この手を検証 */
+  kind: 'generate' | 'verify';
+  /** どの局面から（または、どの局面を）調べているか */
+  startKey: string;
   /** engine：エンジンの準備中、running：生成中、done：終わった */
   phase: 'engine' | 'running' | 'done';
   settings: GenerationSettings;
@@ -36,12 +41,30 @@ export function isGenerating(): boolean {
   return g !== null && g.phase !== 'done';
 }
 
-/** 生成を始める（同時に 1 つだけ） */
-export async function startGeneration(tree: TreeData, settings: GenerationSettings, startKey?: string): Promise<void> {
+/** 生成を始める（同時に 1 つだけ）。startKey を渡すと「ここから展開」になる */
+export function startGeneration(tree: TreeData, settings: GenerationSettings, startKey: string = tree.rootKey): Promise<void> {
+  tree.settings = settings;
+  return runJob(tree, 'generate', startKey, settings, (g) => g.run(startKey));
+}
+
+/** 「この手を検証」：自分の手番の局面を 1 つだけ調べ直す */
+export function startVerify(tree: TreeData, key: string, movetimeMs: number): Promise<void> {
+  const settings: GenerationSettings = { ...tree.settings, totalMs: movetimeMs, movetimeMs, multiPV: 1 };
+  return runJob(tree, 'verify', key, settings, (g) => g.verify(key, movetimeMs));
+}
+
+async function runJob(
+  tree: TreeData,
+  kind: GenerationState['kind'],
+  startKey: string,
+  settings: GenerationSettings,
+  work: (generator: TreeGenerator) => Promise<FinishReason>,
+): Promise<void> {
   if (isGenerating()) return;
   stopRequested = false;
-  generation.value = { treeId: tree.id, phase: 'engine', settings };
-  tree.settings = settings;
+  generation.value = { treeId: tree.id, kind, startKey, phase: 'engine', settings };
+  const wakeLock = new ScreenWakeLock();
+  void wakeLock.acquire();
 
   let reason: FinishReason;
   let error: string | undefined;
@@ -64,19 +87,22 @@ export async function startGeneration(tree: TreeData, settings: GenerationSettin
           }
         },
       });
-      reason = await current.run(startKey);
+      reason = await work(current);
       if (reason === 'error') error = current.errorMessage;
-      tree.generation = {
-        elapsedMs: Date.now() - runStartedAt,
-        searched: generation.value?.progress?.searched ?? 0,
-        finishedReason: FINISH_TEXT[reason],
-      };
+      if (kind === 'generate') {
+        tree.generation = {
+          elapsedMs: Date.now() - runStartedAt,
+          searched: generation.value?.progress?.searched ?? 0,
+          finishedReason: FINISH_TEXT[reason],
+        };
+      }
     }
   } catch (e) {
     reason = 'error';
     error = e instanceof Error ? e.message : String(e);
   } finally {
     current = null;
+    wakeLock.release();
   }
   tree.updatedAt = Date.now();
   await saveTree(tree).catch(() => undefined);
@@ -88,4 +114,40 @@ export async function startGeneration(tree: TreeData, settings: GenerationSettin
 export function stopGeneration(): void {
   stopRequested = true;
   current?.stop();
+}
+
+/**
+ * 画面を点けたままにする（Wake Lock API）。使えない端末では何もしない。
+ * アプリを裏に回すと自動で外れるので、表に戻ったときに取り直す。
+ */
+class ScreenWakeLock {
+  private sentinel: WakeLockSentinel | null = null;
+  private active = false;
+  private readonly onVisible = () => {
+    if (this.active && document.visibilityState === 'visible') void this.request();
+  };
+
+  async acquire(): Promise<void> {
+    this.active = true;
+    document.addEventListener('visibilitychange', this.onVisible);
+    await this.request();
+  }
+
+  private async request(): Promise<void> {
+    if (!('wakeLock' in navigator) || (this.sentinel && !this.sentinel.released)) return;
+    try {
+      this.sentinel = await navigator.wakeLock.request('screen');
+      // 取れたときにはもう終わっていた（すぐ終わる検証など）
+      if (!this.active) void this.sentinel.release();
+    } catch {
+      // 電池残量が少ないときなどは断られる。生成はそのまま続ける
+    }
+  }
+
+  release(): void {
+    this.active = false;
+    document.removeEventListener('visibilitychange', this.onVisible);
+    void this.sentinel?.release().catch(() => undefined);
+    this.sentinel = null;
+  }
 }
