@@ -96,6 +96,9 @@ async function init(msg: InitMessage): Promise<void> {
     locateFile: (path: string) => msg.engineDir + path,
     // エンジン内部のスレッド（さらに別の Worker）が読み込む JS の場所
     mainScriptUrlOrBlob: msg.engineJs,
+    // 「実行ファイルの場所」。やねうら王は <この場所のフォルダ>/<EvalDir>/progress.bin を読むので、
+    // "." のフォルダ＝仮想 FS の "/" になるようにする（ブラウザの既定値と同じだが、念のため明示）
+    thisProgram: './this.program',
   });
   const tModule = performance.now();
 

@@ -21,12 +21,18 @@ const recent = [];
 
 // 失敗の理由を GitHub Actions の「注記（annotation）」にも出す。
 // ログは管理者しか読めないが、注記は誰でも見られるので原因を共有しやすい。
+// エンジンの出力は setTimeout で少し遅れて届くので、終了の直前に出たメッセージを拾えるよう少し待ってから書き出す。
+let failing = false;
 function fail(message) {
-  const detail = [`[${pkg}] ${message}`, ...recent.filter((l) => !l.startsWith('option name')).slice(-25)].join('\n');
-  console.error(detail);
-  const escaped = detail.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
-  console.log(`::error title=エンジン単体の動作確認（${pkg}）::${escaped}`);
-  process.exit(1);
+  if (failing) return;
+  failing = true;
+  setTimeout(() => {
+    const detail = [`[${pkg}] ${message}`, ...recent.filter((l) => !l.startsWith('option name')).slice(-25)].join('\n');
+    console.error(detail);
+    const escaped = detail.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+    console.log(`::error title=エンジン単体の動作確認（${pkg}）::${escaped}`);
+    process.exit(1);
+  }, 500);
 }
 // 例外の中身を文字にする（Emscripten の終了通知 ExitStatus などは Error ではないので stack が無い）
 function describe(e) {
@@ -53,6 +59,10 @@ const factory = require(path.resolve(distDir, `yaneuraou.${pkg}.js`));
 const t0 = Date.now();
 // エンジンのエラー出力（stderr）も手がかりとして残す
 const engine = await factory({
+  // 「実行ファイルの場所」をブラウザと同じ "./this.program" にそろえる。
+  // Node.js では既定でこのスクリプトの実際のパスになり、progress.bin を
+  // /home/runner/.../engine/eval/ から探してしまう（ブラウザでは /eval/ から探す）。
+  thisProgram: './this.program',
   printErr: (line) => {
     console.error(`! ${line}`);
     recent.push(`! ${line}`);
