@@ -56,6 +56,12 @@ GitHub Actions でエンジンのビルド〜テスト〜公開まで通った�
     エンジンの 2 項目は、手元にエンジンが無いので省略（GitHub Actions で実行される）
   - `npm audit`：ビルド時だけ使う部品（vite-plugin-pwa → workbox-build）に注意 6 件。公開されるアプリには含まれないので様子見
 
+- 2026-11-13 実機 1 台目（Safari 26.6、UA は Macintosh＝iPad の可能性が高い。CPU 数 8、isolated: true、ハッシュ 32MB、11micro）
+  - **Safari でも service worker のヘッダ付け足しで cross-origin isolated になった**。エンジンも動いた
+  - 読み込み：エンジン 755ms／評価関数 1232ms／isready 248ms
+  - 1 スレッド：MultiPV1・500ms で深さ 18〜21・約 32〜42 万 nps、MultiPV3・400ms で深さ 15〜18・約 40〜50 万 nps
+  - 4 スレッド：MultiPV1・500ms で深さ 19〜21・約 139〜150 万 nps、MultiPV3・400ms で深さ 16〜19・約 160〜210 万 nps（1 スレッドの約 4 倍）
+
 ## 実機で未確認のこと
 - 公開済み。実機（スマホ・iPad）ではまだ何も確認していない
 - iPhone / iPad の Safari で、service worker によるヘッダの付け足しで cross-origin isolated になるか
