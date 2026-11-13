@@ -33,6 +33,13 @@
   - GitHub Actions（`.github/workflows/deploy.yml`）：エンジンのビルド（キャッシュ付き）→ 単体動作確認 → 型チェック → Vitest → ビルド → Playwright → 公開
   - ライセンス：リポジトリは GPLv3（`LICENSE`）。tsshogi は MIT License（README に記載）
 
+- 2026-11-13 GitHub に push（初回の Actions）
+  - **エンジンの WASM ビルドは成功**（約 4 分。キャッシュにも保存された）
+  - Node.js での単体確認が 0 秒で失敗。原因：package.json の `"type": "module"` のせいで、
+    Emscripten が出す CommonJS 形式の .js が ES モジュールとして読まれ、関数として取り出せなかった（手元で再現）
+  - 対処：smoke.mjs が engine-dist に `{"type":"commonjs"}` の package.json を置いてから読み込む。
+    失敗理由を GitHub の注記（誰でも見られる）にも出すようにした。公開用フォルダにはエンジンのファイルだけコピーする
+
 ## テスト結果
 - 2026-11-13 手元（Windows）
   - 型チェック：合格

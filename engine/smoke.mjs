@@ -16,13 +16,29 @@ if (!distDir || !pkg || !evalDir) {
   process.exit(2);
 }
 
-const require = createRequire(import.meta.url);
-const TIMEOUT_MS = 180_000;
-const timer = setTimeout(() => {
-  console.error(`[smoke] ${TIMEOUT_MS / 1000} 秒以内に終わりませんでした`);
-  process.exit(1);
-}, TIMEOUT_MS);
+// エンジンが出した最近の行（失敗したときの手がかり用）
+const recent = [];
 
+// 失敗の理由を GitHub Actions の「注記（annotation）」にも出す。
+// ログは管理者しか読めないが、注記は誰でも見られるので原因を共有しやすい。
+function fail(message) {
+  const detail = [`[${pkg}] ${message}`, ...recent.slice(-15)].join('\n');
+  console.error(detail);
+  const escaped = detail.replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+  console.log(`::error title=エンジン単体の動作確認（${pkg}）::${escaped}`);
+  process.exit(1);
+}
+process.on('uncaughtException', (e) => fail(`例外: ${e?.stack ?? e}`));
+process.on('unhandledRejection', (e) => fail(`例外: ${e?.stack ?? e}`));
+
+const TIMEOUT_MS = 180_000;
+const timer = setTimeout(() => fail(`${TIMEOUT_MS / 1000} 秒以内に終わりませんでした`), TIMEOUT_MS);
+
+// このリポジトリの package.json は "type": "module"（.js を ES モジュール扱い）。
+// Emscripten が出すエンジンの .js は古い形式（CommonJS）なので、そのフォルダだけ CommonJS 扱いにする。
+fs.writeFileSync(path.join(distDir, 'package.json'), '{ "type": "commonjs" }\n');
+
+const require = createRequire(import.meta.url);
 const factory = require(path.resolve(distDir, `yaneuraou.${pkg}.js`));
 const t0 = Date.now();
 const engine = await factory();
@@ -39,6 +55,7 @@ const waiters = [];
 engine.addMessageListener((line) => {
   console.log(`< ${line}`);
   lines.push(line);
+  recent.push(line);
   for (const w of [...waiters]) {
     if (w.test(line)) {
       waiters.splice(waiters.indexOf(w), 1);
@@ -76,6 +93,7 @@ const last = infos[infos.length - 1] ?? '';
 const ok = /^bestmove [1-9][a-i][1-9][a-i]\+?/.test(best) && /score (cp|mate) -?\d+/.test(last);
 console.log(`[smoke] 最後の info: ${last}`);
 console.log(`[smoke] ${best} → ${ok ? 'OK' : 'NG'}`);
+if (!ok) fail(`答えがおかしい: ${best}`);
 clearTimeout(timer);
 engine.terminate();
-process.exit(ok ? 0 : 1);
+process.exit(0);

@@ -67,7 +67,7 @@ jobs:
       - name: エンジンを公開用のフォルダへ
         run: |
           mkdir -p "public/engine/${{ steps.engine.outputs.id }}"
-          cp engine-dist/* "public/engine/${{ steps.engine.outputs.id }}/"
+          cp engine-dist/yaneuraou.* "public/engine/${{ steps.engine.outputs.id }}/"
 
       - name: 型チェック
         run: npm run typecheck
