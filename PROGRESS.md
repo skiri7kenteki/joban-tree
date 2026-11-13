@@ -42,6 +42,11 @@
   - 次の失敗：`usi` → `usiok` までは正常。`setoption name Threads` で「Failed to allocate 1024MB for transposition table」→ exit(1)。
     USI_Hash の初期値 1024MB のまま置換表を作り直したため（メモリ上限 1GB）。
     → USI_Hash を Threads より先に送るよう、smoke.mjs とエンジンを包むモジュールを修正（Vitest に順番のテストを追加）
+  - 次の失敗：`isready` で exit(1)。progress.bin は「実行ファイルの場所/EvalDir/progress.bin」から読まれ、
+    Node.js では実行ファイルの場所＝smoke.mjs の実パスになっていた。→ `thisProgram: './this.program'` を渡す（ブラウザ側の worker でも明示）
+  - **5 回目で全部合格して公開**：エンジン単体確認（Node.js、micro・mini）、型チェック、Vitest 19、Playwright（Chromium で
+    service worker 経由の isolation、bench ページで micro・mini とも bestmove が返る）、GitHub Pages への公開
+  - 公開されたエンジン：`engine/96194a149bd8/`（.wasm は約 0.8MB）
 
 ## テスト結果
 - 2026-11-13 手元（Windows）
@@ -52,7 +57,7 @@
   - `npm audit`：ビルド時だけ使う部品（vite-plugin-pwa → workbox-build）に注意 6 件。公開されるアプリには含まれないので様子見
 
 ## 実機で未確認のこと
-- まだ公開していないので、すべて未確認
+- 公開済み。実機（スマホ・iPad）ではまだ何も確認していない
 - iPhone / iPad の Safari で、service worker によるヘッダの付け足しで cross-origin isolated になるか
 - スマホでエンジンが答えを返すか、速さはどれくらいか（速度測定ページの数値）
 
