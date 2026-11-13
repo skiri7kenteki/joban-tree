@@ -17,6 +17,7 @@
   --color-piece-text: #1a1a1a;
   --color-piece-promoted: #c0261b;
   --color-last-move: rgba(214, 96, 40, 0.28);
+  --color-selected: rgba(47, 93, 138, 0.32);
 
   --color-eval-good: #1f5fae;
   --color-eval-bad: #c0392b;

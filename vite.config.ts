@@ -26,7 +26,7 @@ export default defineConfig({
       filename: 'sw.ts',
       // service worker の登録は src/isolation.ts で自分で行う
       injectRegister: false,
-      // ホーム画面用の設定（アイコンなど）は段階1で追加する
+      // ホーム画面用の設定は public/manifest.webmanifest に手で書いている
       manifest: false,
       injectManifest: {
         globPatterns: ['**/*.{js,css,html,svg,png,webmanifest}'],

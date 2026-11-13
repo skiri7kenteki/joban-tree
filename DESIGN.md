@@ -29,6 +29,7 @@
 | `--color-piece-text` | 駒の文字 | `#1a1a1a` |
 | `--color-piece-promoted` | 成駒の文字 | `#c0261b` |
 | `--color-last-move` | 最終手のマス | `rgba(214, 96, 40, 0.28)` |
+| `--color-selected` | タップで選んだマス・持ち駒 | `rgba(47, 93, 138, 0.32)` |
 | `--color-eval-good` | 評価値（自分が有利） | `#1f5fae` |
 | `--color-eval-bad` | 評価値（自分が不利） | `#c0392b` |
 | `--color-eval-even` | 評価値（0 付近） | `#1f2328` |

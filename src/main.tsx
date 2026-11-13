@@ -1,50 +1,52 @@
-// アプリ本体の入口。段階0では「土台が公開できること」の確認用に、最小限の画面だけを出す。
+// アプリ本体の入口。画面の切り替え（router.ts）に合わせて、トップ・入力・閲覧の画面を出す。
 import { render } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import './styles/base.css';
+import './app/app.css';
 import { Footer } from './components/Footer';
 import { ensureCrossOriginIsolated, type IsolationState } from './isolation';
+import { pruneOldBigFiles } from './engine/config';
+import { route } from './app/router';
+import { HomeScreen } from './app/HomeScreen';
+import { InputScreen } from './app/InputScreen';
+import { TreeScreen } from './app/TreeScreen';
 
 function App() {
   const [isolation, setIsolation] = useState<IsolationState | 'checking'>('checking');
 
   useEffect(() => {
-    ensureCrossOriginIsolated().then(setIsolation);
+    ensureCrossOriginIsolated().then((state) => {
+      setIsolation(state);
+      // 古い版のエンジン・評価関数を端末から消す
+      if (state === 'isolated') pruneOldBigFiles().catch(() => undefined);
+    });
   }, []);
 
+  const r = route.value;
   return (
-    <div class="app">
+    <div class="app" data-testid="isolation" data-state={isolation}>
       <main class="main">
-        <h1>序盤ツリー</h1>
-        <div class="card">
-          <p>いまは準備中です（段階0：土台づくりとエンジンの速度測定）。</p>
-          <p class="muted" data-testid="isolation">
-            エンジンを使う準備：{isolationText(isolation)}
-          </p>
-          <div class="btn-row">
-            <a class="btn btn-primary" href={`${import.meta.env.BASE_URL}bench.html`}>
-              エンジンの速度測定へ
-            </a>
-          </div>
-        </div>
+        {r.name === 'home' && <HomeScreen isolationMessage={isolationMessage(isolation)} />}
+        {r.name === 'new' && <InputScreen />}
+        {r.name === 'tree' && <TreeScreen id={r.id} />}
       </main>
       <Footer />
     </div>
   );
 }
 
-function isolationText(state: IsolationState | 'checking'): string {
+/** エンジンが使えないときの説明（使えるなら null） */
+function isolationMessage(state: IsolationState | 'checking'): string | null {
   switch (state) {
     case 'checking':
-      return '確認中…';
     case 'isolated':
-      return 'OK';
+      return null;
     case 'reloading':
-      return '再読み込みします…';
+      return '準備のため、ページを読み込み直しています…';
     case 'no-service-worker':
-      return 'この端末のブラウザは service worker に対応していません';
+      return 'このブラウザでは、エンジン（将棋 AI）を動かす準備ができません。Safari か Chrome の新しい版で開いてください。';
     case 'failed':
-      return 'できませんでした（もう一度開き直してください）';
+      return 'エンジン（将棋 AI）を動かす準備ができませんでした。アプリを開き直してください。';
   }
 }
 

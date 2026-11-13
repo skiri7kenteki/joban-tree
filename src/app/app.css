@@ -1,0 +1,352 @@
+/* アプリ本体の画面（色は tokens.css の変数） */
+
+.btn-wide {
+  width: 100%;
+}
+
+.btn-ghost {
+  border-color: transparent;
+  background: transparent;
+  color: var(--color-accent);
+  padding: 0 var(--space-2);
+}
+
+.btn-danger {
+  background: var(--color-surface);
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+.btn-toggle.on {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-accent-text);
+}
+
+.notice {
+  padding: var(--space-3);
+  border-radius: var(--radius-button);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+.notice-danger {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+/* 画面の上の「‹ 一覧」と見出し */
+.screen-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.screen-header h1 {
+  margin: 0;
+  min-width: 0;
+}
+
+.tree-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* トップの一覧 */
+.tree-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.tree-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  min-height: var(--row-min);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tree-item-meta {
+  color: var(--color-text-muted);
+  font-size: var(--font-size-small);
+}
+
+/* 入力画面 */
+.kifu-box summary {
+  min-height: var(--touch-min);
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.kifu-input {
+  width: 100%;
+  min-height: 120px;
+  padding: var(--space-2);
+  font-family: var(--font-mono);
+  resize: vertical;
+}
+
+.move-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: var(--space-2) 0;
+}
+
+.move-nav .btn {
+  min-width: var(--touch-min);
+  padding: 0 var(--space-2);
+}
+
+.move-nav-text {
+  flex: 1;
+  text-align: center;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.move-slider {
+  width: 100%;
+  accent-color: var(--color-accent);
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.side-choice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.promote-box {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+/* 生成の進み具合 */
+.gen-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  margin-bottom: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  font-size: var(--font-size-small);
+}
+
+.gen-panel progress {
+  width: 100%;
+  height: 6px;
+  accent-color: var(--color-accent);
+}
+
+.gen-error {
+  border-color: var(--color-danger);
+}
+
+.gen-error-text {
+  width: 100%;
+  color: var(--color-danger);
+}
+
+/* 閲覧画面：スマホ縦向きは上下、iPad 横向きなど広い画面は左右に並べる */
+.tree-layout {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.tree-board {
+  touch-action: pan-y;
+}
+
+@media (min-width: 768px) and (orientation: landscape) {
+  .tree-layout {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .tree-board {
+    flex: 0 0 55%;
+  }
+
+  .tree-side {
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+/* 手順のパンくずリスト（横にスクロール） */
+.crumbs {
+  display: flex;
+  gap: var(--space-1);
+  overflow-x: auto;
+  padding-bottom: var(--space-1);
+  -webkit-overflow-scrolling: touch;
+}
+
+.crumb {
+  flex: 0 0 auto;
+  min-height: var(--touch-min);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-button);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--font-size-small);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.crumb.current {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  font-weight: bold;
+}
+
+.nav-row {
+  display: flex;
+  gap: var(--space-2);
+  margin: var(--space-2) 0;
+}
+
+/* 候補手リスト */
+.candidates {
+  padding: var(--space-2) var(--space-3);
+}
+
+.candidates-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+
+.candidate-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.candidate {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--row-min);
+  padding: var(--space-1) 0;
+  border: none;
+  border-top: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.candidate-list li:first-child .candidate {
+  border-top: none;
+}
+
+.candidate-move {
+  flex: 0 0 auto;
+  min-width: 7.5em;
+  font-weight: bold;
+}
+
+.candidate-score {
+  flex: 0 0 auto;
+  min-width: 5em;
+  text-align: right;
+}
+
+.candidate-tags {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-1);
+}
+
+.eval-good {
+  color: var(--color-eval-good);
+}
+
+.eval-bad {
+  color: var(--color-eval-bad);
+}
+
+.eval-even {
+  color: var(--color-eval-even);
+}
+
+/* ラベルのチップ */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-chip);
+  font-size: var(--font-size-small);
+  white-space: nowrap;
+}
+
+.chip-main {
+  background: var(--chip-main-bg);
+  color: var(--chip-main-text);
+}
+
+.chip-good {
+  background: var(--chip-good-bg);
+  color: var(--chip-good-text);
+}
+
+.chip-dubious {
+  background: var(--chip-dubious-bg);
+  color: var(--chip-dubious-text);
+  font-weight: bold;
+}
+
+.chip-unverified {
+  border: 1px dashed var(--color-unverified);
+  color: var(--color-unverified);
+}
+
+.chip-merge {
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+}
+
+.home-links {
+  margin-top: var(--space-6);
+}

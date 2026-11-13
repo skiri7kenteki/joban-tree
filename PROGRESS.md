@@ -1,80 +1,64 @@
 # 進捗メモ
 
 ## 現在の状況
-段階0（土台づくりと、エンジンの WASM 化・速度測定）の作業中。
-GitHub Actions でエンジンのビルド〜テスト〜公開まで通った（2026-11-13）。スマホ・iPad での速度測定の結果待ち。
+**段階1（最小限の PWA）の作業中**（2026-11-13 着手。段階0は完了し、持ち主の了承済み）。
+棋譜の貼り付け → 局面選択 → 「さっと」で生成 → たどる → 自動保存、まで実装。GitHub Actions での通し確認と、実機での確認待ち。
 公開 URL：https://skiri7kenteki.github.io/joban-tree/ ／速度測定：https://skiri7kenteki.github.io/joban-tree/bench.html
 
 ## 完了したこと
-- 2026-11-13 着手前の確認（持ち主の回答）
-  - リポジトリ名：joban-tree。作業フォルダ：OneDrive の中（`Desktop\Claude 作業用\joban-tree`）
-  - Node.js と 7-Zip のインストール：了承。ただし winget の管理者確認が通らなかったため、
-    **管理者権限のいらない持ち運び版**を `C:\Users\skiri\tools\node`（Node.js v26.13.1、公式チェックサム一致）と
-    `C:\Users\skiri\tools\7zip\7zr.exe` に置いた（PATH には入れていない。消すときはフォルダごと消せばよい）
-  - **指示書との食い違い**：やねうら王の WASM 版は `-pthread` 付きでビルドされ、1 スレッドでも SharedArrayBuffer が必須。
-    → service worker によるヘッダの付け足しを**必須**にし、初回だけ自動で 1 回再読み込みする（持ち主了承）
-- 2026-11-13 やねうら王のソースで確認したこと（コミット 96b9ae5d、2026-11-13 の master）
-  - `ka2` は `nnue_arch_gen.py` に、`progress8` は Makefile の SFNN 指定にあり、指示書どおり
-  - `progress.bin` は `<実行ファイルのディレクトリ>/<EvalDir>/progress.bin` から読まれる（WASM では `/eval/progress.bin`）
-  - WASM では `EvalFile` オプションで nn.bin の名前を指定でき、JS から仮想 FS に書く方式が上流でも想定されている
-  - Makefile の WASM 設定：スレッドプール 32 本・最大メモリ 4GB → スマホには重いので、パッチで 8 本・1GB に
-  - FV_SCALE の初期値は 16 → ビルド時の `ENGINE_OPTIONS` で 24 にし、`setoption` でも 24 を送る
-- 2026-11-13 評価関数の取得（11micro・11mini とも取得できた）
-  - 中身は 5 ファイル：`nn.bin`・`progress.bin`（必要）、`eval_options.txt`（中身は `FV_SCALE 24`）、`tag.json`（説明）、`banner.png`
-  - `progress.bin` は micro と mini で同一。サイズ：micro 3.9MB＋1.0MB、mini 7.7MB＋1.0MB
-  - `public/eval/tuyoura11micro-20261001/`・`public/eval/tuyoura11mini-20261003/` に nn.bin・progress.bin・tag.json を置いた
-  - **配布物にライセンス文書は入っていなかった**ので、`public/eval/LICENSE-tuyoura.txt` に MIT License の表記を書いた（要確認：判断してほしいこと参照）
-- 2026-11-13 土台（TypeScript＋Vite 8＋Preact 11、Vitest、Playwright、vite-plugin-pwa の injectManifest）
-  - トップページ（準備中の表示・速度測定へのボタン・バージョン表示 v0.1.0）
-  - service worker（`src/sw.ts`）：COOP/COEP の付け足し、HTML はネット優先、JS/CSS は事前保存、engine/・eval/ はキャッシュ優先
-  - 速度測定ページ（`bench.html`）：動作確認（初期局面 0.5 秒）、速度測定（4 局面 × MultiPV1・500ms と MultiPV3・400ms × 1 スレッドと最大スレッド）、結果をコピー、エンジンの出力ログ
-  - エンジンを包むモジュール（`src/engine/engine.ts`）：コマンドの順番待ち、analyze（MultiPV の各候補の最後の行を採用）
-  - エンジンのビルド：`engine/build.sh`（Docker の emsdk 3.1.43）、`engine/patches/0001-sfnn-ka2-packages.patch`、Node.js での単体動作確認 `engine/smoke.mjs`
-  - GitHub Actions（`.github/workflows/deploy.yml`）：エンジンのビルド（キャッシュ付き）→ 単体動作確認 → 型チェック → Vitest → ビルド → Playwright → 公開
-  - ライセンス：リポジトリは GPLv3（`LICENSE`）。tsshogi は MIT License（README に記載）
 
-- 2026-11-13 GitHub に push（初回の Actions）
-  - **エンジンの WASM ビルドは成功**（約 4 分。キャッシュにも保存された）
-  - Node.js での単体確認が 0 秒で失敗。原因：package.json の `"type": "module"` のせいで、
-    Emscripten が出す CommonJS 形式の .js が ES モジュールとして読まれ、関数として取り出せなかった（手元で再現）
-  - 対処：smoke.mjs が engine-dist に `{"type":"commonjs"}` の package.json を置いてから読み込む。
-    失敗理由を GitHub の注記（誰でも見られる）にも出すようにした。公開用フォルダにはエンジンのファイルだけコピーする
-  - 次の失敗：`usi` → `usiok` までは正常。`setoption name Threads` で「Failed to allocate 1024MB for transposition table」→ exit(1)。
-    USI_Hash の初期値 1024MB のまま置換表を作り直したため（メモリ上限 1GB）。
-    → USI_Hash を Threads より先に送るよう、smoke.mjs とエンジンを包むモジュールを修正（Vitest に順番のテストを追加）
-  - 次の失敗：`isready` で exit(1)。progress.bin は「実行ファイルの場所/EvalDir/progress.bin」から読まれ、
-    Node.js では実行ファイルの場所＝smoke.mjs の実パスになっていた。→ `thisProgram: './this.program'` を渡す（ブラウザ側の worker でも明示）
-  - **5 回目で全部合格して公開**：エンジン単体確認（Node.js、micro・mini）、型チェック、Vitest 19、Playwright（Chromium で
-    service worker 経由の isolation、bench ページで micro・mini とも bestmove が返る）、GitHub Pages への公開
-  - 公開されたエンジン：`engine/96194a149bd8/`（.wasm は約 0.8MB）
+### 段階1（v0.2.0）
+- 2026-11-13 プリセットを確定（持ち主了承）：さっと 30秒/400ms/N=3/3往復、ふつう 2分/800ms/N=4/4往復、
+  じっくり 5分/**1000ms**/N=4/5往復（じっくりだけ 2000ms から変更）。スレッド数の初期値は「使える範囲で最大、上限 4」
+- ツリー生成ロジック（`src/tree/generator.ts`）：相手ノードだけ MultiPV で調べ、PV の 1 手目＝相手の応手、2 手目＝自分の対応（未検証）。
+  浅い順・同じ深さなら自分に良い順。W 点以内だけ採用。PV が 1 手なら自分ノードとして調べる。合流（同じ局面は 1 つに）。
+  時間・深さ・局面数の上限と停止で終わり、どこで終わってもツリーは有効
+- データの形（`src/tree/types.ts`）：`app`・`version`（1）付き。局面のキーは手数を除いた SFEN。評価値は自分から見た値で保存
+- ラベル（本線・有力・疑問手）は保存せず、最善手との差（diff）から表示のときに決める（しきい値を後から変えられるように）
+- 棋譜の貼り付け（`src/shogi/kifu.ts`）：KIF・KI2・CSA・SFEN・USI（`7g7f 3c3d` のような指し手だけ、`startpos moves …`、`position …`）
+  - tsshogi の形式判定は「指し手だけ」を KIF と取り違えるので、指し手だけ・SFEN だけ・startpos は自前で先に見分ける
+- 画面（ハッシュで切り替え。Android の戻るボタンが効く）
+  - トップ：新しいツリーを作る、保存したツリーの一覧（開くだけ。名前の変更・削除は段階2）、速度測定へのリンク
+  - 入力：棋譜の貼り付け、盤をタップして指す（成・不成の確認付き、持ち駒を打てる）、手順の前後とスライダー、自分は先手/後手、「さっと（30秒）で作る」
+  - 閲覧：上に盤（自分が下）、手順のパンくず、1手戻る・開始局面へ、左右スワイプで戻る/進む、候補手リスト
+    （相手の応手＝評価値・ラベルのチップ、自分の対応＝未検証の印、合流の印）。iPad 横向きなど広い画面では左右に並べる
+  - 生成中：経過時間・調べた局面数・何往復目か・停止ボタン。生成中もできた枝からたどれる
+- 自動保存（`src/storage/trees.ts`、IndexedDB を直接使う。ライブラリは足していない）：生成中は 2 秒ごと、終わったときにも保存
+- 将棋盤（`src/components/Board.tsx`）：SVG、五角形の駒、相手の駒は 180 度回転、成駒は赤字、星、筋・段の数字、最終手のマス、持ち駒
+- ホーム画面に追加：`public/manifest.webmanifest`、アイコン（`public/icon.svg` から `scripts/make-icons.mjs` で PNG を作成）、apple-touch-icon
+- DESIGN.md：タップで選んだマスの色 `--color-selected` を追加
+
+### 段階0（v0.1.x、2026-11-13 完了）
+- 土台（TypeScript＋Vite 8＋Preact 11、Vitest、Playwright、vite-plugin-pwa の injectManifest）、GitHub Actions でビルド・テスト・公開
+- やねうら王の WASM 版（コミット 96b9ae5d に SFNN_ka2 用パッチ。スレッドプール 8 本・最大メモリ 1GB）を Actions でビルド（約 4 分、キャッシュ付き）
+- 評価関数：つようら王11micro・11mini（MIT。出典はやねうら王公式サイト 2026-10-14 の記事）をリポジトリに同梱
+- service worker で COOP/COEP を付け足し、初回だけ 1 回再読み込み（iPad の Safari・Android の Chrome とも isolated になった）
+- 速度測定ページ（`bench.html`）
+- Node.js は winget が管理者確認で止まったため、持ち運び版を `C:\Users\skiri\tools\node` に置いた（PATH には入れていない）
+- 分かったこと（CLAUDE.md にも記載）
+  - `setoption` は **USI_Hash を Threads より先に**（初期値 1024MB のまま置換表を作り直してエンジンが終了した）
+  - `progress.bin` は「実行ファイルの場所/EvalDir/」から読まれる。`thisProgram: './this.program'` で `/eval/` にそろえる
+  - Emscripten の .js は CommonJS。リポジトリの `"type": "module"` の下で Node.js から読むときは、そのフォルダを CommonJS 扱いにする
+  - ビルド時の `ENGINE_OPTIONS "FV_SCALE=24"` は `usi` の default に出ない。必ず `setoption` で 24 を送る
 
 ## テスト結果
-- 2026-11-13 手元（Windows）
+- 2026-11-13 手元（Windows）段階1
   - 型チェック：合格
-  - Vitest：18 項目すべて合格（USI の読み取り 11、エンジンを包むモジュール 3、速度測定の局面が合法 4）
-  - Playwright（Chromium）：2 項目合格（トップページとバージョン表示、service worker 経由で cross-origin isolated になる）。
-    エンジンの 2 項目は、手元にエンジンが無いので省略（GitHub Actions で実行される）
-  - `npm audit`：ビルド時だけ使う部品（vite-plugin-pwa → workbox-build）に注意 6 件。公開されるアプリには含まれないので様子見
-
-- 2026-11-13 評価関数のライセンス：持ち主が出典を確認（やねうら王公式サイト 2026-10-14 の記事「今回、これらをMIT Licenseで頒布します。」）。
-  `LICENSE-tuyoura.txt` に出典を書き、名義を「やねうらお（やねうら王プロジェクト）」にした
-- 2026-11-13 実機 1 台目：**iPad**（Safari 26.6。UA は Macintosh と名乗る。CPU 数 8、isolated: true、ハッシュ 32MB、11micro）
-  - **Safari でも service worker のヘッダ付け足しで cross-origin isolated になった**。エンジンも動いた
-  - 読み込み：エンジン 755ms／評価関数 1232ms／isready 248ms
-  - 1 スレッド：MultiPV1・500ms で深さ 18〜21・約 32〜42 万 nps、MultiPV3・400ms で深さ 15〜18・約 40〜50 万 nps
-  - 4 スレッド：MultiPV1・500ms で深さ 19〜21・約 139〜150 万 nps、MultiPV3・400ms で深さ 16〜19・約 160〜210 万 nps（1 スレッドの約 4 倍）
-
-- 2026-11-13 実機 2 台目：**Android**（Chrome 157。機種は UA から分からない。CPU 数 8、isolated: true、ハッシュ 32MB、11micro）
-  - **Android の Chrome でも cross-origin isolated になり、エンジンが動いた**
-  - 読み込み：エンジン 1275ms／評価関数 1275ms／isready 612ms
-  - 1 スレッド：MultiPV1・500ms で深さ 12〜15・約 5 万 nps、MultiPV3・400ms で深さ 11〜14・約 7 万 nps（iPad の約 1/7）
-  - 4 スレッド：MultiPV1・500ms で深さ 14〜16・約 15〜16 万 nps、MultiPV3・400ms で深さ 9〜13・約 17〜23 万 nps（1 スレッドの約 3 倍）
-  - 4 スレッド・MultiPV3 で深さが 1 スレッドより浅く出た局面がある（短時間の並列探索で、報告される深さがぶれるため。nps は伸びている）
+  - Vitest：40 項目すべて合格（ツリー生成 10、局面・指し手・棋譜の貼り付け 11、USI 11、エンジンを包むモジュール 4、速度測定の局面 4）
+  - Playwright（Chromium）：5 項目合格（トップ・バージョン、isolation、manifest とアイコン、棋譜の貼り付けと手順の移動、盤のタップで指す）。
+    エンジンを使う 3 項目（速度測定 2、貼り付け→生成→たどる→停止→自動保存 1）は GitHub Actions で実行
+  - 画面写真で確認：スマホ縦（390px）で盤が幅いっぱい、iPad 横（1180px）で盤と候補手リストが左右に並ぶ
+- 2026-11-13 実機の速度（段階0、11micro、ハッシュ 32MB）
+  - iPad（Safari 26.6）：1 スレッド 約 32〜50 万 nps、4 スレッド 約 140〜210 万 nps。0.4 秒・MultiPV3 で深さ 16〜19
+  - Android（Chrome 157）：1 スレッド 約 5〜7 万 nps、4 スレッド 約 15〜23 万 nps。0.4 秒・MultiPV3 で深さ 9〜13
+- `npm audit`：ビルド時だけ使う部品（vite-plugin-pwa → workbox-build）に注意 6 件。公開されるアプリには含まれないので様子見
 
 ## 実機で未確認のこと
-- 11mini の速さ（iPad・Android）。評価関数が大きいぶん、11micro より遅いはず
+- 段階1の画面すべて（iPad・Android）：貼り付け → 局面選択 → 30 秒で生成 → たどる、ホーム画面に追加して起動
+- 生成中に画面を消す・別のアプリに切り替えたときの動き（Wake Lock は段階2）
+- 11mini の速さ
 
 ## 次にやること
-1. 持ち主：Android で速度測定ページを開き、「結果をコピー」で数値を報告（できれば 11mini も）
-2. 測定結果でプリセット（さっと・ふつう・じっくり）の値を見直す
-3. 段階0の完了報告 → 了承を得てから段階1へ
+1. push して、GitHub Actions のエンジンを使う通し確認（Playwright）が通るか見る
+2. 持ち主：iPad と Android で段階1の流れを試す（試し方は報告に書く）
+3. 段階1の完了報告 → 了承を得てから段階2へ

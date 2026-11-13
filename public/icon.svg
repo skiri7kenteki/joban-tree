@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#2f5d8a"/>
+  <polygon points="256,104 352,140 380,412 132,412 160,140" fill="#f7e7bf" stroke="#8a6a33" stroke-width="8" stroke-linejoin="round"/>
+  <text x="256" y="300" font-size="170" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a" font-family="'Hiragino Mincho ProN','Yu Mincho','YuMincho','Noto Serif JP',serif" font-weight="bold">序</text>
+</svg>

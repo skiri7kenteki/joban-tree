@@ -4,7 +4,7 @@
 「相手のいろいろな応手に対する対策ツリー」を作り、見て、保存できるようにすることを目指しています。
 
 公開 URL：https://skiri7kenteki.github.io/joban-tree/
-（段階0の今は、エンジンの速度測定ページ `bench.html` だけが動きます）
+（段階1：棋譜の貼り付け → 局面選択 → 「さっと」で生成 → たどる、まで動きます。速度測定ページ `bench.html` もあります）
 
 ## しくみ
 - 画面：TypeScript ＋ Vite ＋ Preact

@@ -76,7 +76,8 @@
 - PV が 1 手しかないときは、その応手の後の局面を自分ノードとして探索する
 - 詰み（`score mate`）は評価値の大小比較で正しく扱う
 - 終了条件：時間の上限・深さの上限（往復の数、初期値 4）・ノード数の上限・利用者の停止。どこで止まっても、それまでのツリーは有効なものとして保存する
-- プリセット（仮。段階0の測定で見直す）：さっと 30秒/400ms/N=3/3往復、ふつう 2分/800ms/N=4/4往復、じっくり 5分/2000ms/N=4/5往復
+- プリセット（段階0の測定で確定、持ち主了承 2026-11-13。`src/tree/presets.ts`）：さっと 30秒/400ms/N=3/3往復、ふつう 2分/800ms/N=4/4往復、じっくり 5分/1000ms/N=4/5往復
+  - 基準はいちばん遅い Android（4 スレッドで 1 秒あたり約 15〜23 万局面）。スレッド数の初期値は「使える範囲で最大、上限 4」
 - 局面のキーは「手数を除いた SFEN」。同じ局面はまとめる（有向非巡回グラフ）。画面ではツリーとして見せ、合流には印を付ける
 - 評価値は**常に自分から見た値**で表示（プラスなら自分が有利）
 - 「ここから展開」：任意のノードから同じ処理をプリセットを選んで追加実行し、既存のツリーに枝を足す
@@ -103,7 +104,12 @@
 ## フォルダ構成
 ```
 index.html / bench.html     画面の入口（bench は段階0の速度測定ページ）
-src/main.tsx                アプリ本体の入口
+src/main.tsx                アプリ本体の入口（画面の切り替え）
+src/app/                    画面（トップ・入力・閲覧）、生成の実行と自動保存、エンジンの用意
+src/components/Board.tsx    将棋盤（SVG）と持ち駒
+src/shogi/                  局面・指し手の小さな関数（tsshogi を包む）、棋譜の貼り付けの読み取り
+src/tree/                   ツリーのデータの形・生成ロジック（モックでテスト）・ラベル・プリセット
+src/storage/trees.ts        IndexedDB への保存
 src/bench/                  速度測定ページ
 src/engine/usi.ts           USI の行を読み取る関数（テスト対象）
 src/engine/engine.ts        エンジンを包むモジュール（コマンドの順番待ち）
@@ -112,6 +118,7 @@ src/engine/config.ts        エンジン・評価関数のファイルの場所
 src/isolation.ts            service worker の登録と cross-origin isolated の確保
 src/sw.ts                   service worker
 src/styles/                 CSS（tokens.css に色などの変数）
+public/manifest.webmanifest ホーム画面用の設定（アイコンは public/*.png。scripts/make-icons.mjs で icon.svg から作る）
 public/eval/                評価関数（nn.bin・progress.bin・ライセンス。リポジトリに含める）
 engine/                     やねうら王のビルド（コミット固定・パッチ・build.sh・smoke.mjs）
 tests/unit/                 Vitest

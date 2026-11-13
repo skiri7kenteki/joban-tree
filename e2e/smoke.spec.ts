@@ -1,4 +1,4 @@
-// 画面の通し確認（段階0）：トップページが開き、service worker 経由で isolated になること
+// 画面の通し確認（段階1）：トップページが開き、service worker 経由で isolated になること
 import { expect, test } from '@playwright/test';
 
 test('トップページが開き、バージョンが出る', async ({ page }) => {
@@ -9,6 +9,6 @@ test('トップページが開き、バージョンが出る', async ({ page }) 
 
 test('service worker により cross-origin isolated になる（初回は 1 回だけ再読み込み）', async ({ page }) => {
   await page.goto('./');
-  await expect(page.getByTestId('isolation')).toHaveText(/OK/, { timeout: 30_000 });
+  await expect(page.getByTestId('isolation')).toHaveAttribute('data-state', 'isolated', { timeout: 30_000 });
   expect(await page.evaluate(() => self.crossOriginIsolated)).toBe(true);
 });
