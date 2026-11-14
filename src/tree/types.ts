@@ -21,6 +21,11 @@ export interface GenerationSettings {
   maxNodes: number;
   /** 最善手から何点以内の応手を採用するか */
   windowCp: number;
+  /**
+   * 自分の対応を調べる時間（ミリ秒）。0 か無いときは、相手の局面の読み筋の 2 手目をそのまま使う（未検証）。
+   * 1 以上なら、相手の応手の後の局面（自分ノード）を MultiPV=1 でこの時間だけ調べて確定する（v0.4.0〜）
+   */
+  replyMs?: number;
 }
 
 /** 局面から次の局面への矢印（1 手） */

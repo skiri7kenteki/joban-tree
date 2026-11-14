@@ -60,7 +60,7 @@ test.describe('エンジンを使う通し確認', () => {
     await page.getByTestId('kifu-load').click();
     // 3 手目の後＝後手番。自分は先手（初期値）
     await expect(page.getByTestId('side-black')).toHaveAttribute('aria-checked', 'true');
-    await page.getByTestId('start-quick').click();
+    await page.getByTestId('start-normal').click();
 
     // 生成が始まり、開始局面に相手の応手が並ぶ
     await expect(page.getByTestId('gen-status')).toHaveAttribute('data-phase', /running|done/, { timeout: 120_000 });
@@ -69,34 +69,37 @@ test.describe('エンジンを使う通し確認', () => {
     await expect(candidates.first()).toContainText(/△/);
     await expect(candidates.first()).toContainText(/本線/);
 
-    // 1 手進む（相手の応手）→ 自分の対応（未検証）が出る
-    await candidates.first().click();
-    await expect(page.getByTestId('crumb')).toHaveCount(1);
-    await expect(page.getByTestId('candidate').first()).toContainText(/▲/);
-    await expect(page.getByTestId('candidate').first()).toContainText('未検証');
-    await page.getByTestId('nav-back').click();
-    await expect(page.getByTestId('crumb')).toHaveCount(0);
-
-    // 停止
+    // すぐ止める（自分の対応はまだ調べていない局面が残る）
     const stop = page.getByTestId('gen-stop');
     if (await stop.isVisible()) await stop.click();
     await expect(page.getByTestId('gen-status')).toHaveAttribute('data-phase', 'done', { timeout: 30_000 });
 
-    // この手を検証：相手の応手の後（自分の手番）で、自分の対応を調べ直して確定する
-    await page.getByTestId('candidate').first().click();
-    await expect(page.getByTestId('verify-here')).toBeVisible();
+    // この手を検証：まだ調べていない自分の局面を探して、自分の手を調べて確定する
+    const count = await candidates.count();
+    let found = false;
+    for (let i = 0; i < count && !found; i++) {
+      await candidates.nth(i).click();
+      await expect(page.getByTestId('crumb')).toHaveCount(1);
+      found = (await page.getByTestId('verify-here').count()) > 0;
+      if (!found) await page.getByTestId('nav-back').click();
+    }
+    expect(found).toBe(true);
     await page.getByTestId('verify-here').click();
     await expect(page.getByTestId('gen-status')).toHaveAttribute('data-kind', 'verify');
     await expect(page.getByTestId('gen-status')).toHaveAttribute('data-phase', 'done', { timeout: 30_000 });
+    await expect(page.getByTestId('candidate').first()).toContainText(/▲/);
     await expect(page.getByTestId('candidate').first()).toContainText('検証済み');
     await expect(page.getByTestId('verify-here')).toHaveCount(0);
 
-    // ここから展開：確定した手の先を、さっとで広げる（途中で止める）
+    // ここから展開（ふつう）：確定した手の先で、相手の応手と、それへの自分の対応（自動で検証済み）が出る
     await page.getByTestId('candidate').first().click();
     await page.getByTestId('expand-here').click();
-    await page.getByTestId('expand-quick').click();
+    await page.getByTestId('expand-normal').click();
     await expect(page.getByTestId('gen-status')).toHaveAttribute('data-kind', 'generate');
     await expect(page.getByTestId('candidate').first()).toBeVisible({ timeout: 60_000 });
+    await page.getByTestId('candidate').first().click();
+    await expect(page.getByTestId('candidate').first()).toContainText('検証済み', { timeout: 60_000 });
+    await page.getByTestId('nav-back').click();
     if (await stop.isVisible()) await stop.click();
     await expect(page.getByTestId('gen-status')).toHaveAttribute('data-phase', 'done', { timeout: 30_000 });
     await expect(page.getByTestId('gen-status')).toContainText('途中の局面から');

@@ -137,8 +137,8 @@ test('設定：変えた値が保存され、プリセットのボタンに反�
   await openHome(page);
   await page.getByTestId('open-settings').click();
   await expect(page.getByRole('heading', { name: '設定' })).toBeVisible();
-  await page.getByTestId('quick-total').fill('45');
-  await page.getByTestId('quick-total').blur();
+  await page.getByTestId('normal-total').fill('90');
+  await page.getByTestId('normal-total').blur();
   await page.getByTestId('window').fill('-10');
   await page.getByTestId('window').blur();
   // 範囲外の値は直る
@@ -147,17 +147,18 @@ test('設定：変えた値が保存され、プリセットのボタンに反�
   await expect(page.getByTestId('eval-mini')).toHaveAttribute('aria-checked', 'true');
 
   await page.reload();
-  await expect(page.getByTestId('quick-total')).toHaveValue('45');
+  await expect(page.getByTestId('normal-total')).toHaveValue('90');
   await expect(page.getByTestId('eval-mini')).toHaveAttribute('aria-checked', 'true');
 
   await page.goto('./#/new');
-  await expect(page.getByTestId('start-quick')).toHaveText('さっと（45秒）で作る');
-  await expect(page.getByTestId('start-normal')).toHaveText('ふつう（2分）で作る');
+  await expect(page.getByTestId('start-normal')).toHaveText('ふつう（1分30秒）で作る');
+  await expect(page.getByTestId('start-deep')).toHaveText('じっくり（5分）で作る');
+  await expect(page.getByTestId('start-quick')).toHaveCount(0);
 
   await page.goto('./#/settings');
   await page.getByTestId('reset-settings').click();
   await page.getByTestId('reset-confirm').click();
-  await expect(page.getByTestId('quick-total')).toHaveValue('30');
+  await expect(page.getByTestId('normal-total')).toHaveValue('120');
   await expect(page.getByTestId('window')).toHaveValue('300');
   await expect(page.getByTestId('eval-micro')).toHaveAttribute('aria-checked', 'true');
 });

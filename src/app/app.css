@@ -377,7 +377,7 @@
   margin-top: var(--space-4);
 }
 
-/* 入力画面のプリセットのボタン（縦に並べる。いちばん上が「さっと」） */
+/* 入力画面のプリセットのボタン（縦に並べる。いちばん上が「ふつう」） */
 .preset-buttons {
   display: grid;
   grid-template-columns: 1fr;

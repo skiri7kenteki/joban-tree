@@ -13,6 +13,8 @@ export interface PresetValues {
   movetimeMs: number;
   multiPV: number;
   maxRounds: number;
+  /** 自分の対応を調べる時間（ミリ秒）。0 なら調べず、読み筋の 2 手目を使う（未検証） */
+  replyMs: number;
 }
 
 export interface AppSettings {
@@ -37,8 +39,8 @@ const STORAGE_KEY = 'joban-tree.settings';
 export function defaultSettings(): AppSettings {
   const presets = {} as Record<PresetId, PresetValues>;
   for (const id of Object.keys(PRESETS) as PresetId[]) {
-    const { totalMs, movetimeMs, multiPV, maxRounds } = PRESETS[id].settings;
-    presets[id] = { totalMs, movetimeMs, multiPV, maxRounds };
+    const { totalMs, movetimeMs, multiPV, maxRounds, replyMs = 0 } = PRESETS[id].settings;
+    presets[id] = { totalMs, movetimeMs, multiPV, maxRounds, replyMs };
   }
   return {
     version: 1,
@@ -67,15 +69,18 @@ export function normalizeSettings(raw: unknown): AppSettings {
   const t = (r.thresholds ?? {}) as Record<string, unknown>;
   const mainMax = num(t.mainMax, d.thresholds.mainMax, 0, 2000);
   const presetsRaw = (r.presets ?? {}) as Record<string, Record<string, unknown> | undefined>;
+  // v0.4.0 でプリセットの中身を見直した。それより前に保存された値（replyMs が無い）は新しい初期値に置き換える
+  const oldPresets = Object.values(presetsRaw).some((p) => p && !('replyMs' in p));
   const presets = {} as Record<PresetId, PresetValues>;
   for (const id of Object.keys(d.presets) as PresetId[]) {
-    const p = presetsRaw[id] ?? {};
+    const p = (oldPresets ? undefined : presetsRaw[id]) ?? {};
     const def = d.presets[id];
     presets[id] = {
       totalMs: num(p.totalMs, def.totalMs, 5_000, 3_600_000),
       movetimeMs: num(p.movetimeMs, def.movetimeMs, 100, 60_000),
       multiPV: num(p.multiPV, def.multiPV, 1, 8),
       maxRounds: num(p.maxRounds, def.maxRounds, 1, 20),
+      replyMs: num(p.replyMs, def.replyMs, 0, 60_000),
     };
   }
   return {
@@ -124,9 +129,9 @@ export function generationSettingsFor(id: PresetId, s: AppSettings = settings.va
   return { ...s.presets[id], windowCp: s.windowCp, maxNodes: s.maxNodes };
 }
 
-/** プリセットのボタンに出す名前（例：「さっと（30秒）」） */
+/** プリセットのボタンに出す名前（例：「ふつう（2分）」） */
 export function presetLabel(id: PresetId, s: AppSettings = settings.value): string {
-  const name = { quick: 'さっと', normal: 'ふつう', deep: 'じっくり' }[id];
+  const name = { normal: 'ふつう', deep: 'じっくり' }[id];
   return `${name}（${formatDuration(s.presets[id].totalMs)}）`;
 }
 

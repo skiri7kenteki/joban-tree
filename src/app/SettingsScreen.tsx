@@ -3,13 +3,12 @@
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { EVALS, isOfflineReady, prepareOffline, type EvalId } from '../engine/config';
-import type { PresetId } from '../tree/presets';
+import { PRESET_IDS, type PresetId } from '../tree/presets';
 import { POOL_THREADS, defaultThreads } from './engineService';
 import { isGenerating } from './generation';
 import { go } from './router';
 import { HASH_CHOICES, presetLabel, resetSettings, settings, updateSettings, type AppSettings, type PresetValues } from './settings';
 
-const PRESET_IDS: PresetId[] = ['quick', 'normal', 'deep'];
 
 export function SettingsScreen() {
   const s = settings.value;
@@ -129,12 +128,20 @@ export function SettingsScreen() {
               <legend>{presetLabel(id)}</legend>
               <NumberField label="全体の時間" value={p.totalMs / 1000} unit="秒" testId={`${id}-total`} onChange={(v) => setPreset(id, { totalMs: v * 1000 })} />
               <NumberField
-                label="1 局面あたりの探索時間"
+                label="相手の局面を調べる時間"
                 value={p.movetimeMs}
                 unit="ミリ秒"
                 step={100}
                 testId={`${id}-movetime`}
                 onChange={(v) => setPreset(id, { movetimeMs: v })}
+              />
+              <NumberField
+                label="自分の対応を調べる時間（0 なら調べず「未検証」のまま）"
+                value={p.replyMs}
+                unit="ミリ秒"
+                step={100}
+                testId={`${id}-reply`}
+                onChange={(v) => setPreset(id, { replyMs: v })}
               />
               <NumberField label="候補手の数（N）" value={p.multiPV} unit="手" testId={`${id}-multipv`} onChange={(v) => setPreset(id, { multiPV: v })} />
               <NumberField label="深さ（往復の数）" value={p.maxRounds} unit="往復" testId={`${id}-rounds`} onChange={(v) => setPreset(id, { maxRounds: v })} />

@@ -4,6 +4,7 @@
 // 流れ（CLAUDE.md「ツリー生成の仕様」）：
 //   1. 相手ノードを MultiPV=N で調べる
 //   2. 各候補の読み筋の 1 手目＝相手の応手、2 手目＝自分の対応（未検証）として枝を作る
+//      （replyMs があれば 2 手目は使わず、自分ノードを MultiPV=1 で調べて確定した手を置く）
 //   3. 自分の対応の後の局面（また相手ノード）を待ち行列へ。浅い順、同じ深さなら自分に良い順
 //   4. 時間・深さ・局面数の上限か、停止で終わる。どこで終わっても、それまでのツリーは有効
 
@@ -134,8 +135,10 @@ export class TreeGenerator {
       if (!node || node.searched || node.terminal) continue;
 
       const opp = isOpponentNode(this.tree, node);
+      // 自分ノードは「自分の対応を調べる時間」があればそれを使う
+      const baseMs = !opp && this.verifiesReplies() ? this.settings.replyMs! : this.settings.movetimeMs;
       // 残り時間が少なければ、そのぶん短く調べる（全体の時間を大きく超えないように）
-      const movetimeMs = Math.max(100, Math.min(this.settings.movetimeMs, this.settings.totalMs - elapsed));
+      const movetimeMs = Math.max(100, Math.min(baseMs, this.settings.totalMs - elapsed));
       let result: AnalysisResult;
       try {
         result = await this.engine.analyze(positionCommand(node.sfen), {
@@ -190,6 +193,11 @@ export class TreeGenerator {
     return this.stopped ? 'stopped' : 'completed';
   }
 
+  /** 自分の対応も探索して確定するか（replyMs が 1 以上） */
+  private verifiesReplies(): boolean {
+    return (this.settings.replyMs ?? 0) > 0;
+  }
+
   /** startKey から既存の枝をたどり、まだ調べていない局面を待ち行列に入れる */
   private collectFrontier(startKey: string): void {
     const seen = new Set<string>();
@@ -204,6 +212,8 @@ export class TreeGenerator {
         this.enqueue(node, priority);
         continue;
       }
+      // 未検証の手しかない自分ノードは、確定させるために調べ直す（その先の枝もたどる）
+      if (!node.searched && this.verifiesReplies() && !isOpponentNode(this.tree, node)) this.enqueue(node, priority);
       for (const edge of node.edges) stack.push({ key: edge.to, priority: scoreToNumber(edge.score) });
     }
   }
@@ -254,6 +264,12 @@ export class TreeGenerator {
 
       // 自分ノードに既に手があれば（合流など）、それを使う
       if (me.edges.length > 0 || me.searched || me.terminal) continue;
+
+      // 自分の対応も調べる設定なら、自分ノードを待ち行列へ（調べたら expandMine が確定した手を置く）
+      if (this.verifiesReplies()) {
+        this.enqueue(me, scoreToNumber(myScore));
+        continue;
+      }
 
       // 2 手目：自分の対応（探索し直さず、読み筋をそのまま使う＝未検証）
       const myMove = line.pv[1];

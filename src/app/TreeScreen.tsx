@@ -13,14 +13,13 @@ import { fileNameOf, treeToJson } from '../tree/backup';
 import { FINISH_TEXT, countParents, isOpponentNode } from '../tree/generator';
 import { pathToKif, treeToKif } from '../tree/kif';
 import { LABEL_TEXT, labelOf } from '../tree/labels';
-import type { PresetId } from '../tree/presets';
+import { PRESET_IDS, type PresetId } from '../tree/presets';
 import type { TreeData, TreeEdge } from '../tree/types';
 import { generation, isGenerating, openTree, startGeneration, startVerify, stopGeneration, treeVersion } from './generation';
 import { go } from './router';
 import { generationSettingsFor, presetLabel, settings } from './settings';
 import { OUTCOME_TEXT, copyText, shareFile } from './share';
 
-const PRESET_IDS: PresetId[] = ['quick', 'normal', 'deep'];
 
 export function TreeScreen({ id }: { id: string }) {
   const [error, setError] = useState('');
@@ -325,6 +324,7 @@ function GenerationPanel({ tree }: { tree: TreeData }) {
 function EmptyNote({ tree, nodeKey, generating }: { tree: TreeData; nodeKey: string; generating: boolean }) {
   const node = tree.nodes[nodeKey];
   let text = 'この局面はまだ調べていません。「ここから展開」で調べられます。';
+  if (!isOpponentNode(tree, node)) text = '自分の手はまだ調べていません。「この手を検証」か「ここから展開」で調べられます。';
   if (node.terminal) text = '指せる手がありません（詰み・投了など）。';
   else if (generating) text = 'この局面はこれから調べます。';
   return <p class="muted">{text}</p>;

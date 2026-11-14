@@ -1,5 +1,5 @@
 // 局面の入力画面：棋譜を貼り付ける／盤をタップして指す → 手順を前後して局面を選ぶ →
-// 自分が先手か後手かを選ぶ → プリセット（さっと・ふつう・じっくり）を選んで生成。
+// 自分が先手か後手かを選ぶ → プリセット（ふつう・じっくり）を選んで生成。
 
 import { useState } from 'preact/hooks';
 import { Position, Square, type Move, type PieceType } from 'tsshogi';
@@ -8,7 +8,7 @@ import { parseKifu, type LinePosition } from '../shogi/kifu';
 import { STARTPOS_SFEN, moveText, otherSide, sideOfColor, sideToMove, type Side } from '../shogi/position';
 import { saveTree, newTreeId } from '../storage/trees';
 import { createTree } from '../tree/generator';
-import type { PresetId } from '../tree/presets';
+import { PRESET_IDS, type PresetId } from '../tree/presets';
 import { openTree, startGeneration, isGenerating } from './generation';
 import { go } from './router';
 import { generationSettingsFor, presetLabel } from './settings';
@@ -247,11 +247,11 @@ export function InputScreen() {
         </p>
         {isGenerating() && <p class="muted">ほかのツリーを生成中です。終わるか止めてから作ってください。</p>}
         <div class="preset-buttons">
-          {(['quick', 'normal', 'deep'] as PresetId[]).map((id) => (
+          {PRESET_IDS.map((id) => (
             <button
               type="button"
               key={id}
-              class={id === 'quick' ? 'btn btn-primary' : 'btn'}
+              class={id === 'normal' ? 'btn btn-primary' : 'btn'}
               data-testid={`start-${id}`}
               onClick={() => void start(id)}
               disabled={busy || isGenerating()}
