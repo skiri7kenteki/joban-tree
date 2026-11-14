@@ -101,3 +101,44 @@ test('復習モード：相手の応手が出て、盤で答える。まちが�
   await page.getByTestId('review-clear-confirm').click();
   await expect(page.getByTestId('review-summary')).toContainText('問題 2（まだ 2・前回まちがい 0・覚えた 0）');
 });
+
+/** 自分は後手。平手 → ▲７六歩（疑問手）→ △３四歩 → ▲２六歩（本線）→ △８四歩。▲７六歩の先は深く出さない */
+function dubiousTree(): TreeData {
+  const tree = reviewTree();
+  const nodes: Record<string, TreeNode> = {};
+  const add = (moves: string[], round: number): TreeNode => {
+    let sfen = STARTPOS_SFEN;
+    for (const m of moves) sfen = applyUsiMove(sfen, m)!.sfen;
+    const key = sfenKey(sfen);
+    nodes[key] ??= { key, sfen, round, edges: [] };
+    return nodes[key];
+  };
+  const line = ['7g7f', '3c3d', '2g2f', '8c8d'];
+  for (let i = 0; i < line.length; i++) {
+    const from = add(line.slice(0, i), Math.floor(i / 2));
+    const to = add(line.slice(0, i + 1), Math.floor((i + 1) / 2));
+    const opp = i % 2 === 0;
+    from.edges.push({ move: line[i], to: to.key, score: { kind: 'cp', value: 200 }, ...(opp ? { diff: i === 0 ? 300 : 0 } : {}) });
+    if (!opp) from.searched = SEARCHED;
+  }
+  return { ...tree, id: 'e2e-dubious', name: '疑問手の復習', rootKey: add([], 0).key, nodes };
+}
+
+test('復習モード：相手の疑問手には、咎める 1 手だけを出して手順を終える', async ({ page }) => {
+  await page.goto('./');
+  await expect(page.getByTestId('isolation')).toHaveAttribute('data-state', 'isolated', { timeout: 30_000 });
+  await page.getByTestId('import-file').setInputFiles({
+    name: 'tree.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(dubiousTree())),
+  });
+  await page.getByTestId('tree-item').first().click();
+  await page.getByTestId('review-open').click();
+  // 問題は △３四歩 の 1 つだけ（▲７六歩△３四歩▲２六歩 の後の △８四歩 は数えない）
+  await expect(page.getByTestId('review-summary')).toContainText('問題 1（まだ 1');
+  await expect(page.getByTestId('review-dubious')).toHaveText('疑問手');
+  await expect(page.getByTestId('review-prompt')).toContainText('相手は ▲７六歩（疑問手）。どう咎めますか？');
+  await play(page, '33', '34');
+  await expect(page.getByTestId('review-answer')).toContainText('正解！');
+  await expect(page.getByTestId('review-end')).toContainText('疑問手を咎める手まで出しました。この手順はここまでです（1 問中 1 問');
+});

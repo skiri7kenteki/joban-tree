@@ -5,8 +5,10 @@ import {
   answerOf,
   computeNeeds,
   emptyRecord,
+  isDubiousReply,
   pickReply,
   recordAnswer,
+  replyKey,
   summarize,
 } from '../../src/review/review';
 import type { TreeData, TreeNode } from '../../src/tree/types';
@@ -93,5 +95,28 @@ describe('復習モード', () => {
     me.edges.push({ move: '9g9f', to: tree.rootKey, score: cp(0) });
     expect(() => computeNeeds(tree, emptyRecord(tree.id))).not.toThrow();
     expect(summarize(tree, emptyRecord(tree.id)).total).toBe(3);
+  });
+
+  it('相手の疑問手の後は、咎める 1 問だけを数える（その先の手順は出さない）', () => {
+    const tree = sampleTree();
+    // ▲７六歩を疑問手（最善手との差 300 点）にする
+    const root = tree.nodes[tree.rootKey];
+    root.edges.find((e) => e.move === '7g7f')!.diff = 300;
+    root.edges.find((e) => e.move === '2g2f')!.diff = 0;
+    expect(isDubiousReply(root.edges[0])).toBe(true);
+    expect(isDubiousReply(root.edges[1])).toBe(false);
+
+    const needs = computeNeeds(tree, emptyRecord(tree.id));
+    // ▲７六歩の先には問題が 2 つあるが、咎める △３四歩 の 1 問だけ
+    expect(needs.get(replyKey(tree.rootKey, '7g7f'))).toBe(1);
+    expect(needs.get(replyKey(tree.rootKey, '2g2f'))).toBe(1);
+    expect(pickReply(tree, tree.rootKey, needs, () => 0.4)?.move).toBe('7g7f');
+    expect(pickReply(tree, tree.rootKey, needs, () => 0.6)?.move).toBe('2g2f');
+    // 問題の数：▲７六歩△３四歩 と ▲２六歩△８四歩 の 2 つ（▲７六歩△３四歩▲２六歩△８四歩 は数えない）
+    expect(summarize(tree, emptyRecord(tree.id))).toEqual({ total: 2, unseen: 2, wrong: 0, learned: 0 });
+    // しきい値を広げて疑問手でなくなれば、先まで数える
+    const wide = { mainMax: 50, goodMax: 500 };
+    expect(summarize(tree, emptyRecord(tree.id), wide).total).toBe(3);
+    expect(computeNeeds(tree, emptyRecord(tree.id), wide).get(replyKey(tree.rootKey, '7g7f'))).toBe(2);
   });
 });

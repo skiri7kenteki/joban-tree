@@ -5,8 +5,11 @@
 //   2. 自分の手番の局面＝問題。ツリーの自分の手（先頭の手）が正解
 //   3. 正解なら次へ。手順の終わり（答えの無い局面・応手の無い局面）まで続ける
 //   4. 相手の応手は「その先に、まだ出していない問題・間違えた問題が多い枝」ほど選ばれやすい
+//   5. 相手が疑問手を指したら、咎める 1 手だけを出して、その手順は終わり（持ち主の判断 2026-11-14：
+//      「悪手に対する次の一手を覚えるのは意味があるが、悪手以降の手順を深く掘り下げても意味が薄い」）
 
 import { isOpponentNode } from '../tree/generator';
+import { DEFAULT_THRESHOLDS, labelOf, type LabelThresholds } from '../tree/labels';
 import type { TreeData, TreeEdge } from '../tree/types';
 
 /** 1 つの問題（自分の手番の局面）の記録 */
@@ -41,6 +44,16 @@ export function answerOf(tree: TreeData, key: string): TreeEdge | null {
   return node.edges[0] ?? null;
 }
 
+/** 相手の疑問手か（その後は、咎める 1 手だけを出す） */
+export function isDubiousReply(edge: TreeEdge, thresholds: LabelThresholds = DEFAULT_THRESHOLDS): boolean {
+  return edge.diff !== undefined && labelOf(edge.diff, thresholds) === 'dubious';
+}
+
+/** 相手の応手 1 つぶんの「出したさ」を入れておくキー（computeNeeds の結果の中で、局面のキーと区別する） */
+export function replyKey(from: string, move: string): string {
+  return `${from}>${move}`;
+}
+
 /** 「覚えた」とみなす連続正解の回数 */
 export const LEARNED_STREAK = 2;
 
@@ -54,9 +67,16 @@ function ownNeed(rec: NodeRecord | undefined): number {
 /**
  * 各局面について「その局面から先にある問題の、出したさの合計」を求める。
  * 0 なら、その先に問題が無い。同じ局面への合流は 1 回だけ数え、ループ（同じ局面に戻る手順）は打ち切る。
+ * 相手の応手ごとの値も replyKey(局面, 手) に入れる（疑問手なら、咎める 1 問の分だけ）。
  */
-export function computeNeeds(tree: TreeData, record: ReviewRecord): Map<string, number> {
+export function computeNeeds(tree: TreeData, record: ReviewRecord, thresholds: LabelThresholds = DEFAULT_THRESHOLDS): Map<string, number> {
   const memo = new Map<string, number>();
+  /** 疑問手の後の局面：咎める 1 問だけ（その先は出さない） */
+  const questionOnly = (key: string): number => {
+    const node = tree.nodes[key];
+    if (!node || isOpponentNode(tree, node) || !node.edges[0]) return 0;
+    return ownNeed(record.nodes[key]);
+  };
   const visiting = new Set<string>();
   const visit = (key: string): number => {
     const cached = memo.get(key);
@@ -67,7 +87,11 @@ export function computeNeeds(tree: TreeData, record: ReviewRecord): Map<string, 
     visiting.add(key);
     let need = 0;
     if (isOpponentNode(tree, node)) {
-      for (const edge of node.edges) need += visit(edge.to);
+      for (const edge of node.edges) {
+        const w = isDubiousReply(edge, thresholds) ? questionOnly(edge.to) : visit(edge.to);
+        memo.set(replyKey(key, edge.move), w);
+        need += w;
+      }
     } else {
       const answer = node.edges[0];
       if (answer) need = ownNeed(record.nodes[key]) + visit(answer.to);
@@ -89,12 +113,13 @@ export function pickReply(
 ): TreeEdge | null {
   const node = tree.nodes[key];
   if (!node || !isOpponentNode(tree, node)) return null;
-  const candidates = node.edges.filter((e) => (needs.get(e.to) ?? 0) > 0);
+  const weight = (e: TreeEdge) => needs.get(replyKey(key, e.move)) ?? 0;
+  const candidates = node.edges.filter((e) => weight(e) > 0);
   if (candidates.length === 0) return null;
-  const total = candidates.reduce((sum, e) => sum + needs.get(e.to)!, 0);
+  const total = candidates.reduce((sum, e) => sum + weight(e), 0);
   let r = rand() * total;
   for (const edge of candidates) {
-    r -= needs.get(edge.to)!;
+    r -= weight(edge);
     if (r < 0) return edge;
   }
   return candidates[candidates.length - 1];
@@ -124,29 +149,37 @@ export interface ReviewSummary {
   learned: number;
 }
 
-/** 開始局面からたどれる問題の、記録のまとめ */
-export function summarize(tree: TreeData, record: ReviewRecord): ReviewSummary {
+/** 開始局面からたどれる問題の、記録のまとめ（疑問手の後は、咎める 1 問だけ数える） */
+export function summarize(tree: TreeData, record: ReviewRecord, thresholds: LabelThresholds = DEFAULT_THRESHOLDS): ReviewSummary {
   const summary: ReviewSummary = { total: 0, unseen: 0, wrong: 0, learned: 0 };
-  const seen = new Set<string>();
-  const stack = [tree.rootKey];
+  /** 問題として数えた局面 */
+  const counted = new Set<string>();
+  /** その先までたどった局面（疑問手の後で数えただけの局面も、ほかの手順から来たときはたどる） */
+  const expanded = new Set<string>();
+  const stack: { key: string; questionOnly: boolean }[] = [{ key: tree.rootKey, questionOnly: false }];
   while (stack.length > 0) {
-    const key = stack.pop()!;
-    if (seen.has(key)) continue;
-    seen.add(key);
+    const { key, questionOnly } = stack.pop()!;
     const node = tree.nodes[key];
     if (!node) continue;
     if (isOpponentNode(tree, node)) {
-      for (const edge of node.edges) stack.push(edge.to);
+      if (questionOnly || expanded.has(key)) continue;
+      expanded.add(key);
+      for (const edge of node.edges) stack.push({ key: edge.to, questionOnly: isDubiousReply(edge, thresholds) });
       continue;
     }
     const answer = node.edges[0];
     if (!answer) continue;
-    summary.total++;
-    const rec = record.nodes[key];
-    if (!rec) summary.unseen++;
-    else if (!rec.lastOk) summary.wrong++;
-    else if (rec.streak >= LEARNED_STREAK) summary.learned++;
-    stack.push(answer.to);
+    if (!counted.has(key)) {
+      counted.add(key);
+      summary.total++;
+      const rec = record.nodes[key];
+      if (!rec) summary.unseen++;
+      else if (!rec.lastOk) summary.wrong++;
+      else if (rec.streak >= LEARNED_STREAK) summary.learned++;
+    }
+    if (questionOnly || expanded.has(key)) continue;
+    expanded.add(key);
+    stack.push({ key: answer.to, questionOnly: false });
   }
   return summary;
 }

@@ -13,9 +13,10 @@ import { loadTree } from '../storage/trees';
 import { clearReview, loadReview, saveReview } from '../storage/review';
 import { isOpponentNode } from '../tree/generator';
 import type { TreeData } from '../tree/types';
-import { answerOf, computeNeeds, emptyRecord, pickReply, recordAnswer, summarize, type ReviewRecord } from '../review/review';
+import { answerOf, computeNeeds, emptyRecord, isDubiousReply, pickReply, recordAnswer, summarize, type ReviewRecord } from '../review/review';
 import { openTree } from './generation';
 import { go } from './router';
+import { settings } from './settings';
 
 export function ReviewScreen({ id }: { id: string }) {
   const [tree, setTree] = useState<TreeData | null>(openTree.value?.id === id ? openTree.value : null);
@@ -46,13 +47,15 @@ export function ReviewScreen({ id }: { id: string }) {
 interface Step {
   key: string;
   move?: string;
+  /** 相手の疑問手で来た局面（咎める 1 手を答えたら、その手順は終わり） */
+  dubious?: boolean;
 }
 
 type Phase =
   | { kind: 'ask'; firstTry: boolean }
   | { kind: 'wrong'; tried: string }
   | { kind: 'answered'; ok: boolean }
-  | { kind: 'end' }
+  | { kind: 'end'; afterDubious?: boolean }
   | { kind: 'start' };
 
 function ReviewView({ tree, initialRecord }: { tree: TreeData; initialRecord: ReviewRecord }) {
@@ -65,8 +68,9 @@ function ReviewView({ tree, initialRecord }: { tree: TreeData; initialRecord: Re
   const [confirmClear, setConfirmClear] = useState(false);
   const [saveError, setSaveError] = useState('');
 
-  const needs = useMemo(() => computeNeeds(tree, record), [tree, record]);
-  const summary = useMemo(() => summarize(tree, record), [tree, record]);
+  const thresholds = settings.value.thresholds;
+  const needs = useMemo(() => computeNeeds(tree, record, thresholds), [tree, record, thresholds]);
+  const summary = useMemo(() => summarize(tree, record, thresholds), [tree, record, thresholds]);
   const current = steps[steps.length - 1];
   const node = tree.nodes[current.key];
   const answer = answerOf(tree, current.key);
@@ -97,6 +101,12 @@ function ReviewView({ tree, initialRecord }: { tree: TreeData; initialRecord: Re
   function continueFrom(list: Step[], currentNeeds = needs) {
     const last = list[list.length - 1];
     const lastNode = tree.nodes[last.key];
+    // 相手の疑問手を咎める手を答えたところで、この手順は終わり（その先は深く掘り下げない）
+    if (list.length >= 3 && list[list.length - 2].dubious) {
+      setSteps(list);
+      setPhase({ kind: 'end', afterDubious: true });
+      return;
+    }
     let next = list;
     if (isOpponentNode(tree, lastNode)) {
       const reply = pickReply(tree, last.key, currentNeeds);
@@ -105,7 +115,7 @@ function ReviewView({ tree, initialRecord }: { tree: TreeData; initialRecord: Re
         setPhase({ kind: 'end' });
         return;
       }
-      next = [...list, { key: reply.to, move: reply.move }];
+      next = [...list, { key: reply.to, move: reply.move, dubious: isDubiousReply(reply, thresholds) }];
     }
     setSteps(next);
     setPhase(answerOf(tree, next[next.length - 1].key) ? { kind: 'ask', firstTry: true } : { kind: 'end' });
@@ -181,12 +191,18 @@ function ReviewView({ tree, initialRecord }: { tree: TreeData; initialRecord: Re
             {phase.kind === 'ask' && (
               <>
                 <p>
-                  {lastText ? (
+                  {lastText && (
                     <>
-                      相手は <strong>{lastText}</strong>。
+                      相手は <strong>{lastText}</strong>
+                      {current.dubious && (
+                        <>
+                          （<span class="status-ng" data-testid="review-dubious">疑問手</span>）
+                        </>
+                      )}
+                      。
                     </>
-                  ) : null}
-                  あなた（{mySideText}）の手は？
+                  )}
+                  {current.dubious ? 'どう咎めますか？' : `あなた（${mySideText}）の手は？`}
                 </p>
                 <p class="muted">盤の駒をタップ → 行き先をタップで答えます。</p>
                 {answer?.unverified && <p class="muted">この局面の答えは「未検証」の手です（エンジンで確かめていません）。</p>}
@@ -227,7 +243,7 @@ function ReviewView({ tree, initialRecord }: { tree: TreeData; initialRecord: Re
               <>
                 <p data-testid="review-end">
                   {lineScore.asked > 0
-                    ? `この手順はここまでです（${lineScore.asked} 問中 ${lineScore.ok} 問、1 回目で正解）。`
+                    ? `${phase.afterDubious ? '疑問手を咎める手まで出しました。' : ''}この手順はここまでです（${lineScore.asked} 問中 ${lineScore.ok} 問、1 回目で正解）。`
                     : 'このツリーには、まだ問題がありません（自分の手が入った局面がありません）。'}
                 </p>
                 {summary.total > 0 && (
