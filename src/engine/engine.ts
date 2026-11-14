@@ -15,6 +15,8 @@ export interface AnalyzeOptions {
   movetimeMs: number;
   /** 候補手の数（MultiPV） */
   multiPV: number;
+  /** この手（USI 形式）の中からだけ調べる（go searchmoves）。除外した手を外して調べ直すときに使う（段階4-3） */
+  searchMoves?: string[];
   /** info 行が届くたびに呼ばれる（進み具合の表示用） */
   onInfo?: (info: InfoLine) => void;
 }
@@ -173,7 +175,8 @@ export class UsiEngine implements AnalysisEngine {
         this.transport.send(`setoption name MultiPV value ${options.multiPV}`);
         this.transport.send(`position ${position}`);
         const t0 = performance.now();
-        this.transport.send(`go movetime ${options.movetimeMs}`);
+        const limit = options.searchMoves?.length ? ` searchmoves ${options.searchMoves.join(' ')}` : '';
+        this.transport.send(`go movetime ${options.movetimeMs}${limit}`);
         const line = await this.waitFor((l) => l.startsWith('bestmove'));
         const elapsedMs = performance.now() - t0;
         const best = parseBestmove(line) ?? { move: 'resign' };

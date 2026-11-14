@@ -76,3 +76,31 @@ export function sideOfColor(color: Color): Side {
 export function positionCommand(sfen: string): string {
   return `sfen ${sfen}`;
 }
+
+/** 持ち駒を打つときの駒（USI の大文字） */
+const DROP_PIECES = ['R', 'B', 'G', 'S', 'N', 'L', 'P'];
+const FILES = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
+const RANKS = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'];
+
+/**
+ * その局面で指せる手（合法手）をすべて USI 形式で返す。
+ * エンジンに「この手の中から調べて」（go searchmoves）と伝えるために使う（除外した手を外すため）。
+ * 盤上のすべての「元のマス × 行き先（成る・成らない）」と「打つ駒 × マス」を作って、tsshogi で反則でないか確かめる
+ */
+export function legalMoves(sfen: string): string[] {
+  const position = Position.newBySFEN(sfen);
+  if (!position) return [];
+  const squares = FILES.flatMap((f) => RANKS.map((r) => f + r));
+  const candidates: string[] = [];
+  for (const from of squares) {
+    for (const to of squares) {
+      if (from === to) continue;
+      candidates.push(from + to, `${from}${to}+`);
+    }
+  }
+  for (const piece of DROP_PIECES) for (const to of squares) candidates.push(`${piece}*${to}`);
+  return candidates.filter((usi) => {
+    const move = position.createMoveByUSI(usi);
+    return move !== null && position.isValidMove(move);
+  });
+}

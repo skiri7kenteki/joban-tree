@@ -35,7 +35,7 @@ export function parseTreeJson(text: string): ParseResult {
   if (!isNumber(raw.version) || raw.version > TREE_FORMAT_VERSION) {
     return { ok: false, message: 'アプリより新しい形式のファイルです。アプリを最新にしてから読み込んでください。' };
   }
-  // 形式 1 の確認（形式を変えたときは、ここで古い形から新しい形に直す）
+  // 形式 1・2 の確認（2 は局面に excluded が足せるだけなので、1 はそのまま読める。形を変えたときは、ここで古い形から新しい形に直す）
   const problem = checkV1(raw);
   if (problem) return { ok: false, message: `ファイルの中身が壊れています（${problem}）。` };
   return { ok: true, tree: raw as unknown as TreeData };
@@ -58,7 +58,8 @@ function checkV1(t: Record<string, unknown>): string | null {
       return `局面 ${key}`;
     }
     if (!Position.newBySFEN(node.sfen) || sfenKey(node.sfen) !== key) return `局面 ${key}`;
-    for (const edge of node.edges) {
+    if (node.excluded !== undefined && !Array.isArray(node.excluded)) return `局面 ${key} の除外した手`;
+    for (const edge of [...node.edges, ...((node.excluded as unknown[] | undefined) ?? [])]) {
       if (!isObject(edge) || !isString(edge.move) || !isString(edge.to) || !isScore(edge.score)) return `局面 ${key} の手`;
       if (!(edge.to in t.nodes)) return `局面 ${key} の手の行き先`;
     }

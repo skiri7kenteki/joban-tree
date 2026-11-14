@@ -189,3 +189,54 @@ test.describe('4-2 iPad 横（1180×820）', () => {
     await expect(page.getByTestId('board')).toBeInViewport({ ratio: 1 });
   });
 });
+
+// ---- 段階4-3 A：この手は調べない（除外） ----
+
+test.describe('4-3 除外', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
+
+  test('除外した手はリストの下に畳まれ、「戻す」で戻る（保存される）', async ({ page }) => {
+    const tree = makeTree('p43-restore', ['7g7f'], [
+      ['3c3d', 0, '2g2f', false],
+      ['8c8d', 20, '2g2f', false],
+      ['9c9d', 200, '2g2f', false],
+    ]);
+    // △９四歩 を除外済みにしておく（形式 2）
+    const root = tree.nodes[tree.rootKey];
+    root.excluded = root.edges.filter((e) => e.move === '9c9d');
+    root.edges = root.edges.filter((e) => e.move !== '9c9d');
+    await openTree(page, tree);
+    await expect(page.getByTestId('candidate')).toHaveCount(2);
+    await expect(page.getByTestId('excluded-toggle')).toHaveText('除外した手（1）▸');
+    // 盤＋候補手は今までどおり 1 画面に（「⋯」が付いても）
+    await expect(page.getByTestId('candidate').nth(1)).toBeInViewport({ ratio: 1 });
+    await page.getByTestId('excluded-toggle').click();
+    await expect(page.getByTestId('excluded-item')).toContainText('△９四歩');
+    await page.getByTestId('excluded-restore').click();
+    await expect(page.getByTestId('candidate')).toHaveCount(3);
+    await expect(page.getByTestId('excluded-box')).toHaveCount(0);
+    await expect(page.getByTestId('candidate').nth(2)).toContainText('疑問手');
+    // 開き直しても戻ったまま
+    await page.reload();
+    await expect(page.getByTestId('candidate')).toHaveCount(3);
+  });
+
+  test('「⋯」のメニューから除外できる（本物のエンジンで調べ直して候補を補う）', async ({ page }) => {
+    test.skip(!process.env.ENGINE_AVAILABLE, 'エンジンがビルドされていないので省略（GitHub Actions では実行される）');
+    test.setTimeout(120_000);
+    // 候補が △３四歩 の 1 手だけのツリー（MultiPV=3）。除外すると、ほかの手が 3 手入るはず
+    const tree = makeTree('p43-exclude', ['7g7f'], [['3c3d', 0, '2g2f', false]]);
+    tree.settings = { ...tree.settings, multiPV: 3, movetimeMs: 800 };
+    await openTree(page, tree);
+    await page.getByTestId('candidate-menu').first().click();
+    await expect(page.getByTestId('move-menu')).toContainText('△３四歩');
+    await page.getByTestId('exclude-move').click();
+    await expect(page.locator('[data-testid="gen-status"][data-kind="resample"][data-phase="done"]')).toBeVisible({ timeout: 90_000 });
+    await expect(page.getByTestId('gen-status')).toContainText('候補を補いました');
+    // エンジンが searchmoves に従っていれば、△３四歩 以外で 3 手そろう
+    await expect(page.getByTestId('candidate')).toHaveCount(3);
+    for (const text of await page.getByTestId('candidate').allInnerTexts()) expect(text).not.toContain('３四歩');
+    await expect(page.getByTestId('candidate').first()).toContainText('本線');
+    await expect(page.getByTestId('excluded-toggle')).toHaveText('除外した手（1）▸');
+  });
+});

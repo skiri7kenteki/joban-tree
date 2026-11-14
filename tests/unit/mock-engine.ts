@@ -31,8 +31,12 @@ export class MockEngine implements AnalysisEngine {
     const key = sfenKey(sfen);
     this.calls.push({ key, options });
     this.hooks.onAnalyze?.(this.calls.length);
-    const lines: PvLine[] = (this.script[key] ?? genericLines(sfen, options.multiPV))
+    // searchMoves があれば、その手から始まる読み筋だけ（本物のエンジンの go searchmoves と同じ）
+    const allowed = options.searchMoves ? new Set(options.searchMoves) : null;
+    const lines: PvLine[] = (this.script[key] ?? genericLines(sfen, options.multiPV + (allowed ? 20 : 0)))
+      .filter((l) => !allowed || allowed.has(l.pv[0]))
       .slice(0, options.multiPV)
+      .map((l, i) => ({ ...l, multipv: i + 1 }))
       .map((l) => ({ ...l, depth: 10 }));
     return {
       bestmove: lines[0]?.pv[0] ?? 'resign',

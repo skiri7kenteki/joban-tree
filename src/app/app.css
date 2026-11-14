@@ -297,8 +297,70 @@
   cursor: pointer;
 }
 
-.candidate-list li:first-child .candidate {
+/* 1 行：候補手のボタン＋右端の「⋯」（段階4-3） */
+.candidate-item {
+  display: flex;
+  align-items: stretch;
+  border-top: 1px solid var(--color-border);
+}
+
+.candidate-list li:first-child {
   border-top: none;
+}
+
+.candidate-item .candidate {
+  flex: 1;
+  min-width: 0;
+  border-top: none;
+}
+
+.candidate-menu {
+  flex: 0 0 auto;
+  width: var(--touch-min);
+  margin-right: calc(-1 * var(--space-2));
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: var(--font-size-heading);
+  cursor: pointer;
+}
+
+/* 除外した手（リストの下に畳む） */
+.excluded-box {
+  border-top: 1px solid var(--color-border);
+}
+
+.excluded-toggle {
+  min-height: var(--touch-min);
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: var(--font-size-small);
+  cursor: pointer;
+}
+
+.excluded-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.excluded-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-text-muted);
+}
+
+.excluded-item .candidate-move {
+  font-weight: normal;
+}
+
+.excluded-item .btn {
+  margin-left: auto;
 }
 
 .candidate-line {

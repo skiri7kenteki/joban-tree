@@ -1,6 +1,7 @@
 // ツリーの閲覧画面（中心となる画面）。
 // 上に盤面、下に「この局面の候補手リスト」。候補手をタップで 1 手進む。戻るボタン・左右スワイプで戻る/進む。
 // 段階4：スマホ縦で「盤＋候補手 3 つ」が 1 画面に収まるよう詰めた。相手の応手の行には自分の対応と枝の先の様子を併記する。
+// 段階4-3：相手の応手の行の「⋯」から「この手を除外」。除外した手はリストの下に畳み、「戻す」で戻せる。
 // 生成中も、できた枝からたどれる。
 // 局面ごとの操作：「ここから展開」「この手を検証」「KIF をコピー」、ツリーの書き出し・共有。
 
@@ -11,14 +12,14 @@ import { formatScore, scoreToNumber, type Score } from '../engine/usi';
 import { moveText } from '../shogi/position';
 import { loadTree } from '../storage/trees';
 import { fileNameOf, treeToJson } from '../tree/backup';
-import { FINISH_TEXT, countParents, isAfterDubiousOnly, isOpponentNode } from '../tree/generator';
+import { FINISH_TEXT, countParents, excludeMove, isAfterDubiousOnly, isOpponentNode, restoreMove } from '../tree/generator';
 import { pathToKif, treeToKif } from '../tree/kif';
 import { branchInfo, branchText, lastPrefixMove, replyOf } from '../tree/browse';
 import { LABEL_TEXT, labelOf } from '../tree/labels';
 import type { PresetId } from '../tree/presets';
 import { availablePresets } from './engineService';
 import type { TreeData, TreeEdge } from '../tree/types';
-import { generation, isGenerating, openTree, startGeneration, startVerify, stopGeneration, treeVersion } from './generation';
+import { generation, isGenerating, openTree, saveEdited, startGeneration, startResample, startVerify, stopGeneration, treeVersion } from './generation';
 import { go } from './router';
 import { generationSettingsFor, presetLabel, settings } from './settings';
 import { OUTCOME_TEXT, copyText, shareFile } from './share';
@@ -52,6 +53,10 @@ function TreeView({ tree }: { tree: TreeData }) {
   const [forward, setForward] = useState<string[]>([]);
   /** 開いている小窓（ここから展開・書き出し） */
   const [dialog, setDialog] = useState<'expand' | 'export' | null>(null);
+  /** 「⋯」を押した候補手（手のメニューを出す） */
+  const [menuEdge, setMenuEdge] = useState<TreeEdge | null>(null);
+  /** 除外した手の欄を開いているか */
+  const [showExcluded, setShowExcluded] = useState(false);
   /** 操作の結果（「コピーしました」など） */
   const [note, setNote] = useState('');
   const crumbsRef = useRef<HTMLDivElement>(null);
@@ -105,6 +110,21 @@ function TreeView({ tree }: { tree: TreeData }) {
   function verify() {
     setNote('');
     void startVerify(tree, key, settings.value.verifyMs);
+  }
+  /** 相手の応手を除外して、この局面を調べ直す（候補を補い、ラベルを付け直す） */
+  async function exclude(edge: TreeEdge) {
+    setMenuEdge(null);
+    if (isGenerating() || !excludeMove(node, edge.move)) return;
+    setForward([]);
+    setNote('');
+    await saveEdited(tree);
+    void startResample(tree, key);
+  }
+  /** 除外した手を戻す（調べ直しはしない。ラベルは付け直す） */
+  async function restore(edge: TreeEdge) {
+    if (isGenerating() || !restoreMove(node, edge.move)) return;
+    setNote('');
+    await saveEdited(tree);
   }
   async function copyKif() {
     const ok = await copyText(pathToKif(tree, path, thresholds));
@@ -207,7 +227,7 @@ function TreeView({ tree }: { tree: TreeData }) {
                 const reply = opp ? replyOf(tree, edge) : undefined;
                 const info = branchInfo(tree, edge);
                 return (
-                  <li key={edge.move}>
+                  <li key={edge.move} class="candidate-item">
                     <button type="button" class="candidate" data-testid="candidate" onClick={() => advance(edge)}>
                       <span class="candidate-line">
                         <span class="candidate-move">{moveText(node.sfen, edge.move, incoming?.move)}</span>
@@ -225,10 +245,47 @@ function TreeView({ tree }: { tree: TreeData }) {
                         )}
                       </span>
                     </button>
+                    {opp && (
+                      <button
+                        type="button"
+                        class="candidate-menu"
+                        data-testid="candidate-menu"
+                        aria-label={`${moveText(node.sfen, edge.move, incoming?.move)} の操作`}
+                        onClick={() => setMenuEdge(edge)}
+                      >
+                        ⋯
+                      </button>
+                    )}
                   </li>
                 );
               })}
             </ul>
+            {node.excluded && node.excluded.length > 0 && (
+              <div class="excluded-box" data-testid="excluded-box">
+                <button
+                  type="button"
+                  class="excluded-toggle"
+                  data-testid="excluded-toggle"
+                  aria-expanded={showExcluded}
+                  onClick={() => setShowExcluded(!showExcluded)}
+                >
+                  除外した手（{node.excluded.length}）{showExcluded ? '▾' : '▸'}
+                </button>
+                {showExcluded && (
+                  <ul class="excluded-list">
+                    {node.excluded.map((edge) => (
+                      <li key={edge.move} class="excluded-item" data-testid="excluded-item">
+                        <span class="candidate-move">{moveText(node.sfen, edge.move, incoming?.move)}</span>
+                        <span class="muted">調べません</span>
+                        <button type="button" class="btn btn-ghost" data-testid="excluded-restore" disabled={busy} onClick={() => void restore(edge)}>
+                          戻す
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
           </div>
 
           {/* 局面ごとの操作（主役の候補手リストを先に見せるため、その下に置く） */}
@@ -266,6 +323,21 @@ function TreeView({ tree }: { tree: TreeData }) {
               </button>
             ))}
           </div>
+        </Dialog>
+      )}
+
+      {menuEdge && (
+        <Dialog title={moveText(node.sfen, menuEdge.move, incoming?.move)} onClose={() => setMenuEdge(null)} testId="move-menu">
+          <p>
+            人があまり指さない手などを除外すると、この局面を調べ直して（約{Math.round(tree.settings.movetimeMs / 100) / 10}秒）代わりの候補を補います。
+            除外した手は、調べ直しても「ここから展開」しても採用しません。リストの下の「除外した手」から戻せます。
+          </p>
+          <div class="dialog-actions dialog-actions-column">
+            <button type="button" class="btn btn-primary" data-testid="exclude-move" disabled={busy} onClick={() => void exclude(menuEdge)}>
+              この手を除外
+            </button>
+          </div>
+          {busy && <p class="muted">生成中は除外できません。止めてから除外してください。</p>}
         </Dialog>
       )}
 
@@ -308,6 +380,11 @@ function GenerationPanel({ tree }: { tree: TreeData }) {
     let text: string;
     if (gen.kind === 'verify') {
       text = gen.finish === 'completed' ? '検証しました（自分の対応のいちばん上が、確定した手です）' : FINISH_TEXT[gen.finish ?? 'stopped'];
+    } else if (gen.kind === 'resample') {
+      text =
+        gen.finish === 'completed'
+          ? '除外した手のほかに候補を補いました（ラベルは残った手の中の最善手から付け直しました）'
+          : FINISH_TEXT[gen.finish ?? 'stopped'];
     } else {
       text = `${gen.finish ? FINISH_TEXT[gen.finish] : '終わりました'}${where}`;
       if (gen.progress) text += `（調べた局面 ${gen.progress.searched}・全部で ${gen.progress.nodeCount} 局面）`;
@@ -325,6 +402,7 @@ function GenerationPanel({ tree }: { tree: TreeData }) {
   let text: string;
   if (gen.phase === 'engine') text = 'エンジンを準備中…';
   else if (gen.kind === 'verify') text = `検証中（${total}秒）…`;
+  else if (gen.kind === 'resample') text = `調べ直し中（${total}秒）…`;
   else text = `生成中${where} ${Math.min(elapsed, total)}秒／${total}秒・調べた局面 ${gen.progress?.searched ?? 0}・${gen.progress?.round ?? 1}往復目`;
   return (
     <div class="gen-panel" data-testid="gen-status" data-phase={gen.phase} data-kind={gen.kind}>

@@ -52,6 +52,15 @@ describe('UsiEngine', () => {
     expect(hashes[1]).toBeLessThan(threads[1]);
   });
 
+  it('調べる手を限るときは go に searchmoves を付ける（除外した手を外す、段階4-3）', async () => {
+    const fake = new FakeEngine();
+    const engine = new UsiEngine(fake);
+    await engine.start({ threads: 1, hashMB: 16 });
+    await engine.analyze('startpos', { movetimeMs: 300, multiPV: 2, searchMoves: ['2g2f', '1g1f'] });
+    await engine.analyze('startpos', { movetimeMs: 300, multiPV: 2, searchMoves: [] });
+    expect(fake.received.filter((l) => l.startsWith('go'))).toEqual(['go movetime 300 searchmoves 2g2f 1g1f', 'go movetime 300']);
+  });
+
   it('analyze は各候補の最後の読み筋を返す', async () => {
     const fake = new FakeEngine();
     const engine = new UsiEngine(fake);

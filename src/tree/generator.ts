@@ -10,7 +10,7 @@
 
 import type { AnalysisEngine, AnalysisResult } from '../engine/engine';
 import { negateScore, scoreToNumber } from '../engine/usi';
-import { applyUsiMove, positionCommand, sfenKey, sideToMove, type Side } from '../shogi/position';
+import { applyUsiMove, legalMoves, positionCommand, sfenKey, sideToMove, type Side } from '../shogi/position';
 import {
   TREE_APP,
   TREE_FORMAT_VERSION,
@@ -168,6 +168,66 @@ export class TreeGenerator {
   }
 
   /**
+   * 除外した手を外して、相手の局面を 1 つだけ調べ直す（段階4-3）。
+   * 除外した手以外の合法手の中から MultiPV の数だけ調べ（go searchmoves）、候補を補い、ラベル（最善手との差）を付け直す。
+   * 新しく入った応手には、読み筋の 2 手目を「未検証」の自分の対応として置く（確定は「ここから展開」か「この手を検証」で）
+   */
+  async resample(key: string, movetimeMs: number): Promise<FinishReason> {
+    this.startedAt = this.now();
+    const node = this.tree.nodes[key];
+    if (!node || node.terminal || !isOpponentNode(this.tree, node)) return 'completed';
+    const excluded = new Set((node.excluded ?? []).map((e) => e.move));
+    const allowed = legalMoves(node.sfen).filter((m) => !excluded.has(m));
+    if (allowed.length === 0) {
+      relabel(node);
+      return 'completed';
+    }
+    let result: AnalysisResult;
+    try {
+      result = await this.engine.analyze(positionCommand(node.sfen), { movetimeMs, multiPV: this.settings.multiPV, searchMoves: allowed });
+    } catch (error) {
+      this.errorMessage = error instanceof Error ? error.message : String(error);
+      return 'error';
+    }
+    node.searched = { movetimeMs, multiPV: this.settings.multiPV, depth: result.depth, nodes: result.nodes };
+    const lines = result.lines.filter((l) => l.pv.length > 0 && l.score && !excluded.has(l.pv[0]));
+    // 今ある応手の評価値は、新しく調べた値に直す
+    for (const line of lines) {
+      const edge = node.edges.find((e) => e.move === line.pv[0]);
+      if (edge) edge.score = negateScore(line.score!);
+    }
+    // 新しい応手を足す（評価値の差は、残った手の中の最善手から。このあと relabel で全体を付け直す）
+    const best = Math.max(...node.edges.map((e) => -scoreToNumber(e.score)), ...lines.map((l) => scoreToNumber(l.score!)));
+    for (const line of lines) {
+      const oppMove = line.pv[0];
+      if (node.edges.some((e) => e.move === oppMove)) continue;
+      const diff = best - scoreToNumber(line.score!);
+      if (diff > this.settings.windowCp) continue;
+      const afterOpp = applyUsiMove(node.sfen, oppMove);
+      if (!afterOpp) continue;
+      const myScore = negateScore(line.score!);
+      const me = this.getOrCreate(afterOpp.sfen, node.round).node;
+      node.edges.push({ move: oppMove, to: me.key, score: myScore, diff });
+      if (me.edges.length > 0 || me.searched || me.terminal) continue;
+      const myMove = line.pv[1];
+      const afterMine = myMove ? applyUsiMove(afterOpp.sfen, myMove) : null;
+      if (!myMove || !afterMine) continue;
+      const next = this.getOrCreate(afterMine.sfen, node.round + 1).node;
+      me.edges.push({ move: myMove, to: next.key, score: myScore, unverified: true });
+    }
+    relabel(node);
+    this.searched++;
+    this.tree.updatedAt = this.now();
+    this.hooks.onChange?.({
+      elapsedMs: this.now() - this.startedAt,
+      searched: this.searched,
+      nodeCount: Object.keys(this.tree.nodes).length,
+      round: Math.max(1, node.round + 1),
+    });
+    return this.stopped ? 'stopped' : 'completed';
+  }
+
+  /**
    * 「この手を検証」：自分ノードを 1 局面だけ、MultiPV=1 で調べ直す。
    * 最善手を「確定した自分の対応」として先頭に置く。読み筋から取った手（未検証）が別の手だったときは、
    * その枝も消さずに残す（その先のツリーを失わないため）。
@@ -287,6 +347,8 @@ export class TreeGenerator {
       const afterOpp = applyUsiMove(node.sfen, oppMove);
       if (!afterOpp) continue;
       if (node.edges.some((e) => e.move === oppMove)) continue;
+      // 利用者が除外した手は採用しない
+      if (node.excluded?.some((e) => e.move === oppMove)) continue;
       const me = this.getOrCreate(afterOpp.sfen, node.round).node;
       node.edges.push({ move: oppMove, to: me.key, score: myScore, diff });
 
@@ -338,6 +400,40 @@ export class TreeGenerator {
 function compare(a: QueueItem, b: QueueItem): number {
   if (a.round !== b.round) return a.round - b.round;
   return b.priority - a.priority;
+}
+
+/**
+ * 相手の応手のラベル（最善手との差 diff）を、今ある応手の中の最善手から付け直し、良い順に並べる（段階4-3）。
+ * 除外した手は比べる相手から外す（最善手を除外したら、残った手の中の最善手が「本線」になる）
+ */
+export function relabel(node: TreeNode): void {
+  if (node.edges.length === 0) return;
+  // 評価値は自分から見た値なので、相手から見た値はその反対
+  const oppValue = (e: TreeEdge) => -scoreToNumber(e.score);
+  const best = Math.max(...node.edges.map(oppValue));
+  for (const edge of node.edges) edge.diff = best - oppValue(edge);
+  node.edges.sort((a, b) => a.diff! - b.diff!);
+}
+
+/** 相手の応手を除外する（edges から excluded に移し、ラベルを付け直す）。その手が無ければ false */
+export function excludeMove(node: TreeNode, move: string): boolean {
+  const edge = node.edges.find((e) => e.move === move);
+  if (!edge) return false;
+  node.edges = node.edges.filter((e) => e !== edge);
+  node.excluded = [...(node.excluded ?? []), edge];
+  relabel(node);
+  return true;
+}
+
+/** 除外した手を戻す（excluded から edges に戻し、ラベルを付け直す）。その手が無ければ false */
+export function restoreMove(node: TreeNode, move: string): boolean {
+  const edge = node.excluded?.find((e) => e.move === move);
+  if (!edge) return false;
+  node.excluded = node.excluded!.filter((e) => e !== edge);
+  if (node.excluded.length === 0) delete node.excluded;
+  node.edges.push(edge);
+  relabel(node);
+  return true;
 }
 
 /**

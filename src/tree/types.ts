@@ -5,7 +5,10 @@ import type { Score } from '../engine/usi';
 import type { Side } from '../shogi/position';
 
 export const TREE_APP = 'joban-tree';
-export const TREE_FORMAT_VERSION = 1;
+/**
+ * 形式の版。1：段階1〜。2：段階4-3〜（局面に「除外した手」excluded を足した。1 の形はそのまま 2 として読める）
+ */
+export const TREE_FORMAT_VERSION = 2;
 
 /** 生成の条件（プリセットから決まる） */
 export interface GenerationSettings {
@@ -64,12 +67,18 @@ export interface TreeNode {
   searched?: { movetimeMs: number; multiPV: number; depth: number; nodes: number };
   /** 指す手が無い（詰み・投了など） */
   terminal?: boolean;
+  /**
+   * 利用者が除外した相手の応手（形式 2〜）。edges から移したもので、その先の局面は消さずに残す（「戻す」で edges に戻る）。
+   * ここにある手は、調べ直すときにも採用しない（go searchmoves で外す）。書き出し・復習・ここから展開ではたどらない
+   */
+  excluded?: TreeEdge[];
 }
 
 /** 保存されるツリー全体 */
 export interface TreeData {
   app: typeof TREE_APP;
-  version: typeof TREE_FORMAT_VERSION;
+  /** 形式の版（古い形式のツリーは、保存し直すときに TREE_FORMAT_VERSION にする） */
+  version: number;
   id: string;
   name: string;
   createdAt: number;

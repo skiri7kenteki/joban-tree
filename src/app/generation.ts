@@ -4,13 +4,13 @@
 import { signal } from '@preact/signals';
 import { saveTree } from '../storage/trees';
 import { FINISH_TEXT, TreeGenerator, type FinishReason, type GeneratorProgress } from '../tree/generator';
-import type { GenerationSettings, TreeData } from '../tree/types';
+import { TREE_FORMAT_VERSION, type GenerationSettings, type TreeData } from '../tree/types';
 import { getEngine } from './engineService';
 
 export interface GenerationState {
   treeId: string;
-  /** generate：生成（ここから展開も同じ）、verify：この手を検証 */
-  kind: 'generate' | 'verify';
+  /** generate：生成（ここから展開も同じ）、verify：この手を検証、resample：除外した手を外して 1 局面を調べ直す */
+  kind: 'generate' | 'verify' | 'resample';
   /** どの局面から（または、どの局面を）調べているか */
   startKey: string;
   /** engine：エンジンの準備中、running：生成中、done：終わった */
@@ -51,6 +51,23 @@ export function startGeneration(tree: TreeData, settings: GenerationSettings, st
 export function startVerify(tree: TreeData, key: string, movetimeMs: number): Promise<void> {
   const settings: GenerationSettings = { ...tree.settings, totalMs: movetimeMs, movetimeMs, multiPV: 1 };
   return runJob(tree, 'verify', key, settings, (g) => g.verify(key, movetimeMs));
+}
+
+/** 除外した手を外して、相手の手番の局面を 1 つだけ調べ直す（候補を補う。段階4-3） */
+export function startResample(tree: TreeData, key: string): Promise<void> {
+  // ツリーを作ったときと同じ 1 局面の時間・候補手の数で
+  const { movetimeMs } = tree.settings;
+  const settings: GenerationSettings = { ...tree.settings, totalMs: movetimeMs };
+  tree.version = TREE_FORMAT_VERSION;
+  return runJob(tree, 'resample', key, settings, (g) => g.resample(key, movetimeMs));
+}
+
+/** 生成していないときに、ツリーを書き換えて保存する（除外した手を戻すなど） */
+export async function saveEdited(tree: TreeData): Promise<void> {
+  tree.version = TREE_FORMAT_VERSION;
+  tree.updatedAt = Date.now();
+  treeVersion.value++;
+  await saveTree(tree);
 }
 
 async function runJob(
