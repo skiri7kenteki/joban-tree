@@ -1,5 +1,5 @@
 // 局面の入力画面：棋譜を貼り付ける／盤をタップして指す → 手順を前後して局面を選ぶ →
-// 自分が先手か後手かを選ぶ → プリセット（ふつう・じっくり）を選んで生成。
+// 自分が先手か後手かを選ぶ → プリセット（ふつう・じっくり。PC 版は精密も）を選んで生成。
 
 import { useState } from 'preact/hooks';
 import { Position, type Move } from 'tsshogi';
@@ -9,7 +9,8 @@ import { parseKifu, type LinePosition } from '../shogi/kifu';
 import { STARTPOS_SFEN, moveText, otherSide, sideToMove, type Side } from '../shogi/position';
 import { saveTree, newTreeId } from '../storage/trees';
 import { createTree } from '../tree/generator';
-import { PRESET_IDS, type PresetId } from '../tree/presets';
+import type { PresetId } from '../tree/presets';
+import { availablePresets, effectivePcThreads, pcEngine } from './engineService';
 import { openTree, startGeneration, isGenerating } from './generation';
 import { go } from './router';
 import { generationSettingsFor, presetLabel } from './settings';
@@ -189,8 +190,13 @@ export function InputScreen() {
             : 'この局面は相手の手番です。相手の応手と、それへの自分の対応を広げます。'}
         </p>
         {isGenerating() && <p class="muted">ほかのツリーを生成中です。終わるか止めてから作ってください。</p>}
+        {pcEngine.value && (
+          <p class="notice" data-testid="pc-engine-note">
+            PC のエンジンで作ります（{effectivePcThreads(pcEngine.value)} スレッド）。できたツリーは「JSON で渡す」で iPad やスマホに渡せます。
+          </p>
+        )}
         <div class="preset-buttons">
-          {PRESET_IDS.map((id) => (
+          {availablePresets().map((id) => (
             <button
               type="button"
               key={id}

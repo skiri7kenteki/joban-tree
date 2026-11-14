@@ -154,6 +154,9 @@ test('設定：変えた値が保存され、プリセットのボタンに反�
   await expect(page.getByTestId('start-normal')).toHaveText('ふつう（1分30秒）で作る');
   await expect(page.getByTestId('start-deep')).toHaveText('じっくり（5分）で作る');
   await expect(page.getByTestId('start-quick')).toHaveCount(0);
+  // 「精密」は PC 版（start.bat から開いたとき）だけ
+  await expect(page.getByTestId('start-precise')).toHaveCount(0);
+  await expect(page.getByTestId('pc-engine-note')).toHaveCount(0);
 
   await page.goto('./#/settings');
   await page.getByTestId('reset-settings').click();

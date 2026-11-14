@@ -87,4 +87,34 @@ describe('UsiEngine', () => {
     const secondPosition = fake.received.indexOf('position startpos moves 2g2f');
     expect(firstGo).toBeLessThan(secondPosition);
   });
+
+  it('エンジンが思いがけず終わったら、待っている探索も後の探索も失敗になる（止まったままにならない）', async () => {
+    /** go を受けても返事をせず、外から「終わった」を知らせられる偽物（PC 版で黒い画面を閉じたときの代わり） */
+    class DyingEngine extends FakeEngine {
+      private closeListener: (reason: string) => void = () => undefined;
+      override send(line: string): void {
+        if (!line.startsWith('go')) super.send(line);
+      }
+      onClose(listener: (reason: string) => void): void {
+        this.closeListener = listener;
+      }
+      die(): void {
+        this.closeListener('エンジンが終了しました');
+      }
+    }
+    const fake = new DyingEngine();
+    const engine = new UsiEngine(fake);
+    await engine.start({ threads: 1, hashMB: 16 });
+    let deadMessage = '';
+    engine.onDead((e) => (deadMessage = e.message));
+    const searching = engine.analyze('startpos', { movetimeMs: 100, multiPV: 1 });
+    const queued = engine.analyze('startpos moves 7g7f', { movetimeMs: 100, multiPV: 1 });
+    setTimeout(() => fake.die(), 5);
+    await expect(searching).rejects.toThrow('エンジンが終了しました');
+    await expect(queued).rejects.toThrow('エンジンが終了しました');
+    await expect(engine.analyze('startpos', { movetimeMs: 100, multiPV: 1 })).rejects.toThrow('エンジンが終了しました');
+    expect(deadMessage).toBe('エンジンが終了しました');
+    // 2 つ目の探索は送られていない
+    expect(fake.received).not.toContain('position startpos moves 7g7f');
+  });
 });

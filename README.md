@@ -40,14 +40,32 @@
 | `npm run build` | 公開用のファイルを `dist/` に作る |
 | `npx playwright test` | 画面の通し確認（初回は `npx playwright install chromium` が必要） |
 
+## PC で作る（精密ツリー）
+PC（Windows）では、ブラウザの中のエンジンの代わりに、PC 用（Windows 版）のやねうら王で速く・深く調べられます（ブラウザ版の約 3 倍）。
+
+1. Node.js を入れておく（上の「手元の PC で動かす」の 1.）
+2. `pc/start.bat` をダブルクリック → 黒い画面が開き、ブラウザで `http://localhost:18765/joban-tree/` が開く
+   - 初回は、エンジン（約 2MB）と評価関数を GitHub Pages から `%LOCALAPPDATA%\joban-tree-pc` にダウンロードする
+3. いつもと同じ画面で作る。PC 版だけ「精密（10分）」のプリセットがある
+4. できたツリーは「JSON で渡す」で iPad やスマホに渡す
+5. 終わるときは黒い画面を閉じる
+
+注意：
+- PC 版の画面（`localhost:18765`）で作ったツリーは、同じ PC のブラウザでも公開版（`skiri7kenteki.github.io`）の一覧には出ません（ブラウザがサイトごとに保存を分けるため）。
+  PC 版を開けば、また見られます
+- ポート番号（18765）を変えると別のサイト扱いになり、保存したツリーが見えなくなります
+- しくみ：`pc/server.mjs`（Node.js の標準機能だけ）が、画面を GitHub Pages から中継し、エンジンと画面の間で USI の行を受け渡す。
+  この PC の中（127.0.0.1）からしか接続できない。エンジンは `public/pc-engine/manifest.json` の sha256 と一致したものだけ動かす
+
 ## エンジンのビルド（GitHub Actions が行う）
+- PC 用（Windows 版）は、同じコミット・パッチを MinGW でクロスビルドします（`engine/build-windows.sh`。AVX2 対応の CPU 用）
 - `engine/yaneuraou.commit` のコミットのやねうら王に、`engine/patches/` のパッチを当てて、
   Docker イメージ `emscripten/emsdk:3.1.43` の中でビルドします（`engine/build.sh`）
 - 評価関数は埋め込まず、アプリが `nn.bin` と `progress.bin` をエンジンの仮想ファイルシステムに書き込みます
 - やねうら王のコミット・パッチ・`build.sh` が変わらなければ、前回のビルド結果を使います（キャッシュ）
 
 ## ライセンス
-- このリポジトリ：**GPLv3**（`LICENSE`）。やねうら王（GPLv3）の WebAssembly 版を同梱して配信するためです
+- このリポジトリ：**GPLv3**（`LICENSE`）。やねうら王（GPLv3）の WebAssembly 版と Windows 版を同梱して配信するためです
 - やねうら王：GPLv3。ソースは https://github.com/yaneurao/YaneuraOu （使っているコミットは `engine/yaneuraou.commit`、変更点は `engine/patches/`）
 - つようら王11micro / 11mini の評価関数（`nn.bin`・`progress.bin`）：MIT License（`public/eval/LICENSE-tuyoura.txt`。出典：[やねうら王公式サイトの公開記事](https://yaneuraou.yaneu.com/2026/10/14/tsuyou-11-mini-micro-released-under-mit-license/)）
 - 使っている主な部品：

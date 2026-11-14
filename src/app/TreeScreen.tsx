@@ -13,7 +13,8 @@ import { fileNameOf, treeToJson } from '../tree/backup';
 import { FINISH_TEXT, countParents, isOpponentNode } from '../tree/generator';
 import { pathToKif, treeToKif } from '../tree/kif';
 import { LABEL_TEXT, labelOf } from '../tree/labels';
-import { PRESET_IDS, type PresetId } from '../tree/presets';
+import type { PresetId } from '../tree/presets';
+import { availablePresets } from './engineService';
 import type { TreeData, TreeEdge } from '../tree/types';
 import { generation, isGenerating, openTree, startGeneration, startVerify, stopGeneration, treeVersion } from './generation';
 import { go } from './router';
@@ -246,7 +247,7 @@ function TreeView({ tree }: { tree: TreeData }) {
         <Dialog title="ここから展開" onClose={() => setDialog(null)} testId="expand-dialog">
           <p>この局面から先の、まだ調べていない枝を広げます。今あるツリーに枝を足します。</p>
           <div class="dialog-actions dialog-actions-column">
-            {PRESET_IDS.map((id) => (
+            {availablePresets().map((id) => (
               <button type="button" key={id} class="btn btn-primary" data-testid={`expand-${id}`} onClick={() => expand(id)}>
                 {presetLabel(id)}
               </button>

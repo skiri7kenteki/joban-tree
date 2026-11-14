@@ -59,5 +59,5 @@ for out in "${!EDITIONS[@]}"; do
 done
 
 # やねうら王のライセンス（GPLv3）も一緒に配る
-cp "$WORK/Copying.txt" "$DIST/" 2>/dev/null || cp "$WORK/LICENSE" "$DIST/" 2>/dev/null || true
+cp "$WORK/LICENSE" "$DIST/LICENSE-yaneuraou.txt"
 ls -la "$DIST"

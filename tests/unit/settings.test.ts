@@ -57,4 +57,20 @@ describe('設定', () => {
     expect(presetLabel('deep', s)).toBe('じっくり（5分）');
     expect(formatDuration(90_000)).toBe('1分30秒');
   });
+
+  it('PC 版：精密プリセットがあり、PC のスレッド数・ハッシュを範囲内に直す。v0.5 の保存分には精密の初期値を足す', () => {
+    const d = defaultSettings();
+    expect(presetLabel('precise', d)).toBe('精密（10分）');
+    expect(d.pcThreads).toBe(0);
+    expect(d.pcHashMB).toBe(1024);
+    const s = normalizeSettings({ pcThreads: -3, pcHashMB: 999 });
+    expect(s.pcThreads).toBe(0);
+    expect(s.pcHashMB).toBe(1024);
+    expect(normalizeSettings({ pcThreads: 12, pcHashMB: 2048 })).toMatchObject({ pcThreads: 12, pcHashMB: 2048 });
+    // v0.5 で保存した設定（精密が無い）でも、ふつうの値は残り、精密は初期値になる
+    const v05 = { presets: { normal: { ...d.presets.normal, totalMs: 90_000 }, deep: d.presets.deep } };
+    const loaded = normalizeSettings(v05);
+    expect(loaded.presets.normal.totalMs).toBe(90_000);
+    expect(loaded.presets.precise).toEqual(d.presets.precise);
+  });
 });

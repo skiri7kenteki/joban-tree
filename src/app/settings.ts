@@ -23,6 +23,10 @@ export interface AppSettings {
   /** スレッド数。0 は「おまかせ」（使える範囲で最大、上限 7） */
   threads: number;
   hashMB: number;
+  /** PC 版（start.bat）のスレッド数。0 は「おまかせ」（論理プロセッサの数 − 2） */
+  pcThreads: number;
+  /** PC 版のハッシュ（MB） */
+  pcHashMB: number;
   /** 最善手から何点以内の応手を採用するか（W） */
   windowCp: number;
   /** 局面の数の上限 */
@@ -34,6 +38,10 @@ export interface AppSettings {
 }
 
 export const HASH_CHOICES = [16, 32, 64] as const;
+/** PC 版のハッシュの選択肢（PC はメモリに余裕がある） */
+export const PC_HASH_CHOICES = [256, 512, 1024, 2048] as const;
+/** PC 版のスレッド数の上限（設定の値の歯止め。実際は PC の論理プロセッサの数まで） */
+export const PC_MAX_THREADS = 256;
 const STORAGE_KEY = 'joban-tree.settings';
 
 export function defaultSettings(): AppSettings {
@@ -47,6 +55,8 @@ export function defaultSettings(): AppSettings {
     evalId: 'micro',
     threads: 0,
     hashMB: 32,
+    pcThreads: 0,
+    pcHashMB: 1024,
     windowCp: DEFAULT_WINDOW_CP,
     maxNodes: DEFAULT_MAX_NODES,
     thresholds: { ...DEFAULT_THRESHOLDS },
@@ -88,6 +98,8 @@ export function normalizeSettings(raw: unknown): AppSettings {
     evalId: r.evalId === 'mini' ? 'mini' : 'micro',
     threads: num(r.threads, d.threads, 0, MAX_SEARCH_THREADS),
     hashMB: HASH_CHOICES.includes(r.hashMB as 16) ? (r.hashMB as number) : d.hashMB,
+    pcThreads: num(r.pcThreads, d.pcThreads, 0, PC_MAX_THREADS),
+    pcHashMB: PC_HASH_CHOICES.includes(r.pcHashMB as 256) ? (r.pcHashMB as number) : d.pcHashMB,
     windowCp: num(r.windowCp, d.windowCp, 0, 5000),
     maxNodes: num(r.maxNodes, d.maxNodes, 50, 20_000),
     thresholds: { mainMax, goodMax: num(t.goodMax, d.thresholds.goodMax, mainMax, 5000) },
@@ -131,7 +143,7 @@ export function generationSettingsFor(id: PresetId, s: AppSettings = settings.va
 
 /** プリセットのボタンに出す名前（例：「ふつう（2分）」） */
 export function presetLabel(id: PresetId, s: AppSettings = settings.value): string {
-  const name = { normal: 'ふつう', deep: 'じっくり' }[id];
+  const name = { normal: 'ふつう', deep: 'じっくり', precise: '精密' }[id];
   return `${name}（${formatDuration(s.presets[id].totalMs)}）`;
 }
 

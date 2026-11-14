@@ -46,6 +46,8 @@ export interface AnalysisEngine {
 export interface LineTransport {
   send(line: string): void;
   onLine(listener: (line: string) => void): void;
+  /** エンジンが思いがけず終わったとき（PC 版で黒い画面を閉じたときなど）に呼んでもらう。無くてもよい */
+  onClose?(listener: (reason: string) => void): void;
   close(): void;
 }
 
@@ -66,11 +68,29 @@ export interface EngineTimings {
 export class UsiEngine implements AnalysisEngine {
   /** 順番待ちの最後尾（前のコマンドが終わってから次を始める） */
   private queue: Promise<unknown> = Promise.resolve();
-  private readonly waiters: { test: (line: string) => boolean; resolve: (line: string) => void }[] = [];
+  private readonly waiters: { test: (line: string) => boolean; resolve: (line: string) => void; reject: (error: Error) => void }[] = [];
   private lineListeners: ((line: string) => void)[] = [];
+  /** エンジンが終わっていたら、その理由 */
+  private dead: Error | null = null;
+  private deadListeners: ((error: Error) => void)[] = [];
 
   constructor(private readonly transport: LineTransport) {
     transport.onLine((line) => this.receive(line));
+    transport.onClose?.((reason) => this.fail(new Error(reason)));
+  }
+
+  /** エンジンが終わった。待っている処理はすべて失敗にする（止まったままにしない） */
+  private fail(error: Error): void {
+    if (this.dead) return;
+    this.dead = error;
+    for (const w of this.waiters.splice(0)) w.reject(error);
+    for (const l of this.deadListeners) l(error);
+  }
+
+  /** エンジンが思いがけず終わったときに呼ばれる */
+  onDead(listener: (error: Error) => void): void {
+    if (this.dead) listener(this.dead);
+    else this.deadListeners.push(listener);
   }
 
   /** 生の出力を見たいとき用（速度測定ページのログ表示など） */
@@ -89,12 +109,14 @@ export class UsiEngine implements AnalysisEngine {
   }
 
   private waitFor(test: (line: string) => boolean): Promise<string> {
-    return new Promise((resolve) => this.waiters.push({ test, resolve }));
+    if (this.dead) return Promise.reject(this.dead);
+    return new Promise((resolve, reject) => this.waiters.push({ test, resolve, reject }));
   }
 
   /** 順番待ちに仕事を入れる */
   private enqueue<T>(task: () => Promise<T>): Promise<T> {
-    const run = this.queue.then(task, task);
+    const guarded = () => (this.dead ? Promise.reject(this.dead) : task());
+    const run = this.queue.then(guarded, guarded);
     this.queue = run.catch(() => undefined);
     return run;
   }

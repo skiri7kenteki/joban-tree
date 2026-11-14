@@ -127,6 +127,23 @@
 - 記録は IndexedDB の `review`（DB の版 2、`src/storage/db.ts`）。キーは treeId。ツリーを消すと記録も消える。**JSON の書き出しには入れない**（自分だけの記録）
 - 盤のタップで指す処理は `src/components/useMoveInput.tsx`（入力画面と共通）
 
+## PC 版（精密ツリー、段階3）
+- 持ち主の判断（2026-11-14）：**PC の画面から作る**。`pc/start.bat` → `pc/server.mjs`（Node.js の標準機能だけ）→ ブラウザで `http://localhost:18765/joban-tree/`
+- サーバーの役目：
+  - 画面を GitHub Pages から中継する（COOP/COEP/CORP を付ける）
+  - `pc-api/`（info・start・events・send・close）で、Windows 版やねうら王と USI の行を受け渡す。events は出力を 1 行ずつ流し続ける応答（`flushHeaders` が必要）
+  - エンジンは同時に 1 つ。画面を閉じる（events が切れる）とエンジンも止める。優先度は「通常以下」
+- 安全：127.0.0.1 だけで待ち受け。Host が localhost/127.0.0.1 でなければ断る。pc-api は `X-Joban-Tree: 1` が無ければ断る。
+  エンジンと評価関数は `public/pc-engine/manifest.json` の sha256 と一致したものだけ使う（`%LOCALAPPDATA%\joban-tree-pc` に保存）
+- アプリ側：`src/engine/pcEngine.ts`（PcTransport。UsiEngine はそのまま）。localhost で開いて `pc-api/info` が答えたら PC 版（`engineService.pcEngine`）
+  - PC 版だけ「精密（10分）」プリセット（3000ms・N=4・自分 1500ms・5往復）。設定は `pcThreads`（おまかせ＝論理プロセッサ − 2）・`pcHashMB`（初期値 1024）
+  - エンジンが途中で終わったら（黒い画面を閉じたなど）、`UsiEngine` が待っている処理をすべて失敗にし、生成は「エラー」で終わる（ツリーは残る）。次に使うとき作り直す
+  - service worker は `pc-api/` に手を出さない
+- 測定（Ryzen 7 250、11micro、MultiPV3・3秒）：8 スレッド 320〜460 万、14 スレッド 500〜540 万、16 スレッド 480〜590 万局面/秒。PC の Chrome の WASM 版（7 スレッド）は約 185 万
+- `start.bat` は**英数字だけ**で書く（cmd は日本語の行を、chcp 65001 の後でも読み違えた）。改行は CRLF（`.gitattributes`）
+- ビルド：`engine/build-windows.sh`（MinGW、AVX2、tournament）。`engine/pc-manifest.mjs` が manifest.json を作る。キャッシュのキーはコミット・パッチ・build-windows.sh
+- PC 版の画面で作ったツリーは、同じ PC の公開版の一覧には出ない（サイトが別なので保存も別）。渡すときは JSON
+
 ## コードの方針
 - 初心者が読んで追えること。短い関数＋日本語コメント
 - 色は CSS 変数（`src/styles/tokens.css`）から使い、直書きしない
@@ -151,12 +168,14 @@ src/engine/usi.ts           USI の行を読み取る関数（テスト対象）
 src/engine/engine.ts        エンジンを包むモジュール（コマンドの順番待ち）
 src/engine/yaneuraou.worker.ts  エンジンを動かす Web Worker
 src/engine/config.ts        エンジン・評価関数のファイルの場所
+src/engine/pcEngine.ts      PC 版：pc/server.mjs 経由で Windows 版やねうら王とやり取りする
+pc/                         PC 版（start.bat・server.mjs）
 src/isolation.ts            service worker の登録と cross-origin isolated の確保
 src/sw.ts                   service worker
 src/styles/                 CSS（tokens.css に色などの変数）
 public/manifest.webmanifest ホーム画面用の設定（アイコンは public/*.png。scripts/make-icons.mjs で icon.svg から作る）
 public/eval/                評価関数（nn.bin・progress.bin・ライセンス。リポジトリに含める）
-engine/                     やねうら王のビルド（コミット固定・パッチ・build.sh・smoke.mjs）
+engine/                     やねうら王のビルド（コミット固定・パッチ・build.sh・smoke.mjs、PC 用は build-windows.sh・pc-manifest.mjs）
 tests/unit/                 Vitest（mock-engine.ts が偽物のエンジン）
 e2e/                        Playwright
 .github/workflows/deploy.yml  ビルド・テスト・公開

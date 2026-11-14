@@ -7,10 +7,12 @@
 
 import type { GenerationSettings } from './types';
 
-export type PresetId = 'normal' | 'deep';
+export type PresetId = 'normal' | 'deep' | 'precise';
 
-/** 画面に出す順 */
+/** 画面に出す順（スマホ・iPad・PC のブラウザ） */
 export const PRESET_IDS: PresetId[] = ['normal', 'deep'];
+/** PC 版（start.bat から開き、PC のエンジンを使うとき）。「精密」は PC だけ */
+export const PC_PRESET_IDS: PresetId[] = ['normal', 'deep', 'precise'];
 
 export interface Preset {
   id: PresetId;
@@ -43,6 +45,21 @@ export const PRESETS: Record<PresetId, Preset> = {
     settings: {
       totalMs: 300_000,
       movetimeMs: 2500,
+      multiPV: 4,
+      maxRounds: 5,
+      maxNodes: DEFAULT_MAX_NODES,
+      windowCp: DEFAULT_WINDOW_CP,
+      replyMs: 1500,
+    },
+  },
+  // PC 版だけ。PC のエンジン（14 スレッドで 1 秒あたり約 500 万局面、ブラウザ版の約 3 倍）で 1 局面を長く調べる。
+  // 3 秒で深さ 22〜25 くらい（段階3の測定、Ryzen 7 250）
+  precise: {
+    id: 'precise',
+    label: '精密（10分）',
+    settings: {
+      totalMs: 600_000,
+      movetimeMs: 3000,
       multiPV: 4,
       maxRounds: 5,
       maxNodes: DEFAULT_MAX_NODES,

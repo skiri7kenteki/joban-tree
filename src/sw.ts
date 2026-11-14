@@ -67,6 +67,8 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET' || url.origin !== self.location.origin) return;
   // Chrome の古い不具合への対策（only-if-cached は same-origin モード以外で使えない）
   if (request.cache === 'only-if-cached' && request.mode !== 'same-origin') return;
+  // PC 版のエンジンとのやり取り（pc/server.mjs）は、そのまま通す（出力が流れ続ける応答を包まないため）
+  if (url.pathname.startsWith(`${scopeUrl().pathname}pc-api/`)) return;
 
   event.respondWith(handle(request, url).then(addIsolationHeaders));
 });

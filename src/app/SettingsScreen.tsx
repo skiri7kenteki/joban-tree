@@ -3,16 +3,17 @@
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { EVALS, isOfflineReady, prepareOffline, type EvalId } from '../engine/config';
-import { PRESET_IDS, type PresetId } from '../tree/presets';
 import { MAX_SEARCH_THREADS } from '../engine/config';
-import { defaultThreads } from './engineService';
+import type { PcInfo } from '../engine/pcEngine';
+import type { PresetId } from '../tree/presets';
+import { availablePresets, defaultPcThreads, defaultThreads, pcEngine } from './engineService';
 import { isGenerating } from './generation';
 import { go } from './router';
-import { HASH_CHOICES, presetLabel, resetSettings, settings, updateSettings, type AppSettings, type PresetValues } from './settings';
-
+import { HASH_CHOICES, PC_HASH_CHOICES, presetLabel, resetSettings, settings, updateSettings, type AppSettings, type PresetValues } from './settings';
 
 export function SettingsScreen() {
   const s = settings.value;
+  const pc = pcEngine.value;
   const [confirmReset, setConfirmReset] = useState(false);
   const isolated = self.crossOriginIsolated;
   const maxThreads = Math.min(MAX_SEARCH_THREADS, navigator.hardwareConcurrency || 1);
@@ -56,34 +57,40 @@ export function SettingsScreen() {
           </span>
         </div>
 
-        <label class="form-field">
-          <span>スレッド数（同時に計算する数）</span>
-          {isolated ? (
-            <select value={s.threads} data-testid="threads" onChange={(e) => set({ threads: Number((e.target as HTMLSelectElement).value) })}>
-              <option value={0}>おまかせ（{defaultThreads()}）</option>
-              {Array.from({ length: maxThreads }, (_, i) => i + 1).map((n) => (
-                <option key={n} value={n}>
-                  {n}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <span class="muted">この端末では 1 スレッドだけ使えます</span>
-          )}
-        </label>
+        {pc ? (
+          <PcEngineFields info={pc} s={s} set={set} />
+        ) : (
+          <>
+            <label class="form-field">
+              <span>スレッド数（同時に計算する数）</span>
+              {isolated ? (
+                <select value={s.threads} data-testid="threads" onChange={(e) => set({ threads: Number((e.target as HTMLSelectElement).value) })}>
+                  <option value={0}>おまかせ（{defaultThreads()}）</option>
+                  {Array.from({ length: maxThreads }, (_, i) => i + 1).map((n) => (
+                    <option key={n} value={n}>
+                      {n}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <span class="muted">この端末では 1 スレッドだけ使えます</span>
+              )}
+            </label>
 
-        <label class="form-field">
-          <span>ハッシュ（エンジンが使うメモリ）</span>
-          <select value={s.hashMB} data-testid="hash" onChange={(e) => set({ hashMB: Number((e.target as HTMLSelectElement).value) })}>
-            {HASH_CHOICES.map((mb) => (
-              <option key={mb} value={mb}>
-                {mb} MB
-              </option>
-            ))}
-          </select>
-        </label>
+            <label class="form-field">
+              <span>ハッシュ（エンジンが使うメモリ）</span>
+              <select value={s.hashMB} data-testid="hash" onChange={(e) => set({ hashMB: Number((e.target as HTMLSelectElement).value) })}>
+                {HASH_CHOICES.map((mb) => (
+                  <option key={mb} value={mb}>
+                    {mb} MB
+                  </option>
+                ))}
+              </select>
+            </label>
 
-        <OfflineStatus evalId={s.evalId} />
+            <OfflineStatus evalId={s.evalId} />
+          </>
+        )}
       </section>
 
       <section class="card settings-section">
@@ -122,12 +129,18 @@ export function SettingsScreen() {
 
       <section class="card settings-section">
         <h2>プリセットの中身</h2>
-        {PRESET_IDS.map((id) => {
+        {availablePresets().map((id) => {
           const p = s.presets[id];
           return (
             <fieldset key={id} class="preset-field" data-testid={`preset-${id}`}>
               <legend>{presetLabel(id)}</legend>
-              <NumberField label="全体の時間" value={p.totalMs / 1000} unit="秒" testId={`${id}-total`} onChange={(v) => setPreset(id, { totalMs: v * 1000 })} />
+              <NumberField
+                label="全体の時間"
+                value={p.totalMs / 1000}
+                unit="秒"
+                testId={`${id}-total`}
+                onChange={(v) => setPreset(id, { totalMs: v * 1000 })}
+              />
               <NumberField
                 label="相手の局面を調べる時間"
                 value={p.movetimeMs}
@@ -144,8 +157,20 @@ export function SettingsScreen() {
                 testId={`${id}-reply`}
                 onChange={(v) => setPreset(id, { replyMs: v })}
               />
-              <NumberField label="候補手の数（N）" value={p.multiPV} unit="手" testId={`${id}-multipv`} onChange={(v) => setPreset(id, { multiPV: v })} />
-              <NumberField label="深さ（往復の数）" value={p.maxRounds} unit="往復" testId={`${id}-rounds`} onChange={(v) => setPreset(id, { maxRounds: v })} />
+              <NumberField
+                label="候補手の数（N）"
+                value={p.multiPV}
+                unit="手"
+                testId={`${id}-multipv`}
+                onChange={(v) => setPreset(id, { multiPV: v })}
+              />
+              <NumberField
+                label="深さ（往復の数）"
+                value={p.maxRounds}
+                unit="往復"
+                testId={`${id}-rounds`}
+                onChange={(v) => setPreset(id, { maxRounds: v })}
+              />
             </fieldset>
           );
         })}
@@ -176,6 +201,39 @@ export function SettingsScreen() {
           </>
         )}
       </div>
+    </>
+  );
+}
+
+/** PC 版（start.bat から開いたとき）のエンジンの設定 */
+function PcEngineFields({ info, s, set }: { info: PcInfo; s: AppSettings; set: (patch: Partial<AppSettings>) => void }) {
+  return (
+    <>
+      <p class="notice" data-testid="pc-engine-info">
+        PC のエンジン（Windows 版やねうら王）を使います。{info.cpuName && `CPU：${info.cpuName}`}
+      </p>
+      <label class="form-field">
+        <span>PC のスレッド数</span>
+        <select value={s.pcThreads} data-testid="pc-threads" onChange={(e) => set({ pcThreads: Number((e.target as HTMLSelectElement).value) })}>
+          <option value={0}>おまかせ（{defaultPcThreads(info)}）</option>
+          {Array.from({ length: info.cpus }, (_, i) => i + 1).map((n) => (
+            <option key={n} value={n}>
+              {n}
+            </option>
+          ))}
+        </select>
+        <span class="muted">多いほど速くなりますが、そのあいだ PC のほかの作業が重くなります。</span>
+      </label>
+      <label class="form-field">
+        <span>PC のハッシュ（エンジンが使うメモリ）</span>
+        <select value={s.pcHashMB} data-testid="pc-hash" onChange={(e) => set({ pcHashMB: Number((e.target as HTMLSelectElement).value) })}>
+          {PC_HASH_CHOICES.filter((mb) => !info.totalMemMB || mb <= info.totalMemMB / 4).map((mb) => (
+            <option key={mb} value={mb}>
+              {mb} MB
+            </option>
+          ))}
+        </select>
+      </label>
     </>
   );
 }
