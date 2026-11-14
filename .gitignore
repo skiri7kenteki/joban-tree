@@ -8,3 +8,5 @@ public/engine/
 # Playwright の記録
 playwright-report/
 test-results/
+# 型チェックのキャッシュ
+*.tsbuildinfo
