@@ -490,3 +490,18 @@
   font-size: var(--font-size-small);
   min-height: var(--touch-min);
 }
+
+/* 復習モード */
+.review-summary {
+  margin: 0 0 8px;
+}
+.review-prompt {
+  margin-bottom: 8px;
+  min-height: 96px;
+}
+.review-prompt p {
+  margin: 0 0 8px;
+}
+.review-prompt .btn-row {
+  margin-top: 4px;
+}

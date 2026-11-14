@@ -150,6 +150,9 @@ function TreeView({ tree }: { tree: TreeData }) {
           ‹ 一覧
         </button>
         <h1 class="tree-title">{tree.name}</h1>
+        <button type="button" class="btn" data-testid="review-open" onClick={() => go(`/review/${tree.id}`)}>
+          復習
+        </button>
       </div>
 
       {gen && <GenerationPanel tree={tree} />}

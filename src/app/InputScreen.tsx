@@ -2,10 +2,11 @@
 // 自分が先手か後手かを選ぶ → プリセット（ふつう・じっくり）を選んで生成。
 
 import { useState } from 'preact/hooks';
-import { Position, Square, type Move, type PieceType } from 'tsshogi';
-import { Board, type Selection } from '../components/Board';
+import { Position, type Move } from 'tsshogi';
+import { Board } from '../components/Board';
+import { PromotionBox, useMoveInput } from '../components/useMoveInput';
 import { parseKifu, type LinePosition } from '../shogi/kifu';
-import { STARTPOS_SFEN, moveText, otherSide, sideOfColor, sideToMove, type Side } from '../shogi/position';
+import { STARTPOS_SFEN, moveText, otherSide, sideToMove, type Side } from '../shogi/position';
 import { saveTree, newTreeId } from '../storage/trees';
 import { createTree } from '../tree/generator';
 import { PRESET_IDS, type PresetId } from '../tree/presets';
@@ -21,8 +22,6 @@ export function InputScreen() {
   const [line, setLine] = useState<LinePosition[]>([{ sfen: STARTPOS_SFEN }]);
   const [index, setIndex] = useState(0);
   const [sideChoice, setSideChoice] = useState<Side | null>(null);
-  const [selection, setSelection] = useState<Selection>(null);
-  const [promotion, setPromotion] = useState<Move | null>(null);
   const [busy, setBusy] = useState(false);
 
   const current = line[index];
@@ -32,8 +31,7 @@ export function InputScreen() {
 
   function moveTo(i: number) {
     setIndex(Math.max(0, Math.min(line.length - 1, i)));
-    setSelection(null);
-    setPromotion(null);
+    input.clear();
     setSideChoice(null);
   }
 
@@ -45,8 +43,7 @@ export function InputScreen() {
     }
     setLine(result.line);
     setIndex(result.line.length - 1);
-    setSelection(null);
-    setPromotion(null);
+    input.clear();
     setSideChoice(null);
     setMessage(`${result.line.length - 1} 手を読み込みました。手順を動かして、研究したい局面を選んでください。`);
   }
@@ -54,8 +51,7 @@ export function InputScreen() {
   function resetToStart() {
     setLine([{ sfen: STARTPOS_SFEN }]);
     setIndex(0);
-    setSelection(null);
-    setPromotion(null);
+    input.clear();
     setSideChoice(null);
     setMessage('');
   }
@@ -70,51 +66,11 @@ export function InputScreen() {
     const next: LinePosition = { sfen: position.getSFEN(ply + 1), usi: move.usi, text };
     setLine([...line.slice(0, index + 1), next]);
     setIndex(index + 1);
-    setSelection(null);
-    setPromotion(null);
+    input.clear();
     setSideChoice(null);
   }
 
-  /** 選んだ駒を to へ動かそうとする。成る・成らないを選べるときは確認を出す */
-  function tryMove(from: Square | Selection, to: Square): boolean {
-    const position = Position.newBySFEN(current.sfen)!;
-    const origin = from instanceof Square ? from : from?.kind === 'hand' ? from.pieceType : null;
-    if (origin === null) return false;
-    const move = position.createMove(origin, to);
-    if (!move) return false;
-    const canStay = position.isValidMove(move);
-    const canPromote = position.isValidMove(move.withPromote());
-    if (canStay && canPromote) {
-      setPromotion(move);
-      return true;
-    }
-    if (canPromote) commit(move.withPromote());
-    else if (canStay) commit(move);
-    else return false;
-    return true;
-  }
-
-  function onSquare(file: number, rank: number) {
-    if (promotion) return;
-    const position = Position.newBySFEN(current.sfen)!;
-    const to = new Square(file, rank);
-    if (selection) {
-      const from = selection.kind === 'square' ? new Square(selection.file, selection.rank) : selection;
-      if (tryMove(from, to)) return;
-    }
-    const piece = position.board.at(to);
-    if (piece && sideOfColor(piece.color) === turn && !(selection?.kind === 'square' && selection.file === file && selection.rank === rank)) {
-      setSelection({ kind: 'square', file, rank });
-    } else {
-      setSelection(null);
-    }
-  }
-
-  function onHand(side: Side, pieceType: PieceType) {
-    if (promotion || side !== turn) return;
-    if (selection?.kind === 'hand' && selection.pieceType === pieceType) setSelection(null);
-    else setSelection({ kind: 'hand', pieceType });
-  }
+  const input = useMoveInput(current.sfen, commit);
 
   async function start(presetId: PresetId) {
     if (busy || isGenerating()) return;
@@ -177,22 +133,9 @@ export function InputScreen() {
       )}
 
       <p class="muted">盤の駒をタップ → 行き先をタップで指せます。</p>
-      <Board sfen={current.sfen} lastMove={current.usi} selection={selection} onSquare={onSquare} onHand={onHand} />
+      <Board sfen={current.sfen} lastMove={current.usi} selection={input.selection} onSquare={input.onSquare} onHand={input.onHand} />
 
-      {promotion && (
-        <div class="card promote-box">
-          <span>成りますか？</span>
-          <button type="button" class="btn btn-primary" onClick={() => commit(promotion.withPromote())}>
-            成る
-          </button>
-          <button type="button" class="btn" onClick={() => commit(promotion)}>
-            成らない
-          </button>
-          <button type="button" class="btn btn-ghost" onClick={() => setPromotion(null)}>
-            やめる
-          </button>
-        </div>
-      )}
+      <PromotionBox input={input} />
 
       <div class="move-nav">
         <button type="button" class="btn" aria-label="最初へ" onClick={() => moveTo(0)} disabled={index === 0}>

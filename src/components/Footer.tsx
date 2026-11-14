@@ -11,7 +11,7 @@ import { Dialog } from './Dialog';
 export const APP_VERSION = import.meta.env.VITE_APP_VERSION;
 const ISSUE_NEW_URL = 'https://github.com/skiri7kenteki/joban-tree/issues/new';
 
-const SCREEN_NAME = { home: '一覧', new: '新しいツリー', tree: 'ツリー', settings: '設定' } as const;
+const SCREEN_NAME = { home: '一覧', new: '新しいツリー', tree: 'ツリー', settings: '設定', review: '復習' } as const;
 
 /** Issue 作成画面の URL（タイトルと本文の下書き入り） */
 export function buildIssueUrl(text: string, screen: string, today: Date = new Date()): string {

@@ -1,0 +1,253 @@
+{
+  "total_count": 2,
+  "jobs": [
+    {
+      "id": 132289646647,
+      "run_id": 43543628642,
+      "workflow_name": "ビルド・テスト・公開",
+      "head_branch": "main",
+      "run_url": "https://api.github.com/repos/skiri7kenteki/joban-tree/actions/runs/43543628642",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOVs-rE88AAAAezRPQNw",
+      "head_sha": "64a81ed500ec221b310da532b5570ad9cbaaa6a0",
+      "url": "https://api.github.com/repos/skiri7kenteki/joban-tree/actions/jobs/132289646647",
+      "html_url": "https://github.com/skiri7kenteki/joban-tree/actions/runs/43543628642/job/132289646647",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-14T01:58:03Z",
+      "started_at": "2026-11-14T01:58:06Z",
+      "completed_at": "2026-11-14T01:59:13Z",
+      "name": "build",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-11-14T01:58:07Z",
+          "completed_at": "2026-11-14T01:58:09Z"
+        },
+        {
+          "name": "Run actions/checkout@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-11-14T01:58:09Z",
+          "completed_at": "2026-11-14T01:58:10Z"
+        },
+        {
+          "name": "エンジンのキーを計算",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-11-14T01:58:10Z",
+          "completed_at": "2026-11-14T01:58:10Z"
+        },
+        {
+          "name": "エンジンのキャッシュを探す",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-11-14T01:58:10Z",
+          "completed_at": "2026-11-14T01:58:11Z"
+        },
+        {
+          "name": "エンジンをビルド（キャッシュが無いときだけ。数十分かかる）",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 5,
+          "started_at": "2026-11-14T01:58:11Z",
+          "completed_at": "2026-11-14T01:58:11Z"
+        },
+        {
+          "name": "エンジンをキャッシュに保存",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 6,
+          "started_at": "2026-11-14T01:58:11Z",
+          "completed_at": "2026-11-14T01:58:11Z"
+        },
+        {
+          "name": "Run actions/setup-node@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-11-14T01:58:11Z",
+          "completed_at": "2026-11-14T01:58:18Z"
+        },
+        {
+          "name": "エンジン単体の動作確認（Node.js で usi → isready → go）",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-11-14T01:58:18Z",
+          "completed_at": "2026-11-14T01:58:20Z"
+        },
+        {
+          "name": "部品のインストール",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-11-14T01:58:20Z",
+          "completed_at": "2026-11-14T01:58:22Z"
+        },
+        {
+          "name": "エンジンを公開用のフォルダへ",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-11-14T01:58:22Z",
+          "completed_at": "2026-11-14T01:58:22Z"
+        },
+        {
+          "name": "型チェック",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-11-14T01:58:22Z",
+          "completed_at": "2026-11-14T01:58:23Z"
+        },
+        {
+          "name": "ロジックのテスト（Vitest）",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-11-14T01:58:23Z",
+          "completed_at": "2026-11-14T01:58:24Z"
+        },
+        {
+          "name": "アプリのビルド",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-11-14T01:58:24Z",
+          "completed_at": "2026-11-14T01:58:25Z"
+        },
+        {
+          "name": "Playwright の準備",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-11-14T01:58:25Z",
+          "completed_at": "2026-11-14T01:58:51Z"
+        },
+        {
+          "name": "画面の通し確認（Playwright）",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-11-14T01:58:51Z",
+          "completed_at": "2026-11-14T01:59:07Z"
+        },
+        {
+          "name": "失敗したときの記録を残す",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 16,
+          "started_at": "2026-11-14T01:59:07Z",
+          "completed_at": "2026-11-14T01:59:07Z"
+        },
+        {
+          "name": "Run actions/configure-pages@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17,
+          "started_at": "2026-11-14T01:59:07Z",
+          "completed_at": "2026-11-14T01:59:08Z"
+        },
+        {
+          "name": "Run actions/upload-pages-artifact@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18,
+          "started_at": "2026-11-14T01:59:08Z",
+          "completed_at": "2026-11-14T01:59:10Z"
+        },
+        {
+          "name": "Post Run actions/setup-node@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 35,
+          "started_at": "2026-11-14T01:59:10Z",
+          "completed_at": "2026-11-14T01:59:10Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v5",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 36,
+          "started_at": "2026-11-14T01:59:10Z",
+          "completed_at": "2026-11-14T01:59:11Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 37,
+          "started_at": "2026-11-14T01:59:11Z",
+          "completed_at": "2026-11-14T01:59:11Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/skiri7kenteki/joban-tree/check-runs/132289646647",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000000103,
+      "runner_name": "GitHub Actions 1000000103",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 132289980140,
+      "run_id": 43543628642,
+      "workflow_name": "ビルド・テスト・公開",
+      "head_branch": "main",
+      "run_url": "https://api.github.com/repos/skiri7kenteki/joban-tree/actions/runs/43543628642",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOVs-rE88AAAAezRjm7A",
+      "head_sha": "64a81ed500ec221b310da532b5570ad9cbaaa6a0",
+      "url": "https://api.github.com/repos/skiri7kenteki/joban-tree/actions/jobs/132289980140",
+      "html_url": "https://github.com/skiri7kenteki/joban-tree/actions/runs/43543628642/job/132289980140",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-14T01:59:14Z",
+      "started_at": "2026-11-14T01:59:18Z",
+      "completed_at": "2026-11-14T01:59:27Z",
+      "name": "deploy",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-11-14T01:59:19Z",
+          "completed_at": "2026-11-14T01:59:20Z"
+        },
+        {
+          "name": "Run actions/deploy-pages@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-11-14T01:59:20Z",
+          "completed_at": "2026-11-14T01:59:26Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-11-14T01:59:26Z",
+          "completed_at": "2026-11-14T01:59:26Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/skiri7kenteki/joban-tree/check-runs/132289980140",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000000104,
+      "runner_name": "GitHub Actions 1000000104",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    }
+  ]
+}

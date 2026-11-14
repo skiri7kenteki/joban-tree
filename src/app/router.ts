@@ -3,10 +3,12 @@
 //   #/new        … 新しいツリー（局面の入力）
 //   #/tree/<id>  … ツリーの閲覧
 //   #/settings   … 設定
+//   #/review/<id> … 復習モード
 
 import { signal } from '@preact/signals';
 
-export type Route = { name: 'home' } | { name: 'new' } | { name: 'settings' } | { name: 'tree'; id: string };
+export type Route = { name: 'home' } | { name: 'new' } | { name: 'settings' } | { name: 'tree'; id: string }
+  | { name: 'review'; id: string };
 
 function parse(hash: string): Route {
   const path = hash.replace(/^#/, '');
@@ -14,6 +16,8 @@ function parse(hash: string): Route {
   if (path === '/settings') return { name: 'settings' };
   const tree = /^\/tree\/([\w-]+)$/.exec(path);
   if (tree) return { name: 'tree', id: tree[1] };
+  const review = /^\/review\/([\w-]+)$/.exec(path);
+  if (review) return { name: 'review', id: review[1] };
   return { name: 'home' };
 }
 
