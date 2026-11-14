@@ -31,7 +31,7 @@ export default defineConfig({
       injectManifest: {
         globPatterns: ['**/*.{js,css,html,svg,png,webmanifest}'],
         // エンジンと評価関数は大きいので事前保存しない（使ったときに保存する）
-        globIgnores: ['engine/**', 'eval/**'],
+        globIgnores: ['engine/**', 'eval/**', 'pc-engine/**'],
       },
       devOptions: { enabled: false },
     }),

@@ -51,6 +51,35 @@ jobs:
           path: engine-dist
           key: yaneuraou-wasm-${{ steps.engine.outputs.id }}
 
+      # PC（Windows）用のやねうら王。スマホ版と同じく、中身が変わらなければビルドを省略する
+      - name: PC 用エンジンのキーを計算
+        id: pcengine
+        run: |
+          id=$(cat engine/yaneuraou.commit engine/patches/*.patch engine/build-windows.sh | sha256sum | cut -c1-12)
+          echo "id=$id" >> "$GITHUB_OUTPUT"
+          echo "PC 用エンジンのキー: $id"
+
+      - name: PC 用エンジンのキャッシュを探す
+        id: pcengine-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: engine-dist-pc
+          key: yaneuraou-windows-${{ steps.pcengine.outputs.id }}
+
+      - name: PC 用エンジンをビルド（キャッシュが無いときだけ）
+        if: steps.pcengine-cache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update -q
+          sudo apt-get install -y -q mingw-w64
+          bash engine/build-windows.sh
+
+      - name: PC 用エンジンをキャッシュに保存
+        if: steps.pcengine-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: engine-dist-pc
+          key: yaneuraou-windows-${{ steps.pcengine.outputs.id }}
+
       - uses: actions/setup-node@v5
         with:
           node-version: lts/*
@@ -68,6 +97,11 @@ jobs:
         run: |
           mkdir -p "public/engine/${{ steps.engine.outputs.id }}"
           cp engine-dist/yaneuraou.* "public/engine/${{ steps.engine.outputs.id }}/"
+          # PC 用：pc/server.mjs が manifest.json を見て、.exe を PC に取ってくる
+          mkdir -p "public/pc-engine/${{ steps.pcengine.outputs.id }}"
+          cp engine-dist-pc/* "public/pc-engine/${{ steps.pcengine.outputs.id }}/"
+          node engine/pc-manifest.mjs "${{ steps.pcengine.outputs.id }}" > public/pc-engine/manifest.json
+          cat public/pc-engine/manifest.json
 
       - name: 型チェック
         run: npm run typecheck

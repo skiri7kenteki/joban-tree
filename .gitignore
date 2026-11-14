@@ -4,6 +4,9 @@ dev-dist/
 # エンジンのビルド作業場所と成果物（GitHub Actions が作る）
 engine-work/
 engine-dist/
+engine-work-pc/
+engine-dist-pc/
+public/pc-engine/
 public/engine/
 # Playwright の記録
 playwright-report/
