@@ -20,7 +20,7 @@ export interface PresetValues {
 export interface AppSettings {
   version: 1;
   evalId: EvalId;
-  /** スレッド数。0 は「おまかせ」（使える範囲で最大、上限 4） */
+  /** スレッド数。0 は「おまかせ」（使える範囲で最大、上限 7） */
   threads: number;
   hashMB: number;
   /** 最善手から何点以内の応手を採用するか（W） */

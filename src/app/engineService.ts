@@ -9,13 +9,13 @@ import { settings, type AppSettings } from './settings';
 /** 読み込みの進み具合（画面表示用） */
 export const engineStatus = signal('');
 
-/** スレッド数の上限（段階0の測定で、4 まではほぼ比例して速くなった） */
-const MAX_THREADS = 4;
-
-/** 「おまかせ」のときのスレッド数（端末のコア数と上限 4 の小さい方） */
+/**
+ * 「おまかせ」のときのスレッド数（端末のコア数と上限 7 の小さい方）。
+ * 段階3の測定（iPad）で 4→7 スレッドにすると 1 秒に調べる局面が約 3 割増えたため、上限 4 から変えた（持ち主の判断 2026-11-14）
+ */
 export function defaultThreads(): number {
   if (!self.crossOriginIsolated) return 1;
-  return Math.max(1, Math.min(MAX_THREADS, navigator.hardwareConcurrency || 1));
+  return Math.max(1, Math.min(MAX_SEARCH_THREADS, navigator.hardwareConcurrency || 1));
 }
 
 /** 設定から、実際に使うスレッド数を決める */
