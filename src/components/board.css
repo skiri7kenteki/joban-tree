@@ -136,37 +136,3 @@ button.hand-piece.selected {
   border-radius: 3px;
 }
 
-/* 候補手の矢印（半透明。盤のタップの邪魔をしない） */
-.arrow {
-  pointer-events: none;
-}
-
-.arrow-main {
-  fill: var(--arrow-main);
-}
-
-.arrow-good {
-  fill: var(--arrow-good);
-}
-
-.arrow-dubious {
-  fill: var(--arrow-dubious);
-}
-
-/* 持ち駒を打つ手：打つマスに丸印 */
-.arrow-drop {
-  fill: none;
-  stroke-width: 5;
-}
-
-.arrow-drop.arrow-main {
-  stroke: var(--arrow-main);
-}
-
-.arrow-drop.arrow-good {
-  stroke: var(--arrow-good);
-}
-
-.arrow-drop.arrow-dubious {
-  stroke: var(--arrow-dubious);
-}

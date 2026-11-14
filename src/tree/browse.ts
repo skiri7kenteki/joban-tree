@@ -17,7 +17,7 @@ export type BranchInfo =
   | { kind: 'count'; positions: number }; // 先に何局面あるか
 
 /**
- * 手 edge の先に、手が分かっている局面（矢印が出ている局面）がいくつあるか。
+ * 手 edge の先に、手が分かっている局面（次の手が入っている局面）がいくつあるか。
  * 合流した局面は 1 回だけ数える（その枝の中で重複を除く）。edge の行き先の局面も数に入れる
  */
 export function countAhead(tree: TreeData, edge: TreeEdge): number {

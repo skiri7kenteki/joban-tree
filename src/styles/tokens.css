@@ -32,11 +32,6 @@
   --chip-dubious-text: #ffffff;
   --color-unverified: #8a8f98;
 
-  /* 盤上の候補手の矢印（ラベルの色に合わせて半透明） */
-  --arrow-main: rgba(80, 80, 80, 0.45);
-  --arrow-good: rgba(0, 100, 240, 0.6);
-  --arrow-dubious: rgba(255, 120, 0, 0.7);
-
   --font-sans: system-ui, -apple-system, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic UI', 'Meiryo', sans-serif;
   --font-mono: ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
   --font-size-body: 16px;

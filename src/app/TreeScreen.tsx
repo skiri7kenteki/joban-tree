@@ -1,11 +1,11 @@
 // ツリーの閲覧画面（中心となる画面）。
 // 上に盤面、下に「この局面の候補手リスト」。候補手をタップで 1 手進む。戻るボタン・左右スワイプで戻る/進む。
-// 段階4：スマホ縦で「盤＋候補手 3 つ」が 1 画面に収まるよう詰めた。相手の応手の行には自分の対応と枝の先の様子を併記し、盤上に矢印を描く。
+// 段階4：スマホ縦で「盤＋候補手 3 つ」が 1 画面に収まるよう詰めた。相手の応手の行には自分の対応と枝の先の様子を併記する。
 // 生成中も、できた枝からたどれる。
 // 局面ごとの操作：「ここから展開」「この手を検証」「KIF をコピー」、ツリーの書き出し・共有。
 
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { Board, type BoardArrow } from '../components/Board';
+import { Board } from '../components/Board';
 import { Dialog } from '../components/Dialog';
 import { formatScore, scoreToNumber, type Score } from '../engine/usi';
 import { moveText } from '../shogi/position';
@@ -145,10 +145,6 @@ function TreeView({ tree }: { tree: TreeData }) {
   };
 
   const sideText = tree.mySide === 'black' ? '☗先手' : '☖後手';
-  // 盤上の矢印：相手の手番は相手の応手（ラベルの色）、自分の手番は自分の対応（グレー）
-  const arrows: BoardArrow[] = settings.value.showArrows
-    ? node.edges.map((e) => ({ move: e.move, tone: opp && e.diff !== undefined ? labelOf(e.diff, thresholds) : 'main' }))
-    : [];
 
   return (
     <>
@@ -166,7 +162,7 @@ function TreeView({ tree }: { tree: TreeData }) {
 
       <div class="tree-layout">
         <div class="tree-board" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-          <Board sfen={node.sfen} lastMove={incoming?.move} arrows={arrows} />
+          <Board sfen={node.sfen} lastMove={incoming?.move} />
         </div>
 
         <div class="tree-side">

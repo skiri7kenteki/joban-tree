@@ -1,4 +1,4 @@
-// 段階4-1：閲覧画面（スマホ縦で盤＋候補手 3 つが 1 画面に収まる、自分の対応の併記、枝の先の様子、盤上の矢印）
+// 段階4-1：閲覧画面（スマホ縦で盤＋候補手 3 つが 1 画面に収まる、自分の対応の併記、枝の先の様子）
 import { expect, test, type Page } from '@playwright/test';
 import { STARTPOS_SFEN, applyUsiMove, sfenKey } from '../src/shogi/position';
 import { TREE_APP, TREE_FORMAT_VERSION, type TreeData, type TreeNode } from '../src/tree/types';
@@ -47,13 +47,6 @@ const OPENING = makeTree('p4-opening', ['7g7f'], [
   ['4a3b', 90, '2g2f', false],
   ['9c9d', 200, '2g2f', false],
   ['1c1d', 220, null, false],
-]);
-
-/** 角交換の後（先手の手番）。▲５五角・▲４五角は持ち駒を打つ手 */
-const DROPS = makeTree('p4-drops', ['7g7f', '3c3d', '8h2b+', '3a2b'], [
-  ['2g2f', 0, '8c8d', false],
-  ['B*5e', 80, '2b3c', false],
-  ['B*4e', 180, '6c6d', false],
 ]);
 
 async function openTree(page: Page, tree: TreeData) {
@@ -106,23 +99,11 @@ test.describe('スマホ縦（390×844）', () => {
     await expect(page.getByTestId('nav-back')).toBeDisabled();
   });
 
-  test('盤上に候補手の矢印（ラベルの色）。打つ手は丸印。設定で消せる', async ({ page }) => {
+  test('盤上に候補手の矢印・丸印は描かない（持ち主の判断 2026-11-14）', async ({ page }) => {
     await openTree(page, OPENING);
-    const arrows = page.getByTestId('board-arrow');
-    await expect(arrows).toHaveCount(5);
-    await expect(page.locator('[data-testid="board-arrow"][data-move="9c9d"]')).toHaveClass(/arrow-dubious/);
-    await expect(page.locator('[data-testid="board-arrow"][data-move="4a3b"]')).toHaveClass(/arrow-good/);
-    await expect(page.locator('[data-testid="board-arrow"][data-move="3c3d"]')).toHaveClass(/arrow-main/);
-
-    await openTree(page, DROPS);
-    await expect(page.locator('circle[data-testid="board-arrow"][data-move="B*5e"]')).toHaveClass(/arrow-good/);
-    await expect(page.locator('circle[data-testid="board-arrow"][data-move="B*4e"]')).toHaveClass(/arrow-dubious/);
-
-    await page.goto('./#/settings');
-    await page.getByTestId('arrows-off').click();
-    await page.goto(`./#/tree/${DROPS.id}`);
-    await expect(page.getByTestId('candidate').first()).toBeVisible();
-    await expect(page.getByTestId('board-arrow')).toHaveCount(0);
+    // 盤の上の図形は、駒 40 枚の五角形と星 4 つだけ
+    await expect(page.locator('[data-testid="board"] polygon')).toHaveCount(40);
+    await expect(page.locator('[data-testid="board"] circle')).toHaveCount(4);
   });
 });
 
