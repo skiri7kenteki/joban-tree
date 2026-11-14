@@ -5,6 +5,7 @@
 //   段階0の値（さっと 0.4 秒など）では Android で深さ 9〜13 しか届かず、評価値のぶれと自分の対応の悪さが目立った。
 //   1 局面の時間を延ばし、自分の対応も別に調べて確定する（replyMs）。代わりに枝は少なくなる。「さっと」はやめた。
 
+import { DEFAULT_THRESHOLDS } from './labels';
 import type { GenerationSettings } from './types';
 
 export type PresetId = 'normal' | 'deep' | 'precise';
@@ -36,6 +37,7 @@ export const PRESETS: Record<PresetId, Preset> = {
       maxRounds: 4,
       maxNodes: DEFAULT_MAX_NODES,
       windowCp: DEFAULT_WINDOW_CP,
+      dubiousCp: DEFAULT_THRESHOLDS.goodMax,
       replyMs: 1000,
     },
   },
@@ -49,6 +51,7 @@ export const PRESETS: Record<PresetId, Preset> = {
       maxRounds: 5,
       maxNodes: DEFAULT_MAX_NODES,
       windowCp: DEFAULT_WINDOW_CP,
+      dubiousCp: DEFAULT_THRESHOLDS.goodMax,
       replyMs: 1500,
     },
   },
@@ -64,6 +67,7 @@ export const PRESETS: Record<PresetId, Preset> = {
       maxRounds: 5,
       maxNodes: DEFAULT_MAX_NODES,
       windowCp: DEFAULT_WINDOW_CP,
+      dubiousCp: DEFAULT_THRESHOLDS.goodMax,
       replyMs: 1500,
     },
   },

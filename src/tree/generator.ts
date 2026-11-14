@@ -89,6 +89,8 @@ export class TreeGenerator {
   private startedAt = 0;
   /** 相手ノードを調べる深さの上限（この値より小さい round だけ調べる） */
   private roundLimit = 0;
+  /** 生成を始めた局面（「ここから展開」でここを選んだときは、疑問手の後でも先まで調べる） */
+  private startKey = '';
   /** エラーになったときの内容 */
   errorMessage = '';
 
@@ -119,6 +121,7 @@ export class TreeGenerator {
     this.startedAt = this.now();
     const start = this.tree.nodes[startKey];
     if (!start) return 'completed';
+    this.startKey = startKey;
     const baseRound = isOpponentNode(this.tree, start) ? start.round : start.round + 1;
     this.roundLimit = baseRound + this.settings.maxRounds;
     this.collectFrontier(startKey);
@@ -198,6 +201,29 @@ export class TreeGenerator {
     return (this.settings.replyMs ?? 0) > 0;
   }
 
+  /** 疑問手の先を止める設定のとき、この相手の応手は疑問手か */
+  private isDubious(edge: TreeEdge): boolean {
+    const limit = this.settings.dubiousCp;
+    return limit !== undefined && edge.diff !== undefined && edge.diff > limit;
+  }
+
+  /**
+   * この自分ノードの先（自分の手の後の局面）を調べないか：疑問手を通ってしか来られない局面なら、咎める手までで止める。
+   * ほかの手順（本線・有力）からも来られる局面や、「ここから展開」で選んだ局面は先まで調べる
+   */
+  private stopsAfterAnswer(key: string): boolean {
+    if (this.settings.dubiousCp === undefined || key === this.startKey) return false;
+    let viaDubious = false;
+    for (const node of Object.values(this.tree.nodes)) {
+      for (const edge of node.edges) {
+        if (edge.to !== key) continue;
+        if (!this.isDubious(edge)) return false;
+        viaDubious = true;
+      }
+    }
+    return viaDubious;
+  }
+
   /** startKey から既存の枝をたどり、まだ調べていない局面を待ち行列に入れる */
   private collectFrontier(startKey: string): void {
     const seen = new Set<string>();
@@ -214,6 +240,8 @@ export class TreeGenerator {
       }
       // 未検証の手しかない自分ノードは、確定させるために調べ直す（その先の枝もたどる）
       if (!node.searched && this.verifiesReplies() && !isOpponentNode(this.tree, node)) this.enqueue(node, priority);
+      // 疑問手の後の自分ノードは、咎める手（の確定）までで止める
+      if (!isOpponentNode(this.tree, node) && this.stopsAfterAnswer(key)) continue;
       for (const edge of node.edges) stack.push({ key: edge.to, priority: scoreToNumber(edge.score) });
     }
   }
@@ -281,7 +309,8 @@ export class TreeGenerator {
       }
       const next = this.getOrCreate(afterMine.sfen, node.round + 1).node;
       me.edges.push({ move: myMove, to: next.key, score: myScore, unverified: true });
-      this.enqueue(next, scoreToNumber(myScore));
+      // 疑問手なら、咎める手までで止める
+      if (!this.stopsAfterAnswer(me.key)) this.enqueue(next, scoreToNumber(myScore));
     }
   }
 
@@ -301,13 +330,29 @@ export class TreeGenerator {
     const next = this.getOrCreate(after.sfen, node.round + 1).node;
     const edge: TreeEdge = { move: myMove, to: next.key, score: line.score! };
     node.edges = [edge, ...node.edges.filter((e) => e.move !== myMove)];
-    this.enqueue(next, scoreToNumber(line.score!));
+    // 疑問手の後の局面なら、咎める手を置いたところで止める（その先は調べない）
+    if (!this.stopsAfterAnswer(node.key)) this.enqueue(next, scoreToNumber(line.score!));
   }
 }
 
 function compare(a: QueueItem, b: QueueItem): number {
   if (a.round !== b.round) return a.round - b.round;
   return b.priority - a.priority;
+}
+
+/**
+ * 相手の疑問手を咎めた後の局面で、疑問手の先を止める設定（dubiousCp）のために調べていない局面か（画面の案内用）。
+ * 入ってくる手順がすべて「疑問手 → 咎める手」のとき true
+ */
+export function isAfterDubiousOnly(tree: TreeData, key: string, dubiousCp: number | undefined = tree.settings.dubiousCp): boolean {
+  if (dubiousCp === undefined) return false;
+  const incoming = (to: string) => Object.values(tree.nodes).flatMap((n) => n.edges.filter((e) => e.to === to).map((e) => ({ from: n.key, edge: e })));
+  const mine = incoming(key);
+  if (mine.length === 0) return false;
+  return mine.every(({ from }) => {
+    const opp = incoming(from);
+    return opp.length > 0 && opp.every(({ edge }) => edge.diff !== undefined && edge.diff > dubiousCp);
+  });
 }
 
 /** 局面ごとに、そこへ入ってくる矢印の数（2 以上なら合流している） */

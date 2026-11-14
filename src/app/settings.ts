@@ -138,7 +138,8 @@ export function resetSettings(): void {
 
 /** プリセットと設定から、生成の条件を作る */
 export function generationSettingsFor(id: PresetId, s: AppSettings = settings.value): GenerationSettings {
-  return { ...s.presets[id], windowCp: s.windowCp, maxNodes: s.maxNodes };
+  // 疑問手（「有力」のしきい値を超える応手）の先は、咎める手までで止める（持ち主の判断 2026-11-14）
+  return { ...s.presets[id], windowCp: s.windowCp, maxNodes: s.maxNodes, dubiousCp: s.thresholds.goodMax };
 }
 
 /** プリセットのボタンに出す名前（例：「ふつう（2分）」） */

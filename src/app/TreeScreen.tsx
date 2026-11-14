@@ -10,7 +10,7 @@ import { formatScore, scoreToNumber, type Score } from '../engine/usi';
 import { moveText } from '../shogi/position';
 import { loadTree } from '../storage/trees';
 import { fileNameOf, treeToJson } from '../tree/backup';
-import { FINISH_TEXT, countParents, isOpponentNode } from '../tree/generator';
+import { FINISH_TEXT, countParents, isAfterDubiousOnly, isOpponentNode } from '../tree/generator';
 import { pathToKif, treeToKif } from '../tree/kif';
 import { LABEL_TEXT, labelOf } from '../tree/labels';
 import type { PresetId } from '../tree/presets';
@@ -330,8 +330,14 @@ function EmptyNote({ tree, nodeKey, generating }: { tree: TreeData; nodeKey: str
   let text = 'この局面はまだ調べていません。「ここから展開」で調べられます。';
   if (!isOpponentNode(tree, node)) text = '自分の手はまだ調べていません。「この手を検証」か「ここから展開」で調べられます。';
   if (node.terminal) text = '指せる手がありません（詰み・投了など）。';
+  else if (isOpponentNode(tree, node) && isAfterDubiousOnly(tree, nodeKey))
+    text = '相手の疑問手を咎めた後の局面なので、この先は調べていません（疑問手の先は浅くしています）。必要なら「ここから展開」で調べられます。';
   else if (generating) text = 'この局面はこれから調べます。';
-  return <p class="muted">{text}</p>;
+  return (
+    <p class="muted" data-testid="empty-note">
+      {text}
+    </p>
+  );
 }
 
 function ScoreText({ score }: { score: Score }) {
