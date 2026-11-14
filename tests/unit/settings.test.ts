@@ -27,7 +27,8 @@ describe('設定', () => {
     });
     expect(s.evalId).toBe('micro');
     expect(s.hashMB).toBe(32);
-    expect(s.threads).toBe(8);
+    // 探索に使えるのは 7 まで（8 にするとエンジンが止まる）
+    expect(s.threads).toBe(7);
     expect(s.windowCp).toBe(0);
     // 「有力」の上限は「本線」の上限より小さくできない
     expect(s.thresholds).toEqual({ mainMax: 200, goodMax: 200 });

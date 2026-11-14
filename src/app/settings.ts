@@ -2,7 +2,7 @@
 // 端末の中（localStorage）にだけ保存する。読み込むときは、壊れた値や古い形でも使える値に直す。
 
 import { signal } from '@preact/signals';
-import type { EvalId } from '../engine/config';
+import { MAX_SEARCH_THREADS, type EvalId } from '../engine/config';
 import { DEFAULT_THRESHOLDS, type LabelThresholds } from '../tree/labels';
 import { DEFAULT_MAX_NODES, DEFAULT_WINDOW_CP, PRESETS, type PresetId } from '../tree/presets';
 import type { GenerationSettings } from '../tree/types';
@@ -86,7 +86,7 @@ export function normalizeSettings(raw: unknown): AppSettings {
   return {
     version: 1,
     evalId: r.evalId === 'mini' ? 'mini' : 'micro',
-    threads: num(r.threads, d.threads, 0, 8),
+    threads: num(r.threads, d.threads, 0, MAX_SEARCH_THREADS),
     hashMB: HASH_CHOICES.includes(r.hashMB as 16) ? (r.hashMB as number) : d.hashMB,
     windowCp: num(r.windowCp, d.windowCp, 0, 5000),
     maxNodes: num(r.maxNodes, d.maxNodes, 50, 20_000),

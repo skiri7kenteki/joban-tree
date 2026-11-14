@@ -14,3 +14,16 @@ for (const evalId of ['micro', 'mini']) {
     await expect(page.getByTestId('check-result')).toContainText(/評価値 [+−0]/);
   });
 }
+
+test('速度測定ページの並列の測定：複数のエンジンを同時に動かせる', async ({ page }) => {
+  test.setTimeout(180_000);
+  await page.goto('./bench.html');
+  await expect(page.getByTestId('env')).toContainText('isolated：OK', { timeout: 30_000 });
+  const parallel = page.getByTestId('run-parallel');
+  test.skip((await parallel.count()) === 0, 'この環境は CPU が少ないので並列の測定が出ない');
+  await parallel.click();
+  await expect(page.getByTestId('status')).toContainText('並列の測定おわり', { timeout: 150_000 });
+  const rows = page.getByTestId('parallel-table').locator('tbody tr');
+  expect(await rows.count()).toBeGreaterThanOrEqual(3);
+  await expect(page.getByTestId('parallel-table')).not.toContainText('失敗');
+});

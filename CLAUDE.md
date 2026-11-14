@@ -55,6 +55,7 @@
 - エンジンは Web Worker の中で動かし、画面を固まらせない。USI の送受信は `src/engine/` のモジュールにまとめ、コマンドを順番待ちさせる
 - `info ... multipv k ... score ... pv ...` は、各候補について**最後に出た行**を採用する
 - スマホのメモリを圧迫しないよう、USI_Hash は 16〜64MB にする
+- **探索のスレッド数は 7 まで**（`MAX_SEARCH_THREADS`）。スレッドプールは 8 本だが、エンジンの制御用に 1 本使うため、Threads=8 にすると isready で止まったまま返らない（段階3で発見）
   - **`setoption` は USI_Hash を Threads より先に送る**。Threads を変えるとその時点の USI_Hash（初期値 1024MB）で置換表を作り直し、
     メモリ上限 1GB の WASM 版では確保に失敗してエンジンが終了する
 - ビルド時の `ENGINE_OPTIONS "FV_SCALE=24"` は `usi` の応答の default には反映されない（default 16 と出る）。必ず `setoption` で 24 を送る
@@ -115,6 +116,14 @@
 - 取り込み（`src/tree/backup.ts` の `parseTreeJson`）：他人のファイルも読むので、形・局面・手の行き先をすべて確かめる。同じ id があれば「上書き／別のツリーとして追加／やめる」を聞く
 - 生成中のツリーは削除・上書きできない（自動保存で元に戻ってしまうため）。名前の変更は、開いているツリーそのものを書き換える
 
+## 復習モード（段階3、`src/review/review.ts`・`src/app/ReviewScreen.tsx`）
+- 持ち主の判断（2026-11-14）：**手順を通して出題**、範囲は**相手の応手すべて**（疑問手の咎め方も覚える）
+- 開始局面から。相手の手番ならアプリが応手を 1 つ選んで指す → 自分の手番で盤をタップして答える。正解は**ツリーの先頭の手**（検証済みがあればそれ）
+- 応手の選び方：その先にある問題の「出したさ」の合計に比例した確率。まだ出していない 1、前回まちがい 2、正解が続くと 0.5^(連続正解+1)。問題の無い枝は選ばない
+- まちがえたら「もう一度」か「正解を見る」。記録は 1 回目の答えだけ数える。2 回続けて正解で「覚えた」
+- 記録は IndexedDB の `review`（DB の版 2、`src/storage/db.ts`）。キーは treeId。ツリーを消すと記録も消える。**JSON の書き出しには入れない**（自分だけの記録）
+- 盤のタップで指す処理は `src/components/useMoveInput.tsx`（入力画面と共通）
+
 ## コードの方針
 - 初心者が読んで追えること。短い関数＋日本語コメント
 - 色は CSS 変数（`src/styles/tokens.css`）から使い、直書きしない
@@ -126,13 +135,14 @@
 ```
 index.html / bench.html     画面の入口（bench は段階0の速度測定ページ）
 src/main.tsx                アプリ本体の入口（画面の切り替え）
-src/app/                    画面（トップ・入力・閲覧・設定）、生成・検証の実行と自動保存・Wake Lock、エンジンの用意、設定、共有
+src/app/                    画面（トップ・入力・閲覧・設定・復習）、生成・検証の実行と自動保存・Wake Lock、エンジンの用意、設定、共有
 src/components/Board.tsx    将棋盤（SVG）と持ち駒
 src/components/Dialog.tsx   重ねて出す小窓（確認・メニュー）
 src/components/Footer.tsx   バージョンと「気づきを送る」
 src/shogi/                  局面・指し手の小さな関数（tsshogi を包む）、棋譜の貼り付けの読み取り
 src/tree/                   ツリーのデータの形・生成ロジック（モックでテスト）・ラベル・プリセット・KIF 書き出し・JSON の読み書き
-src/storage/trees.ts        IndexedDB への保存
+src/storage/                IndexedDB への保存（db.ts が開く。trees.ts・review.ts）
+src/review/                 復習モードのロジック（出題の選び方・記録）
 src/bench/                  速度測定ページ
 src/engine/usi.ts           USI の行を読み取る関数（テスト対象）
 src/engine/engine.ts        エンジンを包むモジュール（コマンドの順番待ち）

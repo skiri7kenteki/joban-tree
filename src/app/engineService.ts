@@ -2,6 +2,7 @@
 // 設定（評価関数・スレッド数・ハッシュ）が変わっていたら、次に使うときに作り直す。
 
 import { signal } from '@preact/signals';
+import { MAX_SEARCH_THREADS } from '../engine/config';
 import { createYaneuraOu, type UsiEngine } from '../engine/engine';
 import { settings, type AppSettings } from './settings';
 
@@ -10,8 +11,6 @@ export const engineStatus = signal('');
 
 /** スレッド数の上限（段階0の測定で、4 まではほぼ比例して速くなった） */
 const MAX_THREADS = 4;
-/** エンジンのスレッドプールの大きさ（engine/patches で 8 にしている） */
-export const POOL_THREADS = 8;
 
 /** 「おまかせ」のときのスレッド数（端末のコア数と上限 4 の小さい方） */
 export function defaultThreads(): number {
@@ -22,7 +21,7 @@ export function defaultThreads(): number {
 /** 設定から、実際に使うスレッド数を決める */
 export function effectiveThreads(s: AppSettings = settings.value): number {
   if (!self.crossOriginIsolated) return 1;
-  return s.threads > 0 ? Math.min(s.threads, POOL_THREADS) : defaultThreads();
+  return s.threads > 0 ? Math.min(s.threads, MAX_SEARCH_THREADS) : defaultThreads();
 }
 
 let enginePromise: Promise<UsiEngine> | null = null;

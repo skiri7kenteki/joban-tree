@@ -56,6 +56,14 @@ export function engineUrls(evalId: EvalId, origin: string = location.href) {
   };
 }
 
+/**
+ * エンジンのスレッドプールの大きさ（engine/patches で 8 にしている）。
+ * 探索のスレッドのほかにエンジンの制御用に 1 本使うので、**探索に使えるのは 7 まで**。
+ * 8 にすると isready で止まったまま返ってこない（段階3の測定で発見）
+ */
+export const POOL_THREADS = 8;
+export const MAX_SEARCH_THREADS = POOL_THREADS - 1;
+
 /** service worker の「大きいファイル用」キャッシュの名前（src/sw.ts と同じもの） */
 export const BIG_CACHE = 'joban-tree-big';
 

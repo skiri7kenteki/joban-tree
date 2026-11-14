@@ -4,7 +4,8 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { EVALS, isOfflineReady, prepareOffline, type EvalId } from '../engine/config';
 import { PRESET_IDS, type PresetId } from '../tree/presets';
-import { POOL_THREADS, defaultThreads } from './engineService';
+import { MAX_SEARCH_THREADS } from '../engine/config';
+import { defaultThreads } from './engineService';
 import { isGenerating } from './generation';
 import { go } from './router';
 import { HASH_CHOICES, presetLabel, resetSettings, settings, updateSettings, type AppSettings, type PresetValues } from './settings';
@@ -14,7 +15,7 @@ export function SettingsScreen() {
   const s = settings.value;
   const [confirmReset, setConfirmReset] = useState(false);
   const isolated = self.crossOriginIsolated;
-  const maxThreads = Math.min(POOL_THREADS, navigator.hardwareConcurrency || 1);
+  const maxThreads = Math.min(MAX_SEARCH_THREADS, navigator.hardwareConcurrency || 1);
 
   const set = (patch: Partial<AppSettings>) => updateSettings({ ...s, ...patch });
   const setPreset = (id: PresetId, patch: Partial<PresetValues>) =>
