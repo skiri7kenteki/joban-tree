@@ -6,6 +6,7 @@
 
 import { Position, Record, RecordMetadataKey, exportKIF } from 'tsshogi';
 import { formatScore } from '../engine/usi';
+import { MINE_MARK_TEXT, lossText, mineMark } from './browse';
 import { isOpponentNode } from './generator';
 import { DEFAULT_THRESHOLDS, LABEL_TEXT, labelOf, type LabelThresholds } from './labels';
 import type { TreeData, TreeEdge, TreeNode } from './types';
@@ -36,8 +37,11 @@ function edgeComment(tree: TreeData, from: TreeNode, edge: TreeEdge, thresholds:
   const parts = [`評価値 ${formatScore(edge.score)}`];
   if (isOpponentNode(tree, from)) {
     if (edge.diff !== undefined) parts.push(LABEL_TEXT[labelOf(edge.diff, thresholds)]);
-  } else if (edge.unverified) {
-    parts.push(from.searched ? '検証前の手（検証では別の手が最善）' : '未検証');
+  } else {
+    const mark = mineMark(from, edge);
+    if (mark === 'chosen') parts.push(edge.loss !== undefined ? `自分の手（${lossText(edge.loss)}）` : '自分の手');
+    else if (mark === 'before-verify') parts.push('検証前の手（検証では別の手が最善）');
+    else if (mark === 'best' || mark === 'unverified') parts.push(MINE_MARK_TEXT[mark]);
   }
   return parts.join('・');
 }

@@ -3,7 +3,44 @@
 
 import { STARTPOS_SFEN, applyUsiMove, moveText } from '../shogi/position';
 import { isAfterDubiousOnly } from './generator';
-import type { TreeData, TreeEdge } from './types';
+import type { TreeData, TreeEdge, TreeNode } from './types';
+
+/**
+ * 自分の対応の手の印（段階4-3 B で「自分の手」「最善」を足した）
+ * - chosen：利用者が選んで調べた手（自分の手）
+ * - best：エンジンの最善手（同じ局面に「自分の手」があるとき）
+ * - verified：エンジンの最善手（検証済み）
+ * - before-verify：検証で別の手が最善になった、前の手（検証前の手）
+ * - unverified：読み筋から取っただけの手（未検証）
+ * - none：印なし（調べていない局面の確定した手。ふつうは無い）
+ */
+export type MineMark = 'chosen' | 'best' | 'verified' | 'before-verify' | 'unverified' | 'none';
+
+export const MINE_MARK_TEXT: Record<MineMark, string> = {
+  chosen: '自分の手',
+  best: '最善',
+  verified: '検証済み',
+  'before-verify': '検証前の手',
+  unverified: '未検証',
+  none: '',
+};
+
+export function mineMark(node: TreeNode, edge: TreeEdge): MineMark {
+  if (edge.userChosen) return 'chosen';
+  if (edge.unverified) return node.searched ? 'before-verify' : 'unverified';
+  if (!node.searched) return 'none';
+  return node.edges.some((e) => e.userChosen) ? 'best' : 'verified';
+}
+
+/** 詰みが絡んで評価値の差が大きすぎるとき（数字では出さない） */
+const HUGE_LOSS = 10_000;
+
+/** 自分の手の、最善手との差の短い文（例：「最善より −80」「最善と同じ」） */
+export function lossText(loss: number): string {
+  if (loss <= 0) return '最善と同じ';
+  if (loss >= HUGE_LOSS) return '最善より大きく悪い（詰みの差）';
+  return `最善より −${loss}`;
+}
 
 /** 相手の応手の後の、自分の対応（その局面のいちばん上の手）。まだ無ければ undefined */
 export function replyOf(tree: TreeData, edge: TreeEdge): TreeEdge | undefined {

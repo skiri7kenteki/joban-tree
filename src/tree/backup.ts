@@ -35,7 +35,8 @@ export function parseTreeJson(text: string): ParseResult {
   if (!isNumber(raw.version) || raw.version > TREE_FORMAT_VERSION) {
     return { ok: false, message: 'アプリより新しい形式のファイルです。アプリを最新にしてから読み込んでください。' };
   }
-  // 形式 1・2 の確認（2 は局面に excluded が足せるだけなので、1 はそのまま読める。形を変えたときは、ここで古い形から新しい形に直す）
+  // 形式 1〜3 の確認（2 は局面に excluded、3 は自分の手に userChosen・loss が足せるだけなので、古い形もそのまま読める。
+  // 形を変えたときは、ここで古い形から新しい形に直す）
   const problem = checkV1(raw);
   if (problem) return { ok: false, message: `ファイルの中身が壊れています（${problem}）。` };
   return { ok: true, tree: raw as unknown as TreeData };
@@ -62,6 +63,8 @@ function checkV1(t: Record<string, unknown>): string | null {
     for (const edge of [...node.edges, ...((node.excluded as unknown[] | undefined) ?? [])]) {
       if (!isObject(edge) || !isString(edge.move) || !isString(edge.to) || !isScore(edge.score)) return `局面 ${key} の手`;
       if (!(edge.to in t.nodes)) return `局面 ${key} の手の行き先`;
+      if (edge.userChosen !== undefined && typeof edge.userChosen !== 'boolean') return `局面 ${key} の自分の手`;
+      if (edge.loss !== undefined && !isNumber(edge.loss)) return `局面 ${key} の自分の手の損`;
     }
   }
   if (!(t.rootKey in t.nodes)) return '開始局面';

@@ -6,9 +6,10 @@ import type { Side } from '../shogi/position';
 
 export const TREE_APP = 'joban-tree';
 /**
- * 形式の版。1：段階1〜。2：段階4-3〜（局面に「除外した手」excluded を足した。1 の形はそのまま 2 として読める）
+ * 形式の版。1：段階1〜。2：段階4-3 A〜（局面に「除外した手」excluded を足した）。
+ * 3：段階4-3 B〜（自分の手に userChosen・loss を足した）。1・2 の形はそのまま 3 として読める
  */
-export const TREE_FORMAT_VERSION = 2;
+export const TREE_FORMAT_VERSION = 3;
 
 /** 生成の条件（プリセットから決まる） */
 export interface GenerationSettings {
@@ -48,6 +49,13 @@ export interface TreeEdge {
   diff?: number;
   /** 自分の対応で、まだ探索して確かめていないもの（読み筋の 2 手目をそのまま使ったもの） */
   unverified?: boolean;
+  /**
+   * 自分の対応で、利用者が「自分の指したい手」として選んで調べたもの（形式 3〜）。
+   * 選んだ手は本線（その局面のいちばん上）にする。エンジンの最善手は消さずにその下に残す
+   */
+  userChosen?: boolean;
+  /** userChosen の手が、エンジンの最善手より何点悪いか（0 以上。同じ時間で両方を調べて比べた値） */
+  loss?: number;
 }
 
 /** ツリーの中の 1 局面 */

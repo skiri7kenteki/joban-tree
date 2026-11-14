@@ -7,9 +7,10 @@
 //      （replyMs があれば 2 手目は使わず、自分ノードを MultiPV=1 で調べて確定した手を置く）
 //   3. 自分の対応の後の局面（また相手ノード）を待ち行列へ。浅い順、同じ深さなら自分に良い順
 //   4. 時間・深さ・局面数の上限か、停止で終わる。どこで終わっても、それまでのツリーは有効
+//   自分ノードに手が複数あるとき（検証前の手・利用者が選んだ手）は、本線（いちばん上の手）の先だけをたどる（段階4-3）
 
 import type { AnalysisEngine, AnalysisResult } from '../engine/engine';
-import { negateScore, scoreToNumber } from '../engine/usi';
+import { negateScore, scoreToNumber, type PvLine } from '../engine/usi';
 import { applyUsiMove, legalMoves, positionCommand, sfenKey, sideToMove, type Side } from '../shogi/position';
 import {
   TREE_APP,
@@ -228,6 +229,59 @@ export class TreeGenerator {
   }
 
   /**
+   * 「自分の指したい手で調べる」（段階4-3 B）：自分ノード key で、利用者が選んだ手 move を本線にして、その先を作る。
+   *   1. 同じ時間（compareMs）で、エンジンの最善手（MultiPV=1）と、選んだ手だけ（go searchmoves move）を調べる
+   *   2. 選んだ手を「自分の手」（userChosen）としていちばん上に置き、最善手との差を loss に入れる。最善手はその下に残す
+   *   3. 選んだ手の後の局面（相手の手番）から、この生成の条件で展開する（run と同じ）
+   */
+  async explore(key: string, move: string, compareMs: number): Promise<FinishReason> {
+    this.startedAt = this.now();
+    const node = this.tree.nodes[key];
+    if (!node || node.terminal || isOpponentNode(this.tree, node)) return 'completed';
+    const after = applyUsiMove(node.sfen, move);
+    if (!after) {
+      this.errorMessage = 'この局面では指せない手です';
+      return 'error';
+    }
+    const position = positionCommand(node.sfen);
+    let best: AnalysisResult;
+    let mine: AnalysisResult;
+    try {
+      best = await this.engine.analyze(position, { movetimeMs: compareMs, multiPV: 1 });
+      if (this.stopped) return 'stopped';
+      mine = await this.engine.analyze(position, { movetimeMs: compareMs, multiPV: 1, searchMoves: [move] });
+    } catch (error) {
+      this.errorMessage = error instanceof Error ? error.message : String(error);
+      return 'error';
+    }
+    const bestLine = best.lines.find((l) => l.pv.length > 0 && l.score);
+    const mineLine = mine.lines.find((l) => l.pv[0] === move && l.score);
+    if (!bestLine || !mineLine) {
+      this.errorMessage = 'エンジンがこの手を調べられませんでした';
+      return 'error';
+    }
+    node.searched = { movetimeMs: compareMs, multiPV: 1, depth: best.depth, nodes: best.nodes };
+    this.placeMine(node, bestLine);
+    // 選んだ手が最善手と同じなら損は 0。違えば、同じ時間で調べた評価値の差（自分の手番なので、そのまま自分から見た値）
+    const same = bestLine.pv[0] === move;
+    const score = same ? bestLine.score! : mineLine.score!;
+    const loss = same ? 0 : Math.max(0, scoreToNumber(bestLine.score!) - scoreToNumber(mineLine.score!));
+    const next = this.getOrCreate(after.sfen, node.round + 1).node;
+    const chosen: TreeEdge = { move, to: next.key, score, userChosen: true, loss };
+    node.edges = [chosen, ...node.edges.filter((e) => e.move !== move)];
+    this.searched += 2;
+    this.tree.updatedAt = this.now();
+    this.hooks.onChange?.({
+      elapsedMs: this.now() - this.startedAt,
+      searched: this.searched,
+      nodeCount: Object.keys(this.tree.nodes).length,
+      round: Math.max(1, node.round + 1),
+    });
+    if (this.stopped) return 'stopped';
+    return this.run(next.key);
+  }
+
+  /**
    * 「この手を検証」：自分ノードを 1 局面だけ、MultiPV=1 で調べ直す。
    * 最善手を「確定した自分の対応」として先頭に置く。読み筋から取った手（未検証）が別の手だったときは、
    * その枝も消さずに残す（その先のツリーを失わないため）。
@@ -302,7 +356,9 @@ export class TreeGenerator {
       if (!node.searched && this.verifiesReplies() && !isOpponentNode(this.tree, node)) this.enqueue(node, priority);
       // 疑問手の後の自分ノードは、咎める手（の確定）までで止める
       if (!isOpponentNode(this.tree, node) && this.stopsAfterAnswer(key)) continue;
-      for (const edge of node.edges) stack.push({ key: edge.to, priority: scoreToNumber(edge.score) });
+      // 自分ノードは本線（いちばん上の手）の先だけ。検証前の手・本線にしていない自分の手の先は広げない
+      const edges = isOpponentNode(this.tree, node) ? node.edges : node.edges.slice(0, 1);
+      for (const edge of edges) stack.push({ key: edge.to, priority: scoreToNumber(edge.score) });
     }
   }
 
@@ -383,17 +439,38 @@ export class TreeGenerator {
       node.terminal = true;
       return;
     }
-    const myMove = line.pv[0];
-    const after = applyUsiMove(node.sfen, myMove);
-    if (!after) {
+    const edge = this.placeMine(node, line);
+    if (!edge) {
       node.terminal = true;
       return;
     }
+    // 本線になった手の先だけを調べる。疑問手の後の局面なら、咎める手を置いたところで止める（その先は調べない）
+    if (node.edges[0] === edge && !this.stopsAfterAnswer(node.key)) this.enqueue(this.tree.nodes[edge.to], scoreToNumber(edge.score));
+  }
+
+  /**
+   * 自分ノードに、エンジンの最善手（確定した手）を置く。ふつうはいちばん上（本線）に置くが、
+   * 利用者が選んだ手（userChosen）が本線なら、本線はそのままにして、その下に置く（段階4-3 B）。
+   * 前に置いた最善手（確定した手）が別の手だったら、それは「検証前の手」にする
+   */
+  private placeMine(node: TreeNode, line: PvLine): TreeEdge | null {
+    const myMove = line.pv[0];
+    const after = applyUsiMove(node.sfen, myMove);
+    if (!after) return null;
     const next = this.getOrCreate(after.sfen, node.round + 1).node;
+    const old = node.edges.find((e) => e.move === myMove);
     const edge: TreeEdge = { move: myMove, to: next.key, score: line.score! };
-    node.edges = [edge, ...node.edges.filter((e) => e.move !== myMove)];
-    // 疑問手の後の局面なら、咎める手を置いたところで止める（その先は調べない）
-    if (!this.stopsAfterAnswer(node.key)) this.enqueue(next, scoreToNumber(line.score!));
+    // 利用者が選んだ手が最善手だった：印はそのまま、損は 0
+    if (old?.userChosen) Object.assign(edge, { userChosen: true, loss: 0 });
+    // ほかの手のうち、前の最善手（確定した手）は「検証前の手」にする
+    const rest = node.edges
+      .filter((e) => e.move !== myMove)
+      .map((e) => (e.userChosen || e.unverified ? e : { ...e, unverified: true }));
+    // 置く場所：利用者が選んだ手ならもとの場所。本線が利用者の手ならその下。それ以外はいちばん上
+    const index = old?.userChosen ? node.edges.indexOf(old) : rest[0]?.userChosen ? 1 : 0;
+    rest.splice(index, 0, edge);
+    node.edges = rest;
+    return edge;
   }
 }
 

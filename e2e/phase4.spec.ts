@@ -240,3 +240,110 @@ test.describe('4-3 除外', () => {
     await expect(page.getByTestId('excluded-toggle')).toHaveText('除外した手（1）▸');
   });
 });
+
+// ---- 段階4-3 B：自分の指したい手で調べる・本線にする・消す ----
+
+/** ▲７六歩 △３四歩 の後の自分の手番に、自分の手 ▲６六歩（最善より −80、本線）と最善手 ▲２六歩 があるツリー */
+function chosenTree(id: string): TreeData {
+  const tree = makeTree(id, ['7g7f'], [
+    ['3c3d', 0, '2g2f', false],
+    ['8c8d', 20, '2g2f', false],
+  ]);
+  const me = tree.nodes[tree.nodes[tree.rootKey].edges[0].to];
+  me.searched = { movetimeMs: 1000, multiPV: 1, depth: 16, nodes: 1 };
+  const after = applyUsiMove(me.sfen, '6g6f')!.sfen;
+  tree.nodes[sfenKey(after)] = { key: sfenKey(after), sfen: after, round: 1, edges: [] };
+  me.edges.unshift({ move: '6g6f', to: sfenKey(after), score: cp(30), userChosen: true, loss: 80 });
+  return tree;
+}
+
+test.describe('4-3 自分の手', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
+
+  test('自分の手と最善手の印・損が出る。「⋯」から本線にする・消す（確認あり、保存される）', async ({ page }) => {
+    await openTree(page, chosenTree('p43-chosen'));
+    const rows = page.getByTestId('candidate');
+    // 相手の応手の行の「→ 自分の対応」は、本線の自分の手
+    await expect(rows.nth(0).getByTestId('candidate-reply')).toHaveText('→ ▲６六歩自分の手');
+    await rows.nth(0).click();
+    await expect(rows.nth(0)).toContainText('▲６六歩');
+    await expect(rows.nth(0).getByTestId('mine-mark')).toHaveText('自分の手');
+    await expect(rows.nth(0).getByTestId('candidate-loss')).toHaveText('最善より −80');
+    await expect(rows.nth(1).getByTestId('mine-mark')).toHaveText('最善');
+    // 盤＋自分の手 2 行が 1 画面に（「別の手を調べる」の行が増えても）
+    await expect(rows.nth(1)).toBeInViewport({ ratio: 1 });
+
+    // 最善手を本線に戻す
+    await page.getByTestId('candidate-menu').nth(1).click();
+    await page.getByTestId('make-main').click();
+    await expect(rows.nth(0)).toContainText('▲２六歩');
+    await expect(page.getByTestId('tree-note')).toContainText('本線にしました');
+    await page.reload();
+    await expect(rows.nth(0).getByTestId('candidate-reply')).toHaveText('→ ▲２六歩');
+
+    // 自分の手を消す（確認で「やめる」なら消えない）
+    await rows.nth(0).click();
+    await page.getByTestId('candidate-menu').nth(1).click();
+    await page.getByTestId('delete-move').click();
+    await expect(page.getByTestId('delete-confirm')).toContainText('元に戻せません');
+    await page.getByTestId('delete-cancel').click();
+    await expect(rows).toHaveCount(2);
+    await page.getByTestId('candidate-menu').nth(1).click();
+    await page.getByTestId('delete-move').click();
+    // ▲６六歩 の先はまだ調べていないので、手だけを消す
+    await expect(page.getByTestId('delete-confirm')).toContainText('この手を消します。');
+    await page.getByTestId('delete-ok').click();
+    await expect(rows).toHaveCount(1);
+    // 手が 1 つになったら「⋯」は出さない
+    await expect(page.getByTestId('candidate-menu')).toHaveCount(0);
+    await page.reload();
+    await rows.nth(0).click();
+    await expect(rows).toHaveCount(1);
+  });
+
+  test('「別の手を調べる」で盤をタップして手を選ぶと、調べ方を選ぶ小窓が出る（やめられる）', async ({ page }) => {
+    await openTree(page, OPENING);
+    // 相手の手番の局面には出さない
+    await expect(page.getByTestId('explore-open')).toHaveCount(0);
+    await page.getByTestId('candidate').nth(0).click();
+    await page.getByTestId('explore-open').click();
+    await expect(page.getByTestId('pick-bar')).toBeVisible();
+    await page.locator('[data-square="67"]').click();
+    await page.locator('[data-square="66"]').click();
+    await expect(page.getByTestId('explore-dialog')).toContainText('▲６六歩 で調べる');
+    await expect(page.getByTestId('explore-normal')).toBeVisible();
+    await page.getByTestId('explore-cancel').click();
+    await expect(page.getByTestId('explore-dialog')).toHaveCount(0);
+    await expect(page.getByTestId('pick-bar')).toHaveCount(0);
+    // やめた後は、盤をタップしても何も起きない
+    await page.locator('[data-square="67"]').click();
+    await page.locator('[data-square="66"]').click();
+    await expect(page.getByTestId('explore-dialog')).toHaveCount(0);
+  });
+
+  test('本物のエンジンで、自分の手を最善手と比べて本線にし、その先を作る', async ({ page }) => {
+    test.skip(!process.env.ENGINE_AVAILABLE, 'エンジンがビルドされていないので省略（GitHub Actions では実行される）');
+    test.setTimeout(120_000);
+    await openTree(page, OPENING);
+    await page.getByTestId('candidate').nth(0).click();
+    await page.getByTestId('explore-open').click();
+    // ▲９六歩（端歩。最善手ではないはず）
+    await page.locator('[data-square="97"]').click();
+    await page.locator('[data-square="96"]').click();
+    await page.getByTestId('explore-normal').click();
+    const rows = page.getByTestId('candidate');
+    // 比べ終わると、自分の手が本線になり、損が出る
+    await expect(rows.nth(0).getByTestId('candidate-loss')).toBeVisible({ timeout: 60_000 });
+    await expect(rows.nth(0)).toContainText('▲９六歩');
+    await expect(rows.nth(0).getByTestId('mine-mark')).toHaveText('自分の手');
+    await expect(rows.nth(1).getByTestId('mine-mark')).toHaveText('最善');
+    // その先を作り始めたら止める（ふつうは 2 分かかるので）
+    await expect(page.locator('[data-testid="gen-status"][data-kind="explore"]')).toContainText('調べた局面', { timeout: 30_000 });
+    await page.getByTestId('gen-stop').click();
+    await expect(page.locator('[data-testid="gen-status"][data-phase="done"]')).toContainText('自分の手は最善', { timeout: 30_000 });
+    await expect(page.getByTestId('gen-status')).toContainText('（自分の手から）');
+    // 自分の手の先に進める
+    await rows.nth(0).click();
+    await expect(page.getByTestId('crumb')).toHaveText(['△３四歩', '▲９六歩']);
+  });
+});

@@ -2,24 +2,39 @@
 // 上に盤面、下に「この局面の候補手リスト」。候補手をタップで 1 手進む。戻るボタン・左右スワイプで戻る/進む。
 // 段階4：スマホ縦で「盤＋候補手 3 つ」が 1 画面に収まるよう詰めた。相手の応手の行には自分の対応と枝の先の様子を併記する。
 // 段階4-3：相手の応手の行の「⋯」から「この手を除外」。除外した手はリストの下に畳み、「戻す」で戻せる。
+//          自分の手番では「別の手を調べる」で盤をタップして自分の指したい手を選び、最善手と比べてからその先を作る。
+//          自分の対応の行の「⋯」から「本線にする」「消す」。
 // 生成中も、できた枝からたどれる。
 // 局面ごとの操作：「ここから展開」「この手を検証」「KIF をコピー」、ツリーの書き出し・共有。
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { Board } from '../components/Board';
 import { Dialog } from '../components/Dialog';
+import { PromotionBox, useMoveInput } from '../components/useMoveInput';
 import { formatScore, scoreToNumber, type Score } from '../engine/usi';
 import { moveText } from '../shogi/position';
 import { loadTree } from '../storage/trees';
 import { fileNameOf, treeToJson } from '../tree/backup';
 import { FINISH_TEXT, countParents, excludeMove, isAfterDubiousOnly, isOpponentNode, restoreMove } from '../tree/generator';
 import { pathToKif, treeToKif } from '../tree/kif';
-import { branchInfo, branchText, lastPrefixMove, replyOf } from '../tree/browse';
+import { MINE_MARK_TEXT, branchInfo, branchText, lastPrefixMove, lossText, mineMark, replyOf, type MineMark } from '../tree/browse';
+import { countRemoved, deleteMove, makeMainMove } from '../tree/edit';
 import { LABEL_TEXT, labelOf } from '../tree/labels';
 import type { PresetId } from '../tree/presets';
 import { availablePresets } from './engineService';
 import type { TreeData, TreeEdge } from '../tree/types';
-import { generation, isGenerating, openTree, saveEdited, startGeneration, startResample, startVerify, stopGeneration, treeVersion } from './generation';
+import {
+  generation,
+  isGenerating,
+  openTree,
+  saveEdited,
+  startExplore,
+  startGeneration,
+  startResample,
+  startVerify,
+  stopGeneration,
+  treeVersion,
+} from './generation';
 import { go } from './router';
 import { generationSettingsFor, presetLabel, settings } from './settings';
 import { OUTCOME_TEXT, copyText, shareFile } from './share';
@@ -57,6 +72,12 @@ function TreeView({ tree }: { tree: TreeData }) {
   const [menuEdge, setMenuEdge] = useState<TreeEdge | null>(null);
   /** 除外した手の欄を開いているか */
   const [showExcluded, setShowExcluded] = useState(false);
+  /** 「別の手を調べる」：盤をタップして自分の手を選んでいるところか */
+  const [picking, setPicking] = useState(false);
+  /** 盤で選んだ自分の手（USI。調べ方を選ぶ小窓を出す） */
+  const [pickedMove, setPickedMove] = useState<string | null>(null);
+  /** 消すかどうか確認している自分の手 */
+  const [deleting, setDeleting] = useState<TreeEdge | null>(null);
   /** 操作の結果（「コピーしました」など） */
   const [note, setNote] = useState('');
   const crumbsRef = useRef<HTMLDivElement>(null);
@@ -71,6 +92,21 @@ function TreeView({ tree }: { tree: TreeData }) {
   const busy = isGenerating();
   // 「この手を検証」は、まだ調べていない自分の手番の局面だけ
   const canVerify = !opp && !node.searched && !node.terminal;
+  // 「別の手を調べる」：盤のタップで自分の手を選ぶ（入力画面・復習と同じ仕組み）
+  const input = useMoveInput(
+    node.sfen,
+    (move) => {
+      setPicking(false);
+      setPickedMove(move.usi);
+    },
+    picking && !busy,
+  );
+
+  // 局面が変わったら、手を選んでいる途中のものは取りやめる
+  useEffect(() => {
+    setPicking(false);
+    input.clear();
+  }, [key]);
 
   useEffect(() => {
     // パンくずリストは、今の局面が見えるよう右端までスクロール
@@ -119,6 +155,37 @@ function TreeView({ tree }: { tree: TreeData }) {
     setNote('');
     await saveEdited(tree);
     void startResample(tree, key);
+  }
+  /** 盤で選んだ自分の手を、最善手と比べてから本線にして、その先を作る */
+  function explore(move: string, id: PresetId) {
+    setPickedMove(null);
+    setNote('');
+    setForward([]);
+    void startExplore(tree, key, move, generationSettingsFor(id));
+  }
+  function startPicking() {
+    setNote('');
+    setPicking(true);
+  }
+  function cancelPicking() {
+    setPicking(false);
+    input.clear();
+  }
+  /** 自分の対応の手を本線（いちばん上）にする */
+  async function makeMain(edge: TreeEdge) {
+    setMenuEdge(null);
+    if (isGenerating() || !makeMainMove(node, edge.move)) return;
+    setForward([]);
+    setNote('本線にしました（復習の正解・書き出しの本譜・「ここから展開」でたどる手になります）');
+    await saveEdited(tree);
+  }
+  /** 自分の対応の手と、その先の局面を消す（確認の後） */
+  async function remove(edge: TreeEdge) {
+    setDeleting(null);
+    if (isGenerating() || !deleteMove(tree, key, edge.move)) return;
+    setForward([]);
+    setNote('消しました');
+    await saveEdited(tree);
   }
   /** 除外した手を戻す（調べ直しはしない。ラベルは付け直す） */
   async function restore(edge: TreeEdge) {
@@ -182,7 +249,11 @@ function TreeView({ tree }: { tree: TreeData }) {
 
       <div class="tree-layout">
         <div class="tree-board" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-          <Board sfen={node.sfen} lastMove={path.length > 1 ? incoming?.move : lastPrefixMove(tree)} />
+          <Board
+            sfen={node.sfen}
+            lastMove={path.length > 1 ? incoming?.move : lastPrefixMove(tree)}
+            {...(picking ? { selection: input.selection, onSquare: input.onSquare, onHand: input.onHand } : {})}
+          />
         </div>
 
         <div class="tree-side">
@@ -214,6 +285,16 @@ function TreeView({ tree }: { tree: TreeData }) {
             </div>
           </div>
 
+          {picking && (
+            <div class="card pick-bar" data-testid="pick-bar">
+              <span>盤の駒をタップして、調べたい自分の手を指してください</span>
+              <button type="button" class="btn btn-ghost" data-testid="pick-cancel" onClick={cancelPicking}>
+                やめる
+              </button>
+            </div>
+          )}
+          <PromotionBox input={input} />
+
           <div class="card candidates">
             <div class="candidates-head">
               <strong>{opp ? '相手の応手' : '自分の対応'}</strong>
@@ -232,12 +313,17 @@ function TreeView({ tree }: { tree: TreeData }) {
                       <span class="candidate-line">
                         <span class="candidate-move">{moveText(node.sfen, edge.move, incoming?.move)}</span>
                         {opp && edge.diff !== undefined && <LabelChip diff={edge.diff} />}
-                        {!opp && <MineChip verified={!edge.unverified} searched={node.searched !== undefined} />}
+                        {!opp && <MineChip mark={mineMark(node, edge)} />}
                         {(parents.get(edge.to) ?? 0) > 1 && <span class="chip chip-merge">合流</span>}
                         <ScoreText score={reply?.score ?? edge.score} />
                       </span>
                       <span class="candidate-line candidate-sub">
                         {opp && <ReplyText tree={tree} edge={edge} reply={reply} />}
+                        {!opp && edge.userChosen && edge.loss !== undefined && (
+                          <span class={edge.loss > 0 ? 'candidate-loss loss-bad' : 'candidate-loss'} data-testid="candidate-loss">
+                            {lossText(edge.loss)}
+                          </span>
+                        )}
                         {(!opp || reply) && (
                           <span class={`candidate-ahead ahead-${info.kind}`} data-testid="candidate-ahead">
                             {branchText(info)}
@@ -245,7 +331,7 @@ function TreeView({ tree }: { tree: TreeData }) {
                         )}
                       </span>
                     </button>
-                    {opp && (
+                    {(opp || node.edges.length > 1) && (
                       <button
                         type="button"
                         class="candidate-menu"
@@ -298,6 +384,11 @@ function TreeView({ tree }: { tree: TreeData }) {
                 この手を検証
               </button>
             )}
+            {!opp && !node.terminal && (
+              <button type="button" class="btn" data-testid="explore-open" onClick={startPicking} disabled={busy || picking}>
+                別の手を調べる
+              </button>
+            )}
             <button type="button" class="btn" data-testid="copy-kif" onClick={() => void copyKif()}>
               KIFをコピー
             </button>
@@ -326,7 +417,73 @@ function TreeView({ tree }: { tree: TreeData }) {
         </Dialog>
       )}
 
-      {menuEdge && (
+      {menuEdge && !opp && (
+        <Dialog title={moveText(node.sfen, menuEdge.move, incoming?.move)} onClose={() => setMenuEdge(null)} testId="move-menu">
+          <div class="dialog-actions dialog-actions-column">
+            <button
+              type="button"
+              class="btn btn-primary"
+              data-testid="make-main"
+              disabled={busy || node.edges[0]?.move === menuEdge.move}
+              onClick={() => void makeMain(menuEdge)}
+            >
+              {node.edges[0]?.move === menuEdge.move ? 'これが本線です' : '本線にする'}
+            </button>
+            <button
+              type="button"
+              class="btn btn-danger"
+              data-testid="delete-move"
+              disabled={busy}
+              onClick={() => {
+                setMenuEdge(null);
+                setDeleting(menuEdge);
+              }}
+            >
+              消す
+            </button>
+          </div>
+          <p class="muted">本線（いちばん上の手）が、復習の正解・書き出しの本譜・「ここから展開」でたどる手になります。</p>
+          {busy && <p class="muted">生成中は変えられません。止めてから操作してください。</p>}
+        </Dialog>
+      )}
+
+      {deleting && (
+        <Dialog title={`${moveText(node.sfen, deleting.move, incoming?.move)} を消しますか？`} onClose={() => setDeleting(null)} testId="delete-confirm">
+          <p>
+            {countRemoved(tree, key, deleting.move) > 0 ? `この手と、その先の ${countRemoved(tree, key, deleting.move)} 局面を消します。` : 'この手を消します。'}
+            <strong>元に戻せません。</strong>（ほかの手順からも来られる局面は残します）
+          </p>
+          <div class="dialog-actions">
+            <button type="button" class="btn" data-testid="delete-cancel" onClick={() => setDeleting(null)}>
+              やめる
+            </button>
+            <button type="button" class="btn btn-danger" data-testid="delete-ok" disabled={busy} onClick={() => void remove(deleting)}>
+              消す
+            </button>
+          </div>
+        </Dialog>
+      )}
+
+      {pickedMove && (
+        <Dialog title={`${moveText(node.sfen, pickedMove, incoming?.move)} で調べる`} onClose={() => setPickedMove(null)} testId="explore-dialog">
+          <p>
+            エンジンの最善手とこの手を同じ時間で調べて、最善手からどれだけ損かを出します。
+            この手を本線（いちばん上）にして、その先を作ります。最善手は消さずに下に残ります。
+          </p>
+          <div class="dialog-actions dialog-actions-column">
+            {availablePresets().map((id) => (
+              <button type="button" key={id} class="btn btn-primary" data-testid={`explore-${id}`} disabled={busy} onClick={() => explore(pickedMove, id)}>
+                {presetLabel(id)}
+              </button>
+            ))}
+            <button type="button" class="btn btn-ghost" data-testid="explore-cancel" onClick={() => setPickedMove(null)}>
+              やめる
+            </button>
+          </div>
+        </Dialog>
+      )}
+
+      {menuEdge && opp && (
         <Dialog title={moveText(node.sfen, menuEdge.move, incoming?.move)} onClose={() => setMenuEdge(null)} testId="move-menu">
           <p>
             人があまり指さない手などを除外すると、この局面を調べ直して（約{Math.round(tree.settings.movetimeMs / 100) / 10}秒）代わりの候補を補います。
@@ -374,7 +531,10 @@ function GenerationPanel({ tree }: { tree: TreeData }) {
     return () => clearInterval(timer);
   }, [gen.phase]);
 
-  const where = gen.startKey === tree.rootKey ? '' : '（途中の局面から）';
+  const where = gen.kind === 'explore' ? '（自分の手から）' : gen.startKey === tree.rootKey ? '' : '（途中の局面から）';
+  // 自分の手で調べたとき：その手の損（最善手との差）
+  const chosen = gen.kind === 'explore' ? tree.nodes[gen.startKey]?.edges[0] : undefined;
+  const lossNote = chosen?.userChosen && chosen.loss !== undefined ? `自分の手は${lossText(chosen.loss)}。` : '';
 
   if (gen.phase === 'done') {
     let text: string;
@@ -386,7 +546,7 @@ function GenerationPanel({ tree }: { tree: TreeData }) {
           ? '除外した手のほかに候補を補いました（ラベルは残った手の中の最善手から付け直しました）'
           : FINISH_TEXT[gen.finish ?? 'stopped'];
     } else {
-      text = `${gen.finish ? FINISH_TEXT[gen.finish] : '終わりました'}${where}`;
+      text = `${lossNote}${gen.finish ? FINISH_TEXT[gen.finish] : '終わりました'}${where}`;
       if (gen.progress) text += `（調べた局面 ${gen.progress.searched}・全部で ${gen.progress.nodeCount} 局面）`;
     }
     return (
@@ -444,7 +604,8 @@ function ReplyText({ tree, edge, reply }: { tree: TreeData; edge: TreeEdge; repl
   return (
     <span class="candidate-reply" data-testid="candidate-reply">
       → {moveText(me.sfen, reply.move, edge.move)}
-      {reply.unverified && <span class="chip chip-unverified chip-small">未検証</span>}
+      {reply.userChosen && <span class="chip chip-chosen chip-small">自分の手</span>}
+      {!reply.userChosen && reply.unverified && <span class="chip chip-unverified chip-small">未検証</span>}
     </span>
   );
 }
@@ -455,11 +616,22 @@ function ScoreText({ score }: { score: Score }) {
   return <span class={`candidate-score num ${cls}`}>{formatScore(score)}</span>;
 }
 
-/** 自分の対応の印：未検証／検証済み／検証前の手（検証で別の手が最善になった） */
-function MineChip({ verified, searched }: { verified: boolean; searched: boolean }) {
-  if (verified) return searched ? <span class="chip chip-verified">検証済み</span> : null;
-  if (searched) return <span class="chip chip-unverified">検証前の手</span>;
-  return <span class="chip chip-unverified">未検証</span>;
+/** 自分の対応の印：自分の手／最善／検証済み／検証前の手（検証で別の手が最善になった）／未検証 */
+const MINE_CHIP_CLASS: Record<MineMark, string> = {
+  chosen: 'chip-chosen',
+  best: 'chip-verified',
+  verified: 'chip-verified',
+  'before-verify': 'chip-unverified',
+  unverified: 'chip-unverified',
+  none: '',
+};
+function MineChip({ mark }: { mark: MineMark }) {
+  if (mark === 'none') return null;
+  return (
+    <span class={`chip ${MINE_CHIP_CLASS[mark]}`} data-testid="mine-mark">
+      {MINE_MARK_TEXT[mark]}
+    </span>
+  );
 }
 
 function LabelChip({ diff }: { diff: number }) {

@@ -9,8 +9,11 @@ import { getEngine } from './engineService';
 
 export interface GenerationState {
   treeId: string;
-  /** generate：生成（ここから展開も同じ）、verify：この手を検証、resample：除外した手を外して 1 局面を調べ直す */
-  kind: 'generate' | 'verify' | 'resample';
+  /**
+   * generate：生成（ここから展開も同じ）、verify：この手を検証、resample：除外した手を外して 1 局面を調べ直す、
+   * explore：自分の指したい手で調べる（最善手と比べてから、その手の先を作る）
+   */
+  kind: 'generate' | 'verify' | 'resample' | 'explore';
   /** どの局面から（または、どの局面を）調べているか */
   startKey: string;
   /** engine：エンジンの準備中、running：生成中、done：終わった */
@@ -62,6 +65,21 @@ export function startResample(tree: TreeData, key: string): Promise<void> {
   return runJob(tree, 'resample', key, settings, (g) => g.resample(key, movetimeMs));
 }
 
+/** 最善手と自分の手を比べるときの、1 手あたりの時間：その条件の「自分の対応を調べる時間」（無ければ 1 局面の時間） */
+export function compareMsOf(settings: GenerationSettings): number {
+  return settings.replyMs && settings.replyMs > 0 ? settings.replyMs : settings.movetimeMs;
+}
+
+/**
+ * 「自分の指したい手で調べる」（段階4-3 B）：自分の手番の局面 key で、手 move を最善手と同じ時間で比べ、
+ * 本線にして、その手の後から settings（プリセット）で展開する
+ */
+export function startExplore(tree: TreeData, key: string, move: string, settings: GenerationSettings): Promise<void> {
+  tree.settings = settings;
+  tree.version = TREE_FORMAT_VERSION;
+  return runJob(tree, 'explore', key, settings, (g) => g.explore(key, move, compareMsOf(settings)));
+}
+
 /** 生成していないときに、ツリーを書き換えて保存する（除外した手を戻すなど） */
 export async function saveEdited(tree: TreeData): Promise<void> {
   tree.version = TREE_FORMAT_VERSION;
@@ -106,7 +124,7 @@ async function runJob(
       });
       reason = await work(current);
       if (reason === 'error') error = current.errorMessage;
-      if (kind === 'generate') {
+      if (kind === 'generate' || kind === 'explore') {
         tree.generation = {
           elapsedMs: Date.now() - runStartedAt,
           searched: generation.value?.progress?.searched ?? 0,

@@ -576,6 +576,35 @@
   color: var(--color-ok);
 }
 
+/* 利用者が選んで調べた自分の手（段階4-3 B） */
+.chip-chosen {
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+}
+
+/* 自分の手の、最善手との差 */
+.candidate-loss {
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.candidate-loss.loss-bad {
+  color: var(--color-eval-bad);
+}
+
+/* 「別の手を調べる」：盤をタップして手を選んでいる間の案内 */
+.pick-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  border: 2px solid var(--color-accent);
+}
+
+.pick-bar span {
+  flex: 1;
+}
+
 /* 重ねて出す小窓 */
 .dialog {
   width: min(92vw, 440px);
