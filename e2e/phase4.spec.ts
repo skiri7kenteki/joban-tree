@@ -119,3 +119,73 @@ test.describe('iPad 横（1180×820）', () => {
     await expect(page.getByTestId('candidate').nth(4)).toBeInViewport({ ratio: 1 });
   });
 });
+
+// ---- 段階4-2：そのほかの画面の手直し ----
+
+test.describe('4-2 スマホ縦（390×844）', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
+
+  test('入力画面：作るボタンは画面の下に固定され、盤の操作と重ならない', async ({ page }) => {
+    await page.goto('./#/new');
+    await expect(page.getByTestId('isolation')).toHaveAttribute('data-state', 'isolated', { timeout: 30_000 });
+    await expect(page.getByTestId('start-normal')).toBeInViewport({ ratio: 1 });
+    const bar = (await page.getByTestId('start-bar').boundingBox())!;
+    expect(bar.y + bar.height).toBeLessThanOrEqual(844 + 1);
+    // 開いたときは、盤も手順の操作もバーの上（重なっていない）
+    const board = (await page.getByTestId('board').boundingBox())!;
+    expect(board.y + board.height).toBeLessThanOrEqual(bar.y);
+    const nav = (await page.getByTestId('input-next').boundingBox())!;
+    expect(nav.y + nav.height).toBeLessThanOrEqual(bar.y);
+    // 貼り付け欄を開いても、作るボタンは押せる
+    await page.getByTestId('kifu-open').click();
+    await expect(page.getByTestId('start-normal')).toBeInViewport({ ratio: 1 });
+    // いちばん下までスクロールしても、手順の操作はバーに隠れない
+    await page.mouse.wheel(0, 3000);
+    await expect(page.getByTestId('input-next')).toBeInViewport({ ratio: 1 });
+    const next = (await page.getByTestId('input-next').boundingBox())!;
+    const bar2 = (await page.getByTestId('start-bar').boundingBox())!;
+    expect(next.y + next.height).toBeLessThanOrEqual(bar2.y);
+  });
+
+  test('一覧：自分の側と、開始局面までの最後の数手。速度測定は設定画面へ', async ({ page }) => {
+    await openTree(page, makeTree('p42-list', ['7g7f', '3c3d', '2g2f', '8c8d'], [['2f2e', 0, null, false]]));
+    await page.goto('./');
+    await expect(page.getByTestId('tree-item-position')).toHaveText('自分：☖後手・…△３四歩 ▲２六歩 △８四歩');
+    await expect(page.getByText('エンジンの速度測定')).toHaveCount(0);
+    await page.getByTestId('open-settings').click();
+    await expect(page.getByTestId('open-bench')).toHaveAttribute('href', /bench\.html$/);
+  });
+
+  test('復習：相手が直前に指した手を、盤（最終手のマス）と一言で示す。記録を消すは画面の下', async ({ page }) => {
+    await openTree(page, OPENING);
+    await page.getByTestId('review-open').click();
+    await expect(page.getByTestId('review-prompt')).toHaveAttribute('data-phase', 'ask');
+    const said = await page.getByTestId('review-opponent').innerText();
+    expect(said).toMatch(/^相手は △/);
+    // 盤の最終手のマス（行き先）と元のマスに印
+    await expect(page.locator('[data-testid="board"] .sq-last')).toHaveCount(1);
+    await expect(page.locator('[data-testid="board"] .sq-last-from')).toHaveCount(1);
+    // 「記録を消す…」は盤と問題の下
+    const clear = (await page.getByTestId('review-clear').boundingBox())!;
+    const prompt = (await page.getByTestId('review-prompt').boundingBox())!;
+    const line = (await page.getByTestId('review-line').boundingBox())!;
+    expect(clear.y).toBeGreaterThan(prompt.y + prompt.height);
+    expect(clear.y).toBeGreaterThan(line.y + line.height);
+  });
+});
+
+test.describe('4-2 iPad 横（1180×820）', () => {
+  test.use({ viewport: { width: 1180, height: 820 }, hasTouch: true });
+
+  test('入力画面：左に盤、右に貼り付け・手順の操作・作るボタン（盤に重ならない）', async ({ page }) => {
+    await page.goto('./#/new');
+    await expect(page.getByTestId('isolation')).toHaveAttribute('data-state', 'isolated', { timeout: 30_000 });
+    const board = (await page.getByTestId('board').boundingBox())!;
+    const start = (await page.getByTestId('start-normal').boundingBox())!;
+    const paste = (await page.getByTestId('kifu-open').boundingBox())!;
+    expect(board.x + board.width).toBeLessThanOrEqual(start.x);
+    expect(board.x + board.width).toBeLessThanOrEqual(paste.x);
+    await expect(page.getByTestId('start-normal')).toBeInViewport({ ratio: 1 });
+    await expect(page.getByTestId('board')).toBeInViewport({ ratio: 1 });
+  });
+});

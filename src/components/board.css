@@ -26,6 +26,10 @@
   fill: var(--color-last-move);
 }
 
+.sq-last-from {
+  fill: var(--color-last-move-from);
+}
+
 .sq-selected {
   fill: var(--color-selected);
 }

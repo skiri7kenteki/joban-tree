@@ -69,7 +69,8 @@ async function correctMove(page: Page): Promise<[string, string]> {
 test('復習モード：相手の応手が出て、盤で答える。まちがい → もう一度 → 正解。記録が残る', async ({ page }) => {
   await openReview(page);
   await expect(page.getByTestId('review-summary')).toContainText('問題 2（まだ 2');
-  await expect(page.getByTestId('review-prompt')).toContainText(/相手は ▲(７六歩|２六歩)。あなた（☖後手）の手は？/);
+  await expect(page.getByTestId('review-opponent')).toHaveText(/^相手は ▲(７六歩|２六歩)$/);
+  await expect(page.getByTestId('review-prompt')).toContainText('あなた（☖後手）の手は？');
 
   // まちがえる（△１四歩）
   const [from, to] = await correctMove(page);
@@ -137,7 +138,8 @@ test('復習モード：相手の疑問手には、咎める 1 手だけを出�
   // 問題は △３四歩 の 1 つだけ（▲７六歩△３四歩▲２六歩 の後の △８四歩 は数えない）
   await expect(page.getByTestId('review-summary')).toContainText('問題 1（まだ 1');
   await expect(page.getByTestId('review-dubious')).toHaveText('疑問手');
-  await expect(page.getByTestId('review-prompt')).toContainText('相手は ▲７六歩（疑問手）。どう咎めますか？');
+  await expect(page.getByTestId('review-opponent')).toHaveText('相手は ▲７六歩（疑問手）');
+  await expect(page.getByTestId('review-prompt')).toContainText('どう咎めますか？');
   await play(page, '33', '34');
   await expect(page.getByTestId('review-answer')).toContainText('正解！');
   await expect(page.getByTestId('review-end')).toContainText('疑問手を咎める手まで出しました。この手順はここまでです（1 問中 1 問');

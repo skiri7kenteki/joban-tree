@@ -1,7 +1,7 @@
 // 将棋盤（SVG で描く。画像ファイルは使わない）と持ち駒。
 // - 盤の向きは**常に先手が手前（下）**（持ち主の判断 2026-11-13。自分が後手でも盤はひっくり返さない）
 // - 後手の駒は 180 度回転させる
-// - 最終手のマスを薄く塗る。タップで指すとき用に、選んだマスも塗る
+// - 最終手のマスを薄く塗る（動かした元のマスはもっと薄く）。タップで指すとき用に、選んだマスも塗る
 // - タップで指さない盤（閲覧画面）は、持ち駒の列を薄くして縦の幅を詰める
 
 import { Color, PieceType, Position, Square, parseUSIMove, pieceTypeToStringForBoard } from 'tsshogi';
@@ -75,6 +75,7 @@ export function Board({ sfen, lastMove, selection, onSquare, onHand }: BoardProp
     for (let rank = 1; rank <= 9; rank++) {
       const { x, y } = toXY(file, rank);
       const isLast = last?.to.file === file && last?.to.rank === rank;
+      const isLastFrom = last?.from instanceof Square && last.from.file === file && last.from.rank === rank;
       const isSelected = selection?.kind === 'square' && selection.file === file && selection.rank === rank;
       const piece = position.board.at(new Square(file, rank));
       squares.push(
@@ -84,7 +85,7 @@ export function Board({ sfen, lastMove, selection, onSquare, onHand }: BoardProp
           onClick={onSquare ? () => onSquare(file, rank) : undefined}
           class={onSquare ? 'board-square tappable' : 'board-square'}
         >
-          <rect x={x} y={y} width={CELL_W} height={CELL_H} class={isSelected ? 'sq-selected' : isLast ? 'sq-last' : 'sq'} />
+          <rect x={x} y={y} width={CELL_W} height={CELL_H} class={isSelected ? 'sq-selected' : isLast ? 'sq-last' : isLastFrom ? 'sq-last-from' : 'sq'} />
           {piece && (
             <PieceShape
               cx={x + CELL_W / 2}

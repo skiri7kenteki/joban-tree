@@ -97,6 +97,9 @@ export function HomeScreen({ isolationMessage }: { isolationMessage: string | nu
           <li key={t.id} class="tree-row">
             <button type="button" class="tree-item" data-testid="tree-item" onClick={() => go(`/tree/${t.id}`)}>
               <span class="tree-item-name">{t.name}</span>
+              <span class="tree-item-meta" data-testid="tree-item-position">
+                自分：{t.mySide === 'black' ? '☗先手' : '☖後手'}・{t.prefixText}
+              </span>
               <span class="tree-item-meta num">
                 {formatDate(t.updatedAt)}・{t.nodeCount} 局面{running === t.id ? '・生成中' : ''}
               </span>
@@ -115,10 +118,6 @@ export function HomeScreen({ isolationMessage }: { isolationMessage: string | nu
         <input ref={fileRef} type="file" accept=".json,application/json" hidden data-testid="import-file" onChange={(e) => void onFile(e)} />
       </div>
       <p class="muted">仲間から受け取ったツリー（このアプリで書き出した JSON）を開けます。</p>
-
-      <p class="muted home-links">
-        <a href={`${import.meta.env.BASE_URL}bench.html`}>エンジンの速度測定</a>
-      </p>
 
       {menuTree && (
         <TreeMenu

@@ -1,5 +1,7 @@
 // 閲覧画面の候補手リスト用：相手の応手に対する自分の対応、枝の先にどれだけ調べてあるか（段階4）。
+// 一覧・復習画面用：開始局面に至るまでの手順。
 
+import { STARTPOS_SFEN, applyUsiMove, moveText } from '../shogi/position';
 import { isAfterDubiousOnly } from './generator';
 import type { TreeData, TreeEdge } from './types';
 
@@ -66,4 +68,32 @@ export function branchText(info: BranchInfo): string {
     case 'count':
       return `先に ${info.positions} 局面`;
   }
+}
+
+/** 開始局面に至るまでの手順（棋譜の初めから）を、1 手ずつ日本語にする（例：["▲７六歩", "△３四歩"]） */
+export function prefixMoveTexts(tree: Pick<TreeData, 'prefix'>): string[] {
+  const texts: string[] = [];
+  let sfen = tree.prefix.initialSfen;
+  let prev: string | undefined;
+  for (const move of tree.prefix.moves) {
+    texts.push(moveText(sfen, move, prev));
+    const next = applyUsiMove(sfen, move);
+    if (!next) break;
+    sfen = next.sfen;
+    prev = move;
+  }
+  return texts;
+}
+
+/** 一覧に出す「開始局面まで」の短い説明（例：「…▲２六歩 △３四歩」「平手の初期局面」） */
+export function prefixSummary(tree: Pick<TreeData, 'prefix'>, count = 3): string {
+  const texts = prefixMoveTexts(tree);
+  if (texts.length === 0) return tree.prefix.initialSfen === STARTPOS_SFEN ? '平手の初期局面' : '指定の局面';
+  const tail = texts.slice(-count).join(' ');
+  return texts.length > count ? `…${tail}` : tail;
+}
+
+/** 開始局面の直前の手（開始局面に「最終手」の印を付ける用）。手順が無ければ undefined */
+export function lastPrefixMove(tree: Pick<TreeData, 'prefix'>): string | undefined {
+  return tree.prefix.moves[tree.prefix.moves.length - 1];
 }

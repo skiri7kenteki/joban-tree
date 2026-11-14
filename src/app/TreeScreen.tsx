@@ -13,7 +13,7 @@ import { loadTree } from '../storage/trees';
 import { fileNameOf, treeToJson } from '../tree/backup';
 import { FINISH_TEXT, countParents, isAfterDubiousOnly, isOpponentNode } from '../tree/generator';
 import { pathToKif, treeToKif } from '../tree/kif';
-import { branchInfo, branchText, replyOf } from '../tree/browse';
+import { branchInfo, branchText, lastPrefixMove, replyOf } from '../tree/browse';
 import { LABEL_TEXT, labelOf } from '../tree/labels';
 import type { PresetId } from '../tree/presets';
 import { availablePresets } from './engineService';
@@ -162,7 +162,7 @@ function TreeView({ tree }: { tree: TreeData }) {
 
       <div class="tree-layout">
         <div class="tree-board" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-          <Board sfen={node.sfen} lastMove={incoming?.move} />
+          <Board sfen={node.sfen} lastMove={path.length > 1 ? incoming?.move : lastPrefixMove(tree)} />
         </div>
 
         <div class="tree-side">

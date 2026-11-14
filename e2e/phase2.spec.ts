@@ -65,7 +65,7 @@ test('JSON を取り込み、名前を変えて、削除できる（同じツリ
   await expect(page.getByTestId('home-message')).toContainText('序盤ツリーのファイルではありません');
 
   // 名前の変更
-  const item = page.getByTestId('tree-item').filter({ hasText: /^テスト用ツリー\d/ });
+  const item = page.getByTestId('tree-item').filter({ has: page.locator('.tree-item-name', { hasText: /^テスト用ツリー$/ }) });
   await page.locator('.tree-row').filter({ has: item }).getByTestId('tree-menu').click();
   await page.getByTestId('rename-input').fill('角換わりの研究');
   await page.getByTestId('rename-save').click();
@@ -151,8 +151,8 @@ test('設定：変えた値が保存され、プリセットのボタンに反�
   await expect(page.getByTestId('eval-mini')).toHaveAttribute('aria-checked', 'true');
 
   await page.goto('./#/new');
-  await expect(page.getByTestId('start-normal')).toHaveText('ふつう（1分30秒）で作る');
-  await expect(page.getByTestId('start-deep')).toHaveText('じっくり（5分）で作る');
+  await expect(page.getByTestId('start-normal')).toHaveText('ふつう（1分30秒）');
+  await expect(page.getByTestId('start-deep')).toHaveText('じっくり（5分）');
   await expect(page.getByTestId('start-quick')).toHaveCount(0);
   // 「精密」は PC 版（start.bat から開いたとき）だけ
   await expect(page.getByTestId('start-precise')).toHaveCount(0);

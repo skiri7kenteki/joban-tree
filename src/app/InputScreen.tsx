@@ -1,5 +1,6 @@
 // 局面の入力画面：棋譜を貼り付ける／盤をタップして指す → 手順を前後して局面を選ぶ →
 // 自分が先手か後手かを選ぶ → プリセット（ふつう・じっくり。PC 版は精密も）を選んで生成。
+// 段階4-2：棋譜の貼り付け欄はふだん閉じておく（読み込んだら閉じる）。作るボタンは画面の下に固定して、いつでも押せるようにする。
 
 import { useState } from 'preact/hooks';
 import { Position, type Move } from 'tsshogi';
@@ -24,6 +25,8 @@ export function InputScreen() {
   const [index, setIndex] = useState(0);
   const [sideChoice, setSideChoice] = useState<Side | null>(null);
   const [busy, setBusy] = useState(false);
+  /** 棋譜の貼り付け欄を開いているか */
+  const [pasteOpen, setPasteOpen] = useState(false);
 
   const current = line[index];
   const turn = sideToMove(current.sfen);
@@ -47,6 +50,7 @@ export function InputScreen() {
     input.clear();
     setSideChoice(null);
     setMessage(`${result.line.length - 1} 手を読み込みました。手順を動かして、研究したい局面を選んでください。`);
+    setPasteOpen(false);
   }
 
   function resetToStart() {
@@ -55,6 +59,7 @@ export function InputScreen() {
     input.clear();
     setSideChoice(null);
     setMessage('');
+    setPasteOpen(false);
   }
 
   /** 指し手を確定して、手順の今の位置の後ろに足す（その先の手順は消える） */
@@ -108,106 +113,128 @@ export function InputScreen() {
         <h1>新しいツリー</h1>
       </div>
 
-      <details class="card kifu-box" open={line.length === 1}>
-        <summary>棋譜を貼り付ける（KIF・KI2・CSA・SFEN・USI）</summary>
-        <textarea
-          class="kifu-input"
-          data-testid="kifu-input"
-          rows={5}
-          placeholder={'例）7g7f 3c3d 2g2f\nKIF や KI2 の棋譜をそのまま貼り付けても読めます'}
-          value={kifu}
-          onInput={(e) => setKifu((e.target as HTMLTextAreaElement).value)}
-        />
-        <div class="btn-row">
-          <button type="button" class="btn btn-primary" data-testid="kifu-load" onClick={loadKifu}>
-            読み込む
-          </button>
-          <button type="button" class="btn" onClick={resetToStart}>
-            平手の初期局面に戻す
-          </button>
-        </div>
-      </details>
-      {message && (
-        <p class="muted" data-testid="input-message">
-          {message}
-        </p>
-      )}
-
-      <p class="muted">盤の駒をタップ → 行き先をタップで指せます。</p>
-      <Board sfen={current.sfen} lastMove={current.usi} selection={input.selection} onSquare={input.onSquare} onHand={input.onHand} />
-
-      <PromotionBox input={input} />
-
-      <div class="move-nav">
-        <button type="button" class="btn" aria-label="最初へ" onClick={() => moveTo(0)} disabled={index === 0}>
-          |‹
-        </button>
-        <button type="button" class="btn" aria-label="1手戻る" data-testid="input-prev" onClick={() => moveTo(index - 1)} disabled={index === 0}>
-          ‹
-        </button>
-        <span class="move-nav-text num" data-testid="input-position">
-          {index === 0 ? '開始局面' : `${index}手目 ${current.text ?? ''}`}
-        </span>
-        <button type="button" class="btn" aria-label="1手進む" data-testid="input-next" onClick={() => moveTo(index + 1)} disabled={index >= line.length - 1}>
-          ›
-        </button>
-        <button type="button" class="btn" aria-label="最後へ" onClick={() => moveTo(line.length - 1)} disabled={index >= line.length - 1}>
-          ›|
-        </button>
-      </div>
-      {line.length > 2 && (
-        <input
-          type="range"
-          class="move-slider"
-          min={0}
-          max={line.length - 1}
-          value={index}
-          aria-label="手順"
-          onInput={(e) => moveTo(Number((e.target as HTMLInputElement).value))}
-        />
-      )}
-
-      <div class="card">
-        <div class="side-choice" role="radiogroup" aria-label="自分は">
-          <span>自分は</span>
-          {(['black', 'white'] as Side[]).map((s) => (
-            <button
-              type="button"
-              key={s}
-              role="radio"
-              aria-checked={mySide === s}
-              data-testid={`side-${s}`}
-              class={mySide === s ? 'btn btn-toggle on' : 'btn btn-toggle'}
-              onClick={() => setSideChoice(s)}
-            >
-              {SIDE_TEXT[s]}
+      {/* スマホ縦は上から「貼り付け・盤・操作」、iPad 横は左に盤、右に貼り付けと操作（盤が作るボタンに隠れないように） */}
+      <div class="input-layout">
+        <div class="input-paste">
+          {!pasteOpen ? (
+            <button type="button" class="btn btn-wide kifu-open" data-testid="kifu-open" onClick={() => setPasteOpen(true)}>
+              棋譜を貼り付ける（KIF・KI2・CSA・SFEN・USI）
             </button>
-          ))}
+          ) : (
+            <div class="card kifu-box" data-testid="kifu-box">
+              <textarea
+                class="kifu-input"
+                data-testid="kifu-input"
+                rows={5}
+                placeholder={'例）7g7f 3c3d 2g2f\nKIF や KI2 の棋譜をそのまま貼り付けても読めます'}
+                value={kifu}
+                onInput={(e) => setKifu((e.target as HTMLTextAreaElement).value)}
+              />
+              <div class="btn-row">
+                <button type="button" class="btn btn-primary" data-testid="kifu-load" onClick={loadKifu}>
+                  読み込む
+                </button>
+                <button type="button" class="btn" onClick={resetToStart}>
+                  平手の初期局面に戻す
+                </button>
+                <button type="button" class="btn btn-ghost" data-testid="kifu-close" onClick={() => setPasteOpen(false)}>
+                  閉じる
+                </button>
+              </div>
+            </div>
+          )}
+          {message && (
+            <p class="muted" data-testid="input-message">
+              {message}
+            </p>
+          )}
         </div>
-        <p class="muted">
-          {mySide === turn
-            ? 'この局面は自分の手番です。まず自分の最善手を調べてから、相手の応手を広げます。'
-            : 'この局面は相手の手番です。相手の応手と、それへの自分の対応を広げます。'}
-        </p>
-        {isGenerating() && <p class="muted">ほかのツリーを生成中です。終わるか止めてから作ってください。</p>}
-        {pcEngine.value && (
-          <p class="notice" data-testid="pc-engine-note">
-            PC のエンジンで作ります（{effectivePcThreads(pcEngine.value)} スレッド）。できたツリーは「JSON で渡す」で iPad やスマホに渡せます。
+        <div class="input-board">
+          <p class="muted">盤の駒をタップ → 行き先をタップで指せます。</p>
+          <Board sfen={current.sfen} lastMove={current.usi} selection={input.selection} onSquare={input.onSquare} onHand={input.onHand} />
+
+          <PromotionBox input={input} />
+        </div>
+        <div class="input-controls">
+          <div class="move-nav">
+            <button type="button" class="btn" aria-label="最初へ" onClick={() => moveTo(0)} disabled={index === 0}>
+              |‹
+            </button>
+            <button type="button" class="btn" aria-label="1手戻る" data-testid="input-prev" onClick={() => moveTo(index - 1)} disabled={index === 0}>
+              ‹
+            </button>
+            <span class="move-nav-text num" data-testid="input-position">
+              {index === 0 ? '開始局面' : `${index}手目 ${current.text ?? ''}`}
+            </span>
+            <button type="button" class="btn" aria-label="1手進む" data-testid="input-next" onClick={() => moveTo(index + 1)} disabled={index >= line.length - 1}>
+              ›
+            </button>
+            <button type="button" class="btn" aria-label="最後へ" onClick={() => moveTo(line.length - 1)} disabled={index >= line.length - 1}>
+              ›|
+            </button>
+          </div>
+          {line.length > 2 && (
+            <input
+              type="range"
+              class="move-slider"
+              min={0}
+              max={line.length - 1}
+              value={index}
+              aria-label="手順"
+              onInput={(e) => moveTo(Number((e.target as HTMLInputElement).value))}
+            />
+          )}
+
+          <div class="card">
+            <div class="side-choice" role="radiogroup" aria-label="自分は">
+              <span>自分は</span>
+              {(['black', 'white'] as Side[]).map((s) => (
+                <button
+                  type="button"
+                  key={s}
+                  role="radio"
+                  aria-checked={mySide === s}
+                  data-testid={`side-${s}`}
+                  class={mySide === s ? 'btn btn-toggle on' : 'btn btn-toggle'}
+                  onClick={() => setSideChoice(s)}
+                >
+                  {SIDE_TEXT[s]}
+                </button>
+              ))}
+            </div>
+            <p class="muted">
+              {mySide === turn
+                ? 'この局面は自分の手番です。まず自分の最善手を調べてから、相手の応手を広げます。'
+                : 'この局面は相手の手番です。相手の応手と、それへの自分の対応を広げます。'}
+            </p>
+            {isGenerating() && <p class="muted">ほかのツリーを生成中です。終わるか止めてから作ってください。</p>}
+            {pcEngine.value && (
+              <p class="notice" data-testid="pc-engine-note">
+                PC のエンジンで作ります（{effectivePcThreads(pcEngine.value)} スレッド）。できたツリーは「JSON で渡す」で iPad やスマホに渡せます。
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* 作るボタン：画面の下に固定（ホーム画面アプリでは、下の端のバーを避ける） */}
+        <div class="start-bar" data-testid="start-bar">
+          <p class="start-bar-caption muted">
+            {index === 0 ? '開始局面' : `${index}手目 ${current.text ?? ''}`}から作る（自分は{SIDE_TEXT[mySide]}）
           </p>
-        )}
-        <div class="preset-buttons">
-          {availablePresets().map((id) => (
-            <button
-              type="button"
-              key={id}
-              class={id === 'normal' ? 'btn btn-primary' : 'btn'}
-              data-testid={`start-${id}`}
-              onClick={() => void start(id)}
-              disabled={busy || isGenerating()}
-            >
-              {presetLabel(id)}で作る
-            </button>
-          ))}
+          <div class="preset-buttons">
+            {availablePresets().map((id) => (
+              <button
+                type="button"
+                key={id}
+                class={id === 'normal' ? 'btn btn-primary' : 'btn'}
+                data-testid={`start-${id}`}
+                onClick={() => void start(id)}
+                disabled={busy || isGenerating()}
+              >
+                {presetLabel(id)}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     </>

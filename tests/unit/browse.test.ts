@@ -1,7 +1,7 @@
 // 閲覧画面の候補手リスト用（段階4）：自分の対応・枝の先の様子
 import { describe, expect, it } from 'vitest';
 import { STARTPOS_SFEN } from '../../src/shogi/position';
-import { branchInfo, branchText, countAhead, replyOf } from '../../src/tree/browse';
+import { branchInfo, branchText, countAhead, lastPrefixMove, prefixMoveTexts, prefixSummary, replyOf } from '../../src/tree/browse';
 import { TreeGenerator } from '../../src/tree/generator';
 import { MockEngine, SETTINGS, cp, keyAfter, newTree } from './mock-engine';
 
@@ -66,5 +66,25 @@ describe('閲覧画面の候補手リスト', () => {
     const tree = await built(undefined, 1);
     const root = tree.nodes[tree.rootKey];
     expect(branchText(branchInfo(tree, root.edges[2]))).toBe('対応まで');
+  });
+});
+
+describe('開始局面に至るまでの手順', () => {
+  const prefix = (moves: string[], initialSfen = STARTPOS_SFEN) => ({ prefix: { initialSfen, moves } });
+
+  it('1 手ずつ日本語に（「同」も分かる）', () => {
+    expect(prefixMoveTexts(prefix(['7g7f', '3c3d', '8h2b+', '3a2b']))).toEqual(['▲７六歩', '△３四歩', '▲２二角成', '△同　銀']);
+  });
+
+  it('一覧用の短い説明：最後の 3 手、それより長ければ「…」を付ける', () => {
+    expect(prefixSummary(prefix([]))).toBe('平手の初期局面');
+    expect(prefixSummary(prefix(['7g7f', '3c3d']))).toBe('▲７六歩 △３四歩');
+    expect(prefixSummary(prefix(['7g7f', '3c3d', '2g2f', '8c8d']))).toBe('…△３四歩 ▲２六歩 △８四歩');
+    expect(prefixSummary(prefix([], 'lnsgkgsnl/1r5b1/ppppppppp/9/9/2P6/PP1PPPPPP/1B5R1/LNSGKGSNL w - 2'))).toBe('指定の局面');
+  });
+
+  it('開始局面の直前の手', () => {
+    expect(lastPrefixMove(prefix(['7g7f', '3c3d']))).toBe('3c3d');
+    expect(lastPrefixMove(prefix([]))).toBeUndefined();
   });
 });

@@ -180,6 +180,15 @@ export function SettingsScreen() {
         })}
       </section>
 
+      {/* 一覧画面から移した（段階4-2） */}
+      <section class="card settings-section">
+        <h2>エンジンの速度測定</h2>
+        <p class="muted">この端末でエンジンが 1 秒あたり何局面調べられるかを測ります（スレッド数ごと）。</p>
+        <a class="btn" href={`${import.meta.env.BASE_URL}bench.html`} data-testid="open-bench">
+          速度測定のページを開く
+        </a>
+      </section>
+
       <div class="btn-row">
         {!confirmReset ? (
           <button type="button" class="btn btn-danger" data-testid="reset-settings" onClick={() => setConfirmReset(true)}>

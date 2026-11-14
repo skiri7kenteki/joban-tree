@@ -17,6 +17,7 @@
   --color-piece-text: #1a1a1a;
   --color-piece-promoted: #c0261b;
   --color-last-move: rgba(214, 96, 40, 0.28);
+  --color-last-move-from: rgba(214, 96, 40, 0.12);
   --color-selected: rgba(47, 93, 138, 0.32);
   --color-backdrop: rgba(0, 0, 0, 0.35);
 

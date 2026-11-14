@@ -1,5 +1,6 @@
 // ツリーを端末の中（IndexedDB）に保存する。データは端末の外へは送らない。
 
+import { prefixSummary } from '../tree/browse';
 import type { TreeData } from '../tree/types';
 import { REVIEW, TREES, done, finished, openDb } from './db';
 
@@ -9,6 +10,10 @@ export interface TreeSummary {
   name: string;
   updatedAt: number;
   nodeCount: number;
+  /** 研究する側 */
+  mySide: TreeData['mySide'];
+  /** 開始局面までの最後の数手（例：「…▲２六歩 △３四歩」） */
+  prefixText: string;
 }
 
 /** ツリーを保存する（同じ id なら上書き） */
@@ -29,7 +34,14 @@ export async function listTrees(): Promise<TreeSummary[]> {
   const db = await openDb();
   const trees = (await done(db.transaction(TREES).objectStore(TREES).getAll())) as TreeData[];
   return trees
-    .map((t) => ({ id: t.id, name: t.name, updatedAt: t.updatedAt, nodeCount: Object.keys(t.nodes).length }))
+    .map((t) => ({
+      id: t.id,
+      name: t.name,
+      updatedAt: t.updatedAt,
+      nodeCount: Object.keys(t.nodes).length,
+      mySide: t.mySide,
+      prefixText: prefixSummary(t),
+    }))
     .sort((a, b) => b.updatedAt - a.updatedAt);
 }
 

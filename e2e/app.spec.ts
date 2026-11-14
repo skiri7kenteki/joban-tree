@@ -23,9 +23,15 @@ test('ホーム画面に追加するための manifest とアイコンがある'
 
 test('棋譜を貼り付けて、手順を前後に動かせる', async ({ page }) => {
   await openNewTree(page);
+  // 貼り付け欄はふだん閉じている（段階4-2）
+  await expect(page.getByTestId('kifu-input')).toHaveCount(0);
+  await page.getByTestId('kifu-open').click();
   await page.getByTestId('kifu-input').fill('7g7f 3c3d 2g2f 8c8d');
   await page.getByTestId('kifu-load').click();
   await expect(page.getByTestId('input-message')).toContainText('4 手を読み込みました');
+  // 読み込んだら閉じる
+  await expect(page.getByTestId('kifu-input')).toHaveCount(0);
+  await expect(page.getByTestId('start-bar')).toContainText('4手目 △８四歩から作る（自分は☖後手）');
   await expect(page.getByTestId('input-position')).toHaveText('4手目 △８四歩');
   // 手番は先手 → 初期値の「自分」は後手
   await expect(page.getByTestId('side-white')).toHaveAttribute('aria-checked', 'true');
@@ -56,6 +62,7 @@ test.describe('エンジンを使う通し確認', () => {
     test.setTimeout(180_000);
     page.on('console', (msg) => console.log(`[browser] ${msg.text()}`));
     await openNewTree(page);
+    await page.getByTestId('kifu-open').click();
     await page.getByTestId('kifu-input').fill('7g7f 3c3d 2g2f');
     await page.getByTestId('kifu-load').click();
     // 3 手目の後＝後手番。自分は先手（初期値）

@@ -86,11 +86,13 @@
 }
 
 /* 入力画面 */
-.kifu-box summary {
-  min-height: var(--touch-min);
-  display: flex;
-  align-items: center;
-  cursor: pointer;
+.kifu-open {
+  justify-content: flex-start;
+  margin-bottom: var(--space-3);
+}
+
+.kifu-box .btn-row {
+  margin-bottom: 0;
 }
 
 .kifu-input {
@@ -213,6 +215,8 @@
 
 .crumb {
   flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
   min-height: var(--touch-min);
   padding: 0 var(--space-2);
   border: 1px solid var(--color-border);
@@ -428,11 +432,68 @@
   margin-top: var(--space-4);
 }
 
-/* 入力画面のプリセットのボタン（縦に並べる。いちばん上が「ふつう」） */
+/* 入力画面の作るボタン：画面の下に固定（いちばん左が「ふつう」） */
+.start-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  margin: var(--space-3) calc(-1 * var(--space-4)) calc(-1 * var(--space-4));
+  padding: var(--space-2) var(--space-4) calc(var(--space-2) + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--color-border);
+  background: var(--color-bg);
+}
+
+.start-bar-caption {
+  margin: 0 0 var(--space-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .preset-buttons {
   display: grid;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
   gap: var(--space-2);
+}
+
+.preset-buttons .btn {
+  padding: 0 var(--space-2);
+}
+
+/* iPad 横向きなど広い画面：左に盤、右に貼り付けと操作（作るボタンは右の列の下。盤に重ならない） */
+@media (min-width: 768px) and (orientation: landscape) {
+  .input-layout {
+    display: grid;
+    grid-template-columns: minmax(0, 55%) minmax(0, 1fr);
+    grid-template-rows: auto auto 1fr;
+    grid-template-areas:
+      'board paste'
+      'board controls'
+      'board start';
+    column-gap: var(--space-4);
+    align-items: start;
+  }
+
+  .input-paste {
+    grid-area: paste;
+  }
+
+  .input-board {
+    grid-area: board;
+  }
+
+  .input-controls {
+    grid-area: controls;
+  }
+
+  .start-bar {
+    grid-area: start;
+    position: static;
+    margin: var(--space-3) 0 0;
+    padding: 0;
+    border-top: none;
+    background: transparent;
+  }
 }
 
 /* 閲覧画面の局面ごとの操作 */
@@ -543,6 +604,25 @@
 }
 
 /* 復習モード */
+.review-opponent {
+  font-size: var(--font-size-heading);
+}
+
+/* 復習画面のいちばん下：何本目の手順か・記録を消す */
+.review-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-top: var(--space-4);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
+}
+
+.review-footer .btn {
+  color: var(--color-danger);
+}
+
 .review-summary {
   margin: 0 0 8px;
 }

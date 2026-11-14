@@ -1,6 +1,7 @@
 // 復習モード：ツリーから「相手がこう来たら？」を手順を通して出題する。
 // 相手の応手はアプリが選んで指す（まだ出していない・間違えた問題が多い枝ほど選ばれやすい）。
 // 自分の手番では盤をタップして答える。正解はツリーの先頭の手。記録は端末の中（IndexedDB）に残す。
+// 段階4-2：相手が直前に指した手を、盤（最終手のマス）と一言「相手は △９四歩」ではっきり示す。
 
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { Move } from 'tsshogi';
@@ -11,6 +12,7 @@ import { formatScore } from '../engine/usi';
 import { moveText } from '../shogi/position';
 import { loadTree } from '../storage/trees';
 import { clearReview, loadReview, saveReview } from '../storage/review';
+import { lastPrefixMove, prefixMoveTexts } from '../tree/browse';
 import { isOpponentNode } from '../tree/generator';
 import type { TreeData } from '../tree/types';
 import { answerOf, computeNeeds, emptyRecord, isDubiousReply, pickReply, recordAnswer, summarize, type ReviewRecord } from '../review/review';
@@ -159,7 +161,21 @@ function ReviewView({ tree, initialRecord }: { tree: TreeData; initialRecord: Re
     if (!step.move) return '';
     return moveText(tree.nodes[steps[i - 1].key].sfen, step.move, steps[i - 2]?.move);
   };
-  const lastText = steps.length > 1 ? stepText(steps.length - 1) : '';
+  // 相手が直前に指した手（開始局面が自分の手番なら、開始局面に至る最後の手）
+  const atRoot = steps.length === 1;
+  const lastMove = atRoot ? lastPrefixMove(tree) : current.move;
+  const lastText = atRoot ? (prefixMoveTexts(tree).at(-1) ?? '') : stepText(steps.length - 1);
+  // 問題を出している間は、相手の手を大きめに出す
+  const opponentLine = lastText && (phase.kind === 'ask' || phase.kind === 'wrong') && (
+    <p class="review-opponent" data-testid="review-opponent">
+      相手は <strong>{lastText}</strong>
+      {current.dubious && (
+        <>
+          （<span class="status-ng" data-testid="review-dubious">疑問手</span>）
+        </>
+      )}
+    </p>
+  );
 
   return (
     <>
@@ -178,7 +194,7 @@ function ReviewView({ tree, initialRecord }: { tree: TreeData; initialRecord: Re
         <div class="tree-board">
           <Board
             sfen={node.sfen}
-            lastMove={current.move}
+            lastMove={lastMove}
             selection={input.selection}
             onSquare={input.onSquare}
             onHand={input.onHand}
@@ -188,22 +204,10 @@ function ReviewView({ tree, initialRecord }: { tree: TreeData; initialRecord: Re
 
         <div class="tree-side">
           <div class="card review-prompt" data-testid="review-prompt" data-phase={phase.kind}>
+            {opponentLine}
             {phase.kind === 'ask' && (
               <>
-                <p>
-                  {lastText && (
-                    <>
-                      相手は <strong>{lastText}</strong>
-                      {current.dubious && (
-                        <>
-                          （<span class="status-ng" data-testid="review-dubious">疑問手</span>）
-                        </>
-                      )}
-                      。
-                    </>
-                  )}
-                  {current.dubious ? 'どう咎めますか？' : `あなた（${mySideText}）の手は？`}
-                </p>
+                <p>{current.dubious ? 'どう咎めますか？' : `あなた（${mySideText}）の手は？`}</p>
                 <p class="muted">盤の駒をタップ → 行き先をタップで答えます。</p>
                 {answer?.unverified && <p class="muted">この局面の答えは「未検証」の手です（エンジンで確かめていません）。</p>}
               </>
@@ -264,15 +268,15 @@ function ReviewView({ tree, initialRecord }: { tree: TreeData; initialRecord: Re
               </span>
             ))}
           </div>
-
-          <div class="btn-row">
-            <span class="muted">{lineCount} 本目の手順</span>
-            <span class="spacer" />
-            <button type="button" class="btn btn-ghost" data-testid="review-clear" onClick={() => setConfirmClear(true)}>
-              記録を消す…
-            </button>
-          </div>
         </div>
+      </div>
+
+      {/* 画面のいちばん下にまとめる */}
+      <div class="review-footer">
+        <span class="muted">{lineCount} 本目の手順</span>
+        <button type="button" class="btn btn-ghost" data-testid="review-clear" onClick={() => setConfirmClear(true)}>
+          記録を消す…
+        </button>
       </div>
 
       {confirmClear && (
