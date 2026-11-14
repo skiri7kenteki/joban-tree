@@ -231,10 +231,29 @@
   font-weight: bold;
 }
 
-.nav-row {
+/* 閲覧画面：「‹」（1 手戻る）とパンくずリストを 1 行に */
+.crumb-row {
   display: flex;
-  gap: var(--space-2);
-  margin: var(--space-2) 0;
+  align-items: flex-start;
+  gap: var(--space-1);
+  margin-bottom: var(--space-1);
+}
+
+.crumb-row .crumbs {
+  flex: 1;
+  min-width: 0;
+}
+
+.crumb-back {
+  min-width: var(--touch-min);
+  font-size: var(--font-size-heading);
+  font-weight: bold;
+  color: var(--color-accent);
+}
+
+.crumb-back:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 
 /* 候補手リスト */
@@ -247,8 +266,8 @@
   flex-wrap: wrap;
   align-items: baseline;
   justify-content: space-between;
-  gap: var(--space-2);
-  margin-bottom: var(--space-1);
+  column-gap: var(--space-2);
+  line-height: 1.4;
 }
 
 .candidate-list {
@@ -257,11 +276,11 @@
   padding: 0;
 }
 
+/* 候補手の 1 行：上の段＝手・ラベル・評価値、下の段＝自分の対応（相手の応手のとき）・枝の先の様子 */
 .candidate {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
+  flex-direction: column;
+  justify-content: center;
   width: 100%;
   min-height: var(--row-min);
   padding: var(--space-1) 0;
@@ -278,25 +297,57 @@
   border-top: none;
 }
 
+.candidate-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.candidate-sub {
+  font-size: var(--font-size-small);
+  line-height: 1.4;
+}
+
+.candidate-sub:empty {
+  display: none;
+}
+
 .candidate-move {
   flex: 0 0 auto;
-  min-width: 7.5em;
+  min-width: 6.5em;
   font-weight: bold;
 }
 
 .candidate-score {
   flex: 0 0 auto;
-  min-width: 5em;
+  margin-left: auto;
+  min-width: 4.5em;
   text-align: right;
 }
 
-.candidate-tags {
-  flex: 1 1 auto;
-  min-width: 0;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+.candidate-reply {
+  display: inline-flex;
+  align-items: center;
   gap: var(--space-1);
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.candidate-ahead {
+  margin-left: auto;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.candidate-ahead.ahead-answer-only {
+  color: var(--chip-good-text);
+}
+
+.chip-small {
+  padding: 0 6px;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .eval-good {

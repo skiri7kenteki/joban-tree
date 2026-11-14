@@ -119,3 +119,54 @@ button.hand-piece.selected {
     margin-right: calc(-1 * var(--space-3));
   }
 }
+
+/* 閲覧画面（タップで指さない盤）：持ち駒の列を薄くして、候補手リストを上に寄せる */
+.hand.compact {
+  min-height: 24px;
+  padding: 0 var(--space-1);
+  gap: 2px;
+  font-size: var(--font-size-small);
+  line-height: 1.3;
+}
+
+.hand.compact .hand-piece {
+  min-width: 24px;
+  min-height: 20px;
+  padding: 0 3px;
+  border-radius: 3px;
+}
+
+/* 候補手の矢印（半透明。盤のタップの邪魔をしない） */
+.arrow {
+  pointer-events: none;
+}
+
+.arrow-main {
+  fill: var(--arrow-main);
+}
+
+.arrow-good {
+  fill: var(--arrow-good);
+}
+
+.arrow-dubious {
+  fill: var(--arrow-dubious);
+}
+
+/* 持ち駒を打つ手：打つマスに丸印 */
+.arrow-drop {
+  fill: none;
+  stroke-width: 5;
+}
+
+.arrow-drop.arrow-main {
+  stroke: var(--arrow-main);
+}
+
+.arrow-drop.arrow-good {
+  stroke: var(--arrow-good);
+}
+
+.arrow-drop.arrow-dubious {
+  stroke: var(--arrow-dubious);
+}

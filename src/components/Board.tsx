@@ -2,6 +2,8 @@
 // - 盤の向きは**常に先手が手前（下）**（持ち主の判断 2026-11-13。自分が後手でも盤はひっくり返さない）
 // - 後手の駒は 180 度回転させる
 // - 最終手のマスを薄く塗る。タップで指すとき用に、選んだマスも塗る
+// - 閲覧画面では、候補手を半透明の矢印で描く（持ち駒を打つ手は、打つマスに丸印）
+// - タップで指さない盤（閲覧画面）は、持ち駒の列を薄くして縦の幅を詰める
 
 import { Color, PieceType, Position, Square, parseUSIMove, pieceTypeToStringForBoard } from 'tsshogi';
 import type { Side } from '../shogi/position';
@@ -41,6 +43,16 @@ const PROMOTED = new Set<PieceType>([
   PieceType.DRAGON,
 ]);
 
+/** 盤上に描く矢印の色（ラベルに合わせる。自分の対応は「本線」と同じグレー） */
+export type ArrowTone = 'main' | 'good' | 'dubious';
+
+/** 盤上に描く矢印（候補手） */
+export interface BoardArrow {
+  /** 指し手（USI 形式） */
+  move: string;
+  tone: ArrowTone;
+}
+
 /** タップで選んでいるもの（盤上のマス、または持ち駒） */
 export type Selection = { kind: 'square'; file: number; rank: number } | { kind: 'hand'; pieceType: PieceType } | null;
 
@@ -53,9 +65,11 @@ interface BoardProps {
   onSquare?: (file: number, rank: number) => void;
   /** 持ち駒をタップしたとき */
   onHand?: (side: Side, pieceType: PieceType) => void;
+  /** 盤上に描く矢印（先に書いたものほど上に重ねる） */
+  arrows?: BoardArrow[];
 }
 
-export function Board({ sfen, lastMove, selection, onSquare, onHand }: BoardProps) {
+export function Board({ sfen, lastMove, selection, onSquare, onHand, arrows = [] }: BoardProps) {
   const position = Position.newBySFEN(sfen);
   if (!position) return <p class="muted">局面を表示できません</p>;
   // 持ち駒を選んでいるときは、手番の側の列だけ選択の色を付ける
@@ -124,19 +138,71 @@ export function Board({ sfen, lastMove, selection, onSquare, onHand }: BoardProp
     );
   }
 
+  // 矢印：先頭（いちばん良い手）が最後に描かれて、いちばん上に重なる
+  const marks = [...arrows].reverse().map((arrow, i) => <ArrowMark key={`${arrow.move}-${i}`} arrow={arrow} toXY={toXY} />);
+
+  // タップで指さない盤は、持ち駒の列を薄くする
+  const compact = !onHand;
   return (
     <div class="board-wrap">
-      <HandRow position={position} side="white" selection={turn === 'white' ? (selection ?? null) : null} onHand={onHand} />
+      <HandRow position={position} side="white" selection={turn === 'white' ? (selection ?? null) : null} onHand={onHand} compact={compact} />
       <svg class="board" viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} role="img" aria-label="将棋盤" data-testid="board" data-sfen={sfen}>
         <rect x={MARGIN_LEFT} y={MARGIN_TOP} width={BOARD_W} height={BOARD_H} class="board-bg" />
         {squares}
         <g class="board-lines">{lines}</g>
         {stars}
         {labels}
+        {marks.length > 0 && <g class="board-arrows">{marks}</g>}
       </svg>
-      <HandRow position={position} side="black" selection={turn === 'black' ? (selection ?? null) : null} onHand={onHand} />
+      <HandRow position={position} side="black" selection={turn === 'black' ? (selection ?? null) : null} onHand={onHand} compact={compact} />
     </div>
   );
+}
+
+/** 候補手の矢印 1 本（盤上の駒を動かす手）、または打つマスの丸印（持ち駒を打つ手） */
+function ArrowMark({ arrow, toXY }: { arrow: BoardArrow; toXY: (file: number, rank: number) => { x: number; y: number } }) {
+  const parsed = parseUSIMove(arrow.move);
+  if (!parsed) return null;
+  const center = (sq: Square) => {
+    const { x, y } = toXY(sq.file, sq.rank);
+    return { x: x + CELL_W / 2, y: y + CELL_H / 2 };
+  };
+  const to = center(parsed.to);
+  const cls = `arrow arrow-${arrow.tone}`;
+  if (!(parsed.from instanceof Square)) {
+    return <circle cx={to.x} cy={to.y} r={CELL_W / 2 - 3} class={`${cls} arrow-drop`} data-testid="board-arrow" data-move={arrow.move} />;
+  }
+  const from = center(parsed.from);
+  return <polygon points={arrowPoints(from, to)} class={cls} data-testid="board-arrow" data-move={arrow.move} />;
+}
+
+/** from の中心から to の中心へ向かう矢印の形（軸＋三角の先） */
+function arrowPoints(from: { x: number; y: number }, to: { x: number; y: number }): string {
+  const SHAFT = 4; // 軸の太さの半分
+  const HEAD_W = 11; // 先の幅の半分
+  const HEAD_L = 18; // 先の長さ
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const len = Math.hypot(dx, dy);
+  // 向き（u）と、それに直角な向き（n）
+  const ux = dx / len;
+  const uy = dy / len;
+  const nx = -uy;
+  const ny = ux;
+  // 先端は行き先のマスの中心より少し手前、根元は元のマスの中心から少し先
+  const tip = { x: to.x - ux * 6, y: to.y - uy * 6 };
+  const start = { x: from.x + ux * 8, y: from.y + uy * 8 };
+  const base = { x: tip.x - ux * HEAD_L, y: tip.y - uy * HEAD_L };
+  const pts = [
+    [start.x + nx * SHAFT, start.y + ny * SHAFT],
+    [base.x + nx * SHAFT, base.y + ny * SHAFT],
+    [base.x + nx * HEAD_W, base.y + ny * HEAD_W],
+    [tip.x, tip.y],
+    [base.x - nx * HEAD_W, base.y - ny * HEAD_W],
+    [base.x - nx * SHAFT, base.y - ny * SHAFT],
+    [start.x - nx * SHAFT, start.y - ny * SHAFT],
+  ];
+  return pts.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
 }
 
 /** 五角形の駒 */
@@ -167,16 +233,18 @@ function HandRow({
   side,
   selection,
   onHand,
+  compact,
 }: {
   position: Position;
   side: Side;
   selection: Selection;
   onHand?: (side: Side, pieceType: PieceType) => void;
+  compact: boolean;
 }) {
   const hand = position.hand(side === 'black' ? Color.BLACK : Color.WHITE);
   const pieces = HAND_ORDER.filter((t) => hand.count(t) > 0);
   return (
-    <div class="hand" data-testid={`hand-${side}`}>
+    <div class={compact ? 'hand compact' : 'hand'} data-testid={`hand-${side}`}>
       <span class="hand-mark">{side === 'black' ? '☗' : '☖'}</span>
       {pieces.length === 0 && <span class="hand-empty">持ち駒なし</span>}
       {pieces.map((t) => {

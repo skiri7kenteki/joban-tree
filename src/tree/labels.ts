@@ -14,7 +14,8 @@ export const DEFAULT_THRESHOLDS: LabelThresholds = { mainMax: 50, goodMax: 150 }
 export const LABEL_TEXT: Record<MoveLabel, string> = {
   main: '本線',
   good: '有力',
-  dubious: '疑問手（咎められる）',
+  // 画面で行がそろうよう短くする（段階4）。意味の説明は設定画面に出す
+  dubious: '疑問手',
 };
 
 /** 最善手との差（0 以上）からラベルを決める */

@@ -73,4 +73,11 @@ describe('設定', () => {
     expect(loaded.presets.normal.totalMs).toBe(90_000);
     expect(loaded.presets.precise).toEqual(d.presets.precise);
   });
+
+  it('盤上の矢印（段階4）：初期値は表示。前の版の設定（項目が無い）でも表示、消した設定は消したまま', () => {
+    expect(defaultSettings().showArrows).toBe(true);
+    const { showArrows: _omit, ...old } = defaultSettings();
+    expect(normalizeSettings(old).showArrows).toBe(true);
+    expect(normalizeSettings({ ...defaultSettings(), showArrows: false }).showArrows).toBe(false);
+  });
 });

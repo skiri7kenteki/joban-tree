@@ -35,6 +35,8 @@ export interface AppSettings {
   /** 「この手を検証」で 1 局面を調べる時間（ミリ秒） */
   verifyMs: number;
   presets: Record<PresetId, PresetValues>;
+  /** 閲覧画面で、盤上に候補手の矢印を描く（段階4） */
+  showArrows: boolean;
 }
 
 export const HASH_CHOICES = [16, 32, 64] as const;
@@ -62,6 +64,7 @@ export function defaultSettings(): AppSettings {
     thresholds: { ...DEFAULT_THRESHOLDS },
     verifyMs: 2000,
     presets,
+    showArrows: true,
   };
 }
 
@@ -105,6 +108,7 @@ export function normalizeSettings(raw: unknown): AppSettings {
     thresholds: { mainMax, goodMax: num(t.goodMax, d.thresholds.goodMax, mainMax, 5000) },
     verifyMs: num(r.verifyMs, d.verifyMs, 200, 60_000),
     presets,
+    showArrows: r.showArrows !== false,
   };
 }
 

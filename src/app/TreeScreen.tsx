@@ -1,10 +1,11 @@
 // ツリーの閲覧画面（中心となる画面）。
 // 上に盤面、下に「この局面の候補手リスト」。候補手をタップで 1 手進む。戻るボタン・左右スワイプで戻る/進む。
+// 段階4：スマホ縦で「盤＋候補手 3 つ」が 1 画面に収まるよう詰めた。相手の応手の行には自分の対応と枝の先の様子を併記し、盤上に矢印を描く。
 // 生成中も、できた枝からたどれる。
 // 局面ごとの操作：「ここから展開」「この手を検証」「KIF をコピー」、ツリーの書き出し・共有。
 
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { Board } from '../components/Board';
+import { Board, type BoardArrow } from '../components/Board';
 import { Dialog } from '../components/Dialog';
 import { formatScore, scoreToNumber, type Score } from '../engine/usi';
 import { moveText } from '../shogi/position';
@@ -12,6 +13,7 @@ import { loadTree } from '../storage/trees';
 import { fileNameOf, treeToJson } from '../tree/backup';
 import { FINISH_TEXT, countParents, isAfterDubiousOnly, isOpponentNode } from '../tree/generator';
 import { pathToKif, treeToKif } from '../tree/kif';
+import { branchInfo, branchText, replyOf } from '../tree/browse';
 import { LABEL_TEXT, labelOf } from '../tree/labels';
 import type { PresetId } from '../tree/presets';
 import { availablePresets } from './engineService';
@@ -143,6 +145,10 @@ function TreeView({ tree }: { tree: TreeData }) {
   };
 
   const sideText = tree.mySide === 'black' ? '☗先手' : '☖後手';
+  // 盤上の矢印：相手の手番は相手の応手（ラベルの色）、自分の手番は自分の対応（グレー）
+  const arrows: BoardArrow[] = settings.value.showArrows
+    ? node.edges.map((e) => ({ move: e.move, tone: opp && e.diff !== undefined ? labelOf(e.diff, thresholds) : 'main' }))
+    : [];
 
   return (
     <>
@@ -160,61 +166,72 @@ function TreeView({ tree }: { tree: TreeData }) {
 
       <div class="tree-layout">
         <div class="tree-board" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-          <Board sfen={node.sfen} lastMove={incoming?.move} />
+          <Board sfen={node.sfen} lastMove={incoming?.move} arrows={arrows} />
         </div>
 
         <div class="tree-side">
-          <div class="crumbs" ref={crumbsRef} data-testid="crumbs">
-            <button type="button" class={path.length === 1 ? 'crumb current' : 'crumb'} onClick={() => jumpTo(1)}>
-              開始局面
+          {/* 1 手戻る＋手順のパンくずリストを 1 行に（「開始局面」のパンくずで開始局面へ戻る） */}
+          <div class="crumb-row">
+            <button type="button" class="crumb crumb-back" data-testid="nav-back" onClick={goBack} disabled={path.length <= 1} aria-label="1手戻る">
+              ‹
             </button>
-            {path.slice(1).map((k, i) => {
-              const from = tree.nodes[path[i]];
-              const edge = edgeBetween(tree, path[i], k);
-              const prev = i > 0 ? edgeBetween(tree, path[i - 1], path[i])?.move : undefined;
-              return (
-                <button
-                  type="button"
-                  key={`${i}-${k}`}
-                  class={i + 2 === path.length ? 'crumb current' : 'crumb'}
-                  data-testid="crumb"
-                  onClick={() => jumpTo(i + 2)}
-                >
-                  {edge ? moveText(from.sfen, edge.move, prev) : '?'}
-                </button>
-              );
-            })}
-          </div>
-
-          <div class="nav-row">
-            <button type="button" class="btn" data-testid="nav-back" onClick={goBack} disabled={path.length <= 1}>
-              ‹ 1手戻る
-            </button>
-            <button type="button" class="btn" onClick={() => jumpTo(1)} disabled={path.length <= 1}>
-              開始局面へ
-            </button>
+            <div class="crumbs" ref={crumbsRef} data-testid="crumbs">
+              <button type="button" class={path.length === 1 ? 'crumb current' : 'crumb'} data-testid="crumb-start" onClick={() => jumpTo(1)}>
+                開始局面
+              </button>
+              {path.slice(1).map((k, i) => {
+                const from = tree.nodes[path[i]];
+                const edge = edgeBetween(tree, path[i], k);
+                const prev = i > 0 ? edgeBetween(tree, path[i - 1], path[i])?.move : undefined;
+                return (
+                  <button
+                    type="button"
+                    key={`${i}-${k}`}
+                    class={i + 2 === path.length ? 'crumb current' : 'crumb'}
+                    data-testid="crumb"
+                    onClick={() => jumpTo(i + 2)}
+                  >
+                    {edge ? moveText(from.sfen, edge.move, prev) : '?'}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div class="card candidates">
             <div class="candidates-head">
               <strong>{opp ? '相手の応手' : '自分の対応'}</strong>
-              <span class="muted">評価値は自分（{sideText}）から見た値</span>
+              {/* 1 行に収める（スマホ縦で候補手を上に寄せるため） */}
+              <span class="muted">評価値は{opp ? '対応の後・' : ''}{sideText}から見た値</span>
             </div>
             {node.edges.length === 0 && <EmptyNote tree={tree} nodeKey={key} generating={busy} />}
             <ul class="candidate-list">
-              {node.edges.map((edge) => (
-                <li key={edge.move}>
-                  <button type="button" class="candidate" data-testid="candidate" onClick={() => advance(edge)}>
-                    <span class="candidate-move">{moveText(node.sfen, edge.move, incoming?.move)}</span>
-                    <ScoreText score={edge.score} />
-                    <span class="candidate-tags">
-                      {opp && edge.diff !== undefined && <LabelChip diff={edge.diff} />}
-                      {!opp && <MineChip verified={!edge.unverified} searched={node.searched !== undefined} />}
-                      {(parents.get(edge.to) ?? 0) > 1 && <span class="chip chip-merge">合流</span>}
-                    </span>
-                  </button>
-                </li>
-              ))}
+              {node.edges.map((edge) => {
+                // 相手の応手の行は、自分の対応の後の評価値を主に見せる（まだ対応が無ければ応手の評価値）
+                const reply = opp ? replyOf(tree, edge) : undefined;
+                const info = branchInfo(tree, edge);
+                return (
+                  <li key={edge.move}>
+                    <button type="button" class="candidate" data-testid="candidate" onClick={() => advance(edge)}>
+                      <span class="candidate-line">
+                        <span class="candidate-move">{moveText(node.sfen, edge.move, incoming?.move)}</span>
+                        {opp && edge.diff !== undefined && <LabelChip diff={edge.diff} />}
+                        {!opp && <MineChip verified={!edge.unverified} searched={node.searched !== undefined} />}
+                        {(parents.get(edge.to) ?? 0) > 1 && <span class="chip chip-merge">合流</span>}
+                        <ScoreText score={reply?.score ?? edge.score} />
+                      </span>
+                      <span class="candidate-line candidate-sub">
+                        {opp && <ReplyText tree={tree} edge={edge} reply={reply} />}
+                        {(!opp || reply) && (
+                          <span class={`candidate-ahead ahead-${info.kind}`} data-testid="candidate-ahead">
+                            {branchText(info)}
+                          </span>
+                        )}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           </div>
 
@@ -337,6 +354,24 @@ function EmptyNote({ tree, nodeKey, generating }: { tree: TreeData; nodeKey: str
     <p class="muted" data-testid="empty-note">
       {text}
     </p>
+  );
+}
+
+/** 相手の応手の行の 2 段目：「→ ▲２六歩」（自分の対応）。まだ無ければ「→ 未展開」 */
+function ReplyText({ tree, edge, reply }: { tree: TreeData; edge: TreeEdge; reply: TreeEdge | undefined }) {
+  const me = tree.nodes[edge.to];
+  if (!reply) {
+    return (
+      <span class="candidate-reply muted" data-testid="candidate-reply">
+        {me?.terminal ? '→ 指せる手なし' : '→ 未展開'}
+      </span>
+    );
+  }
+  return (
+    <span class="candidate-reply" data-testid="candidate-reply">
+      → {moveText(me.sfen, reply.move, edge.move)}
+      {reply.unverified && <span class="chip chip-unverified chip-small">未検証</span>}
+    </span>
   );
 }
 

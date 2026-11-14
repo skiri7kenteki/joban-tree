@@ -94,7 +94,34 @@ export function SettingsScreen() {
       </section>
 
       <section class="card settings-section">
+        <h2>表示</h2>
+        <div class="form-field">
+          <span>盤上の候補手の矢印（閲覧画面）</span>
+          <div class="btn-row" role="radiogroup" aria-label="盤上の候補手の矢印">
+            {[true, false].map((on) => (
+              <button
+                type="button"
+                key={String(on)}
+                role="radio"
+                aria-checked={s.showArrows === on}
+                data-testid={on ? 'arrows-on' : 'arrows-off'}
+                class={s.showArrows === on ? 'btn btn-toggle on' : 'btn btn-toggle'}
+                onClick={() => set({ showArrows: on })}
+              >
+                {on ? '表示する' : '表示しない'}
+              </button>
+            ))}
+          </div>
+          <span class="muted">矢印の色はラベルと同じです（本線＝グレー、有力＝青、疑問手＝オレンジ）。持ち駒を打つ手は、打つマスに丸印。</span>
+        </div>
+      </section>
+
+      <section class="card settings-section">
         <h2>応手の選び方とラベル</h2>
+        <p class="muted" data-testid="label-help">
+          相手の応手には、最善手との差でラベルを付けます。「本線」は最善手とほぼ同じ評価の手、「有力」は少し損だが十分ある手、
+          「疑問手」は咎められる（悪い点を突いて自分が有利にできる）手です。疑問手は自分のチャンスなので、オレンジで目立たせています。
+        </p>
         <NumberField
           label="採用する応手：最善手から何点以内（W）"
           value={s.windowCp}
