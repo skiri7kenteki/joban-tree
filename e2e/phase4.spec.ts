@@ -58,42 +58,88 @@ async function openTree(page: Page, tree: TreeData) {
   await expect(page.getByTestId('candidate').first()).toBeVisible();
 }
 
-// 段階4-1 の「390×844 で 3 行」を、細い・低い画面にも広げた（v0.12.2。持ち主の Android は幅 360 相当）
-for (const [width, height, label] of [
-  [360, 740, '細めの Android'],
-  [375, 667, 'iPhone SE'],
-  [412, 800, '一般的な Android'],
-  [390, 844, 'iPhone 標準'],
-  [360, 640, '幅 360・高さ 640（目標の下限）'],
+// 段階4-1 の「390×844 で 3 行」を、細い・低い画面にも広げた（v0.12.2。持ち主の Android は幅 360 相当）。
+// v0.12.3：候補手が 4 つ（「ふつう」「じっくり」の初期設定の数）のとき、盤を画面幅の 85% まで縮めて 4 行目まで収める。
+// 収まらない低い画面では、4 行目がのぞく（上端が画面の中）。3 つ以下なら盤を無駄に縮めない。
+
+/** 相手の応手 4 つ（2 つ目の自分の対応は未検証） */
+const FOUR = makeTree('p4-four', ['7g7f'], [
+  ['3c3d', 0, '2g2f', false],
+  ['8c8d', 20, '2g2f', true],
+  ['4a3b', 90, '2g2f', false],
+  ['9c9d', 200, '2g2f', false],
+]);
+/** 相手の応手 3 つ */
+const THREE = makeTree('p4-three', ['7g7f'], [
+  ['3c3d', 0, '2g2f', false],
+  ['8c8d', 20, '2g2f', true],
+  ['4a3b', 90, '2g2f', false],
+]);
+/** 相手の応手 5 つのうち 1 つを除外（見出しの件数は 4） */
+const FIVE_EXCLUDED: TreeData = (() => {
+  const t = makeTree('p4-five-ex', ['7g7f'], [
+    ['3c3d', 0, '2g2f', false],
+    ['8c8d', 20, '2g2f', true],
+    ['4a3b', 90, '2g2f', false],
+    ['9c9d', 200, '2g2f', false],
+    ['1c1d', 220, null, false],
+  ]);
+  const root = t.nodes[t.rootKey];
+  root.excluded = root.edges.splice(4, 1);
+  return t;
+})();
+
+/** ヘッダーのボタンが 1 行か（折り返すと高さが 44px を超え、文字の行も 2 つになる） */
+async function expectOneLineButtons(page: Page) {
+  for (const button of [page.getByRole('button', { name: '‹ 一覧' }), page.getByTestId('review-open')]) {
+    const box = (await button.boundingBox())!;
+    expect(box.height).toBeLessThanOrEqual(45);
+    const lines = await button.evaluate((el) => {
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      return new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size;
+    });
+    expect(lines).toBe(1);
+  }
+}
+
+for (const [width, height, label, four] of [
+  [360, 740, '細めの Android', 'fit'],
+  [412, 800, '一般的な Android', 'fit'],
+  [390, 844, 'iPhone 標準', 'fit'],
+  [393, 852, 'iPhone 標準（新しめ）', 'fit'],
+  [412, 915, '縦長の Android', 'fit'],
+  [375, 667, 'iPhone SE', 'peek'],
+  [360, 640, '幅 360・高さ 640（目標の下限）', 'peek'],
 ] as const) {
   test.describe(`スマホ縦（${width}×${height}、${label}）`, () => {
     test.use({ viewport: { width, height }, hasTouch: true });
 
-    test('盤と候補手 3 行が、スクロールなしで見える。ヘッダーのボタンは 1 行', async ({ page }) => {
-      await openTree(page, OPENING);
+    test(`候補手 4 つ：${four === 'fit' ? '盤を 85% 以上に保って 4 行目まで見える' : '3 行目まで見え、4 行目がのぞく'}。ヘッダーのボタン・見出しは 1 行`, async ({ page }) => {
+      await openTree(page, FOUR);
       expect(await page.evaluate(() => window.scrollY)).toBe(0);
+      await expect(page.getByTestId('candidates-title')).toHaveText('相手の応手（4）');
       const header = (await page.locator('.screen-header').boundingBox())!;
       const board = (await page.getByTestId('board').boundingBox())!;
-      const third = (await page.getByTestId('candidate').nth(2).boundingBox())!;
+      const rows = page.getByTestId('candidate');
+      const third = (await rows.nth(2).boundingBox())!;
+      const fourth = (await rows.nth(3).boundingBox())!;
       expect(header.y).toBeGreaterThanOrEqual(0);
       expect(board.y).toBeGreaterThan(header.y);
+      // 3 行目までは必ず収める
       expect(third.y + third.height).toBeLessThanOrEqual(height);
-      await expect(page.getByTestId('candidate').nth(2)).toBeInViewport({ ratio: 1 });
+      if (four === 'fit') {
+        expect(fourth.y + fourth.height).toBeLessThanOrEqual(height);
+        expect(board.width).toBeGreaterThanOrEqual(width * 0.85 - 0.5);
+      } else {
+        // 4 行目の上端が画面の中（下にまだ手があることが分かる）
+        expect(fourth.y).toBeLessThan(height);
+      }
       // 盤は画面からはみ出さず、左右の真ん中
       expect(board.x).toBeGreaterThanOrEqual(0);
       expect(board.x + board.width).toBeLessThanOrEqual(width);
       expect(Math.abs(board.x + board.width / 2 - width / 2)).toBeLessThanOrEqual(2);
-      // 「‹ 一覧」「復習」は 1 行（折り返すと高さが 44px を超える）。文字も 1 行の高さ
-      for (const button of [page.getByRole('button', { name: '‹ 一覧' }), page.getByTestId('review-open')]) {
-        const box = (await button.boundingBox())!;
-        expect(box.height).toBeLessThanOrEqual(45);
-        const lines = await button.evaluate((el) => {
-          const range = document.createRange();
-          range.selectNodeContents(el);
-          return new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size;
-        });
-        expect(lines).toBe(1);
-      }
+      await expectOneLineButtons(page);
       // 候補手のカードの見出しは 1 行
       const head = (await page.locator('.candidates-head').boundingBox())!;
       expect(head.height).toBeLessThanOrEqual(26);
@@ -101,11 +147,43 @@ for (const [width, height, label] of [
   });
 }
 
+for (const [width, height] of [
+  [360, 740],
+  [412, 800],
+] as const) {
+  test.describe(`スマホ縦（${width}×${height}）候補手 3 つ`, () => {
+    test.use({ viewport: { width, height }, hasTouch: true });
+
+    test('候補手が 3 つ以下なら、4 行目のために盤を縮めない', async ({ page }) => {
+      await openTree(page, THREE);
+      await expect(page.getByTestId('candidates-title')).toHaveText('相手の応手（3）');
+      const board = (await page.getByTestId('board').boundingBox())!;
+      const third = (await page.getByTestId('candidate').nth(2).boundingBox())!;
+      expect(third.y + third.height).toBeLessThanOrEqual(height);
+      // 画面の端まで（左右 4px ずつの余白）の大きさのまま
+      expect(board.width).toBeGreaterThanOrEqual(width - 8 - 1);
+    });
+  });
+}
+
+test.describe('スマホ縦（360×740）見出しの件数', () => {
+  test.use({ viewport: { width: 360, height: 740 }, hasTouch: true });
+
+  test('除外した手は数えない。自分の手番の局面は「自分の対応（n）」', async ({ page }) => {
+    await openTree(page, FIVE_EXCLUDED);
+    await expect(page.getByTestId('candidates-title')).toHaveText('相手の応手（4）');
+    await expect(page.getByTestId('candidate')).toHaveCount(4);
+    await page.getByTestId('candidate').first().click();
+    await expect(page.getByTestId('candidates-title')).toHaveText('自分の対応（1）');
+  });
+});
+
 test.describe('スマホ縦（360×740）で文字を大きくしたとき', () => {
   test.use({ viewport: { width: 360, height: 740 }, hasTouch: true });
 
   test('文字を 1.25 倍にしても、ヘッダーのボタンは折り返さず、盤が縮んで候補手 3 行が見える', async ({ page }) => {
-    await openTree(page, OPENING);
+    // 候補手 3 つ（4 行目のために縮める分が無く、盤は画面の幅いっぱい）。文字が大きくなった分だけ縮む
+    await openTree(page, THREE);
     const before = (await page.getByTestId('board').boundingBox())!;
     // 端末の文字の大きさの設定を、文字の大きさの変数を大きくして再現する
     await page.addStyleTag({ content: ':root { --font-size-body: 20px; --font-size-small: 16px; --font-size-heading: 23px; }' });
@@ -114,14 +192,7 @@ test.describe('スマホ縦（360×740）で文字を大きくしたとき', () 
       .toBeLessThan(before.width);
     const third = (await page.getByTestId('candidate').nth(2).boundingBox())!;
     expect(third.y + third.height).toBeLessThanOrEqual(740);
-    for (const button of [page.getByRole('button', { name: '‹ 一覧' }), page.getByTestId('review-open')]) {
-      const lines = await button.evaluate((el) => {
-        const range = document.createRange();
-        range.selectNodeContents(el);
-        return new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size;
-      });
-      expect(lines).toBe(1);
-    }
+    await expectOneLineButtons(page);
   });
 });
 

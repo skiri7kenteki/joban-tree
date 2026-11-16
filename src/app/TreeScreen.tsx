@@ -7,6 +7,7 @@
 // 生成中も、できた枝からたどれる。
 // 局面ごとの操作：「ここから展開」「この手を検証」「KIF をコピー」、ツリーの書き出し・共有。
 // v0.12.2：スマホ縦では、盤の大きさを画面の高さに合わせて決める（幅 360・高さ 640 以上で候補手 3 行がスクロールなしで見える。boardFit.ts）。
+// v0.12.3：候補手が 4 つ以上なら 4 行目も見せる（盤を画面幅の 85% まで縮めて収める、収まらなければ半分のぞかせる）。見出しに件数。
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { Board } from '../components/Board';
@@ -324,7 +325,11 @@ function TreeView({ tree }: { tree: TreeData }) {
 
           <div class="card candidates">
             <div class="candidates-head">
-              <strong>{opp ? '相手の応手' : '自分の対応'}</strong>
+              {/* 件数（除外した手は数えない）。4 つ目以降が画面の外にあっても、あることが分かるように（v0.12.3） */}
+              <strong data-testid="candidates-title">
+                {opp ? '相手の応手' : '自分の対応'}
+                {node.edges.length > 0 && `（${node.edges.length}）`}
+              </strong>
               {/* 1 行に収める（スマホ縦で候補手を上に寄せるため）。入りきらなければ説明の方を … で縮める */}
               <span class="muted candidates-note">
                 評価値：{opp ? '対応の後・' : ''}

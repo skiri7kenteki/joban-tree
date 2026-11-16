@@ -1,7 +1,12 @@
-// 閲覧画面のスマホ縦（上下に並べる配置）で、候補手 3 行がスクロールせずに見えるよう、盤の幅の上限を決める（v0.12.2）。
-// 盤の大きさ ＝「画面の幅」と「画面の高さから、盤の上の部分・持ち駒の行・パンくず・候補手の見出し・候補手 3 行を引いた高さ」の小さい方。
+// 閲覧画面のスマホ縦（上下に並べる配置）で、候補手がスクロールせずに見えるよう、盤の幅の上限を決める（v0.12.2〜）。
 // 引く分は決め打ちにせず、実際の高さを測る（端末の文字を大きくしていても、その分だけ盤が縮む）。
 // iPad 横など、盤と候補手を左右に並べる配置では制限しない。
+//
+// 決め方（v0.12.3、持ち主の依頼。「ふつう」「じっくり」は候補手を 4 つ取るので、4 つ目があることに気づけるように）：
+//   1. 3 行目までは必ず収める（盤は MIN_BOARD_W より小さくしない）
+//   2. 候補手が 4 つ以上あり、盤の幅を画面幅の KEEP_RATIO 以上に保ったまま 4 行目まで収まるなら、4 行目まで収める
+//   3. 収まらなければ、4 行目の上半分が画面の下に見える（のぞく）ようにする。ただし、のぞかせるために KEEP_RATIO 未満には縮めない
+//   4. 5 つ以上でも目標は 4 行まで（5 行目からはスクロール）
 
 import { useEffect, useLayoutEffect, useState } from 'preact/hooks';
 
@@ -11,10 +16,14 @@ type ElementRef = { readonly current: HTMLElement | null };
 const SIDE_BY_SIDE = '(min-width: 768px) and (orientation: landscape)';
 /** 候補手が 3 行に満たないときの 1 行の高さの見込み（px） */
 const ROW_GUESS = 51;
-/** 3 行目の下の、画面の端との余白（px） */
+/** 最後に収める行の下の、画面の端との余白（px） */
 const BOTTOM_MARGIN = 4;
 /** 盤をこれより小さくはしない（px）。とても低い画面（スマホの横向きなど）では、スクロールしてもらう */
 const MIN_BOARD_W = 220;
+/** 4 行目を見せる（収める・のぞかせる）ために、盤をここまでは縮めてよい（画面幅に対する割合。仮の値） */
+export const KEEP_RATIO = 0.85;
+/** 4 行目をのぞかせるときに見せる、行の高さの割合 */
+const PEEK_RATIO = 0.5;
 
 /** 盤の幅の上限（px）を測る。制限しないときは null */
 export function measureBoardFit(board: HTMLElement, side: HTMLElement): number | null {
@@ -36,21 +45,33 @@ export function measureBoardFit(board: HTMLElement, side: HTMLElement): number |
   const gap = side.getBoundingClientRect().top - wrapRect.bottom;
   // パンくずの行（下の余白を含む）。「別の手を調べる」の案内などは数えない（盤の大きさが変わらないように）
   const crumbH = crumb.offsetHeight + parseFloat(getComputedStyle(crumb).marginBottom || '0');
-  // 候補手のカードの上端から、3 行目の下端まで
+  /** 候補手のカードの上端から y（画面上の位置）までを画面に収める盤の幅 */
+  const widthFor = (y: number) => {
+    const availH = window.innerHeight - svgTop - belowSvg - gap - crumbH - (y - cardRect.top) - BOTTOM_MARGIN;
+    return Math.floor((availH * svgRect.width) / svgRect.height);
+  };
+
+  // 1. 3 行目の下端まで
   const rows = card.querySelectorAll<HTMLElement>('[data-testid="candidate"]');
-  let cardH: number;
+  let third: number;
   if (rows.length >= 3) {
-    cardH = rows[2].getBoundingClientRect().bottom - cardRect.top;
+    third = rows[2].getBoundingClientRect().bottom;
   } else {
     const last = rows.length > 0 ? rows[rows.length - 1] : card.querySelector<HTMLElement>('.candidates-head');
     const lastBottom = last ? last.getBoundingClientRect().bottom : cardRect.top;
     const rowH = rows.length > 0 ? rows[0].getBoundingClientRect().height : ROW_GUESS;
-    cardH = lastBottom - cardRect.top + (3 - rows.length) * rowH;
+    third = lastBottom + (3 - rows.length) * rowH;
   }
+  const w3 = Math.max(MIN_BOARD_W, widthFor(third));
+  if (rows.length < 4) return w3;
 
-  const availH = window.innerHeight - svgTop - belowSvg - gap - crumbH - cardH - BOTTOM_MARGIN;
-  const width = Math.floor((availH * svgRect.width) / svgRect.height);
-  return Math.max(MIN_BOARD_W, width);
+  // 2・3. 4 行目：収める → のぞかせる（どちらも、盤を画面幅の KEEP_RATIO 未満には縮めない）
+  const keep = Math.ceil(document.documentElement.clientWidth * KEEP_RATIO);
+  const fourth = rows[3].getBoundingClientRect();
+  const w4 = widthFor(fourth.bottom);
+  if (w4 >= keep) return Math.min(w3, w4);
+  const peek = widthFor(fourth.top + fourth.height * PEEK_RATIO);
+  return Math.min(w3, Math.max(peek, keep));
 }
 
 /**
