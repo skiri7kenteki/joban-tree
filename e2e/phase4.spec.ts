@@ -473,3 +473,76 @@ test.describe('4-3 自分の手', () => {
     await expect(page.getByTestId('crumb')).toHaveText(['△３四歩', '▲９六歩']);
   });
 });
+
+// ---- v0.12.4：入力画面・復習画面も、盤の大きさを画面の高さに合わせる ----
+
+/** 入力画面：盤・先手の持ち駒の行・手順の操作が、作るボタンのバーの上に（スクロールせずに）収まっている */
+async function expectInputAboveBar(page: Page, height: number) {
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  const bar = (await page.getByTestId('start-bar').boundingBox())!;
+  expect(bar.y + bar.height).toBeLessThanOrEqual(height + 1);
+  for (const id of ['board', 'hand-black', 'input-nav']) {
+    const box = (await page.getByTestId(id).boundingBox())!;
+    expect(box.y + box.height, id).toBeLessThanOrEqual(bar.y);
+  }
+}
+
+for (const [width, height] of [
+  [360, 740],
+  [375, 667],
+  [412, 800],
+  [390, 844],
+] as const) {
+  test.describe(`入力画面・復習画面（${width}×${height}）`, () => {
+    test.use({ viewport: { width, height }, hasTouch: true });
+
+    test('入力画面：はじめ・戦型を選んだ後・棋譜を読み込んだ後のどれでも、手順の操作が作るボタンのバーの上', async ({ page }) => {
+      await page.goto('./#/new');
+      await expect(page.getByTestId('isolation')).toHaveAttribute('data-state', 'isolated', { timeout: 30_000 });
+      await expectInputAboveBar(page, height);
+      const first = (await page.getByTestId('board').boundingBox())!.width;
+
+      await page.getByTestId('template-open').click();
+      await page.getByTestId('template-group').click();
+      await page.getByTestId('template-item').filter({ hasText: '青野流' }).click();
+      await expectInputAboveBar(page, height);
+
+      await page.getByTestId('kifu-open').click();
+      await page.getByTestId('kifu-input').fill('7g7f 3c3d 2g2f 8c8d');
+      await page.getByTestId('kifu-load').click();
+      await expect(page.getByTestId('input-message')).toHaveText('4 手を読み込みました（‹ › で局面を選べます）');
+      await expectInputAboveBar(page, height);
+      // 持ち駒の有無や一言が出ても、盤の大きさは変わらない（指している途中で盤が動かない）
+      expect((await page.getByTestId('board').boundingBox())!.width).toBeCloseTo(first, 0);
+      // 盤は左右の真ん中
+      const board = (await page.getByTestId('board').boundingBox())!;
+      expect(Math.abs(board.x + board.width / 2 - width / 2)).toBeLessThanOrEqual(2);
+    });
+
+    test('復習画面：問題の文と答えの操作（まちがえた後の「もう一度」「正解を見る」も）が画面の中', async ({ page }) => {
+      await openTree(page, OPENING);
+      await page.getByTestId('review-open').click();
+      const prompt = page.getByTestId('review-prompt');
+      await expect(prompt).toHaveAttribute('data-phase', 'ask');
+      // 相手の手はランダムに選ばれる（疑問手なら「どう咎めますか？」）
+      await expect(prompt).toContainText(/の手は？|どう咎めますか？/);
+      expect(await page.evaluate(() => window.scrollY)).toBe(0);
+      await expect(prompt).toBeInViewport({ ratio: 1 });
+      await expect(page.getByTestId('board')).toBeInViewport({ ratio: 1 });
+      // まちがえる（▲１六歩。答えは ▲２六歩）
+      await page.locator('[data-square="17"]').click();
+      await page.locator('[data-square="16"]').click();
+      await expect(page.getByTestId('review-wrong')).toBeVisible();
+      await expect(prompt).toBeInViewport({ ratio: 1 });
+      await expect(page.getByTestId('review-retry')).toBeInViewport({ ratio: 1 });
+      await expect(page.getByTestId('review-show')).toBeInViewport({ ratio: 1 });
+      await expect(page.getByTestId('board')).toBeInViewport({ ratio: 1 });
+      // 「もう一度」で問題に戻っても、盤の大きさは変わらない（同じ問題の間は縮めた盤を戻さない）
+      const wrongWidth = (await page.getByTestId('board').boundingBox())!.width;
+      await page.getByTestId('review-retry').click();
+      await expect(prompt).toHaveAttribute('data-phase', 'ask');
+      await expect(prompt).toBeInViewport({ ratio: 1 });
+      expect((await page.getByTestId('board').boundingBox())!.width).toBeCloseTo(wrongWidth, 0);
+    });
+  });
+}

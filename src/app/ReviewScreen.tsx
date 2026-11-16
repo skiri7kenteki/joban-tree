@@ -2,8 +2,9 @@
 // 相手の応手はアプリが選んで指す（まだ出していない・間違えた問題が多い枝ほど選ばれやすい）。
 // 自分の手番では盤をタップして答える。正解はツリーの先頭の手。記録は端末の中（IndexedDB）に残す。
 // 段階4-2：相手が直前に指した手を、盤（最終手のマス）と一言「相手は △９四歩」ではっきり示す。
+// v0.12.4：スマホ縦では、盤と問題のカードがスクロールせずに 1 画面に収まるよう、盤の大きさを画面の高さに合わせる（boardFit.ts）。
 
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { Move } from 'tsshogi';
 import { Board } from '../components/Board';
 import { Dialog } from '../components/Dialog';
@@ -16,6 +17,7 @@ import { lastPrefixMove, prefixMoveTexts } from '../tree/browse';
 import { isOpponentNode } from '../tree/generator';
 import type { TreeData } from '../tree/types';
 import { answerOf, computeNeeds, emptyRecord, isDubiousReply, pickReply, recordAnswer, summarize, type ReviewRecord } from '../review/review';
+import { boardFitProps, measureFitAbove, useBoardFit } from './boardFit';
 import { openTree } from './generation';
 import { go } from './router';
 import { settings } from './settings';
@@ -79,6 +81,19 @@ function ReviewView({ tree, initialRecord }: { tree: TreeData; initialRecord: Re
   const mySideText = tree.mySide === 'black' ? '☗先手' : '☖後手';
 
   const input = useMoveInput(node.sfen, onMove, phase.kind === 'ask');
+  // スマホ縦：盤と問題のカード（問題の文・答えの操作）が画面に収まる盤の幅（v0.12.4。成る・成らないの小窓は数えない）
+  const boardRef = useRef<HTMLDivElement>(null);
+  const promptRef = useRef<HTMLDivElement>(null);
+  // 同じ問題の間は、一度縮めた盤を戻さない（まちがえて「もう一度」のボタンが出て縮んだ後、問題に戻るたびに盤が動かないように）
+  const fitMemo = useRef<{ question: string; width: number | null }>({ question: '', width: null });
+  const question = `${steps.length}:${current.key}`;
+  const boardFit = useBoardFit(boardRef, (board) => {
+    const width = measureFitAbove(board, promptRef.current, 0, [board.querySelector<HTMLElement>('.promote-box')]);
+    const memo = fitMemo.current;
+    const kept = memo.question === question && memo.width !== null && width !== null ? Math.min(memo.width, width) : width;
+    fitMemo.current = { question, width: kept };
+    return kept;
+  });
 
   // 最初の手順を始める
   useEffect(() => {
@@ -191,7 +206,7 @@ function ReviewView({ tree, initialRecord }: { tree: TreeData; initialRecord: Re
       </p>
 
       <div class="tree-layout">
-        <div class="tree-board">
+        <div ref={boardRef} {...boardFitProps(boardFit, 'tree-board')}>
           <Board
             sfen={node.sfen}
             lastMove={lastMove}
@@ -203,7 +218,7 @@ function ReviewView({ tree, initialRecord }: { tree: TreeData; initialRecord: Re
         </div>
 
         <div class="tree-side">
-          <div class="card review-prompt" data-testid="review-prompt" data-phase={phase.kind}>
+          <div class="card review-prompt" ref={promptRef} data-testid="review-prompt" data-phase={phase.kind}>
             {opponentLine}
             {phase.kind === 'ask' && (
               <>

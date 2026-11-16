@@ -932,13 +932,14 @@
   padding-bottom: 0;
 }
 
-/* 盤の幅を、候補手 3 行が画面に収まる幅（--board-fit-w。boardFit.ts が測る）までにして、左右の真ん中に置く。
+/* 盤の幅を、盤の下の大事な所（閲覧画面は候補手、入力画面は手順の操作、復習画面は問題）が画面に収まる幅
+   （--board-fit-w。boardFit.ts が測る）までにして、左右の真ん中に置く。
    --board-bleed はスマホ縦で盤を画面の端まで広げている分（board.css） */
-.tree-board {
+.board-fit {
   --board-bleed: 0px;
 }
 
-.tree-board.board-fit .board-wrap {
+.board-fit .board-wrap {
   --board-w: min(calc(100% + 2 * var(--board-bleed)), var(--board-fit-w), 560px);
   width: var(--board-w);
   max-width: none;
@@ -952,7 +953,7 @@
     padding-top: var(--space-2);
   }
 
-  .tree-board {
+  .board-fit {
     --board-bleed: var(--space-3);
   }
 }

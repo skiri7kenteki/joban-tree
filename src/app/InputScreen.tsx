@@ -4,9 +4,11 @@
 // 段階5-1：「戦型から選ぶ」（グループ → 戦型 → 選ぶ）。選んだら手順を読み込んだ状態にし、自分の側は戦型の側のまま固定
 // （手順を前後しても変えない。切り替えはできる）。戦型の出発点か、その先の局面なら、メモを盤の下に出し、ツリーの名前を戦型の名前にする。
 // 段階5-2：「この局面を戦型として登録」（平手の初期局面からの手順だけ）。
+// v0.12.4：スマホ縦では、盤・持ち駒の行・手順の操作（‹ ›）が、下に固定した作るボタンのバーの上にスクロールせず収まるよう、
+// 盤の大きさを画面の高さに合わせて決める（boardFit.ts。貼り付け欄を開いている間はしない）。
 // 段階5の手直し：戦型の出発点かその先にいるときは、盤の上の案内の行を「戦型：○○」にする（スマホ縦でスクロールしなくても見える）。
 
-import { useState } from 'preact/hooks';
+import { useRef, useState } from 'preact/hooks';
 import { Position, type Move } from 'tsshogi';
 import { Board } from '../components/Board';
 import { PromotionBox, useMoveInput } from '../components/useMoveInput';
@@ -21,6 +23,7 @@ import { openTree, startGeneration, isGenerating } from './generation';
 import { go } from './router';
 import { generationSettingsFor, presetLabel } from './settings';
 import { RegisterTemplateDialog, TemplatePicker, allTemplates } from './TemplateDialogs';
+import { boardFitProps, measureFitAbove, useBoardFit } from './boardFit';
 
 const SIDE_TEXT: Record<Side, string> = { black: '☗先手', white: '☖後手' };
 
@@ -73,7 +76,8 @@ export function InputScreen() {
     input.clear();
     setSideChoice(null);
     setTemplate(null);
-    setMessage(`${result.line.length - 1} 手を読み込みました。手順を動かして、研究したい局面を選んでください。`);
+    // 盤の上の 1 行に出すので短く（v0.12.4）
+    setMessage(`${result.line.length - 1} 手を読み込みました（‹ › で局面を選べます）`);
     setPasteOpen(false);
   }
 
@@ -102,6 +106,14 @@ export function InputScreen() {
   }
 
   const input = useMoveInput(current.sfen, commit);
+
+  // スマホ縦：盤・持ち駒の行・手順の操作が、作るボタンのバーの上に収まる盤の幅（成る・成らないの小窓は数えない）
+  const boardRef = useRef<HTMLDivElement>(null);
+  const navRef = useRef<HTMLDivElement>(null);
+  const barRef = useRef<HTMLDivElement>(null);
+  const boardFit = useBoardFit(boardRef, (board) =>
+    pasteOpen ? null : measureFitAbove(board, navRef.current, barRef.current?.offsetHeight ?? 0, [board.querySelector<HTMLElement>('.promote-box')]),
+  );
 
   /** 「この局面を戦型として登録」を押した */
   function openRegister() {
@@ -200,17 +212,23 @@ export function InputScreen() {
               </div>
             </div>
           )}
-          {message && (
+          {/* 貼り付け欄を開いている間は、読み込めなかった理由などを欄の下に。閉じているときは盤の上の 1 行に出す */}
+          {message && pasteOpen && (
             <p class="muted" data-testid="input-message">
               {message}
             </p>
           )}
         </div>
-        <div class="input-board">
+        <div ref={boardRef} {...boardFitProps(boardFit, 'input-board')}>
           {onTemplate ? (
             <p class="template-current" data-testid="template-current">
               戦型：{onTemplate.name}
               {relation === 'after' && ` → ${current.text ?? ''}`}
+            </p>
+          ) : message && !pasteOpen ? (
+            // 読み込んだ手数などの一言は、案内の行と入れ替える（盤の上の行を増やさない。v0.12.4）
+            <p class="muted" data-testid="input-message">
+              {message}
             </p>
           ) : (
             <p class="muted">盤の駒をタップ → 行き先をタップで指せます。</p>
@@ -220,7 +238,7 @@ export function InputScreen() {
           <PromotionBox input={input} />
         </div>
         <div class="input-controls">
-          <div class="move-nav">
+          <div class="move-nav" ref={navRef} data-testid="input-nav">
             <button type="button" class="btn" aria-label="最初へ" onClick={() => moveTo(0)} disabled={index === 0}>
               |‹
             </button>
@@ -301,7 +319,7 @@ export function InputScreen() {
         </div>
 
         {/* 作るボタン：画面の下に固定（ホーム画面アプリでは、下の端のバーを避ける） */}
-        <div class="start-bar" data-testid="start-bar">
+        <div class="start-bar" ref={barRef} data-testid="start-bar">
           <p class="start-bar-caption muted">
             {index === 0 ? '開始局面' : `${index}手目 ${current.text ?? ''}`}から作る（自分は{SIDE_TEXT[mySide]}）
           </p>

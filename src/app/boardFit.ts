@@ -1,8 +1,13 @@
-// 閲覧画面のスマホ縦（上下に並べる配置）で、候補手がスクロールせずに見えるよう、盤の幅の上限を決める（v0.12.2〜）。
+// スマホ縦（盤と操作を上下に並べる配置）で、盤の下の大事な所がスクロールせずに見えるよう、盤の幅の上限を決める（v0.12.2〜）。
 // 引く分は決め打ちにせず、実際の高さを測る（端末の文字を大きくしていても、その分だけ盤が縮む）。
-// iPad 横など、盤と候補手を左右に並べる配置では制限しない。
+// iPad 横など、盤と操作を左右に並べる配置では制限しない。
+//   閲覧画面：候補手（measureBoardFit。下の決め方）
+//   入力画面：盤・持ち駒・手順の操作（‹ ›）を、下に固定した作るボタンのバーの上に（v0.12.4、measureFitAbove）
+//   復習画面：盤と問題のカード（問題の文・答えの操作）を画面の中に（v0.12.4、measureFitAbove）
 //
-// 決め方（v0.12.3、持ち主の依頼。「ふつう」「じっくり」は候補手を 4 つ取るので、4 つ目があることに気づけるように）：
+// 閲覧画面の決め方（v0.12.3）：
+//
+//   （持ち主の依頼。「ふつう」「じっくり」は候補手を 4 つ取るので、4 つ目があることに気づけるように）
 //   1. 3 行目までは必ず収める（盤は MIN_BOARD_W より小さくしない）
 //   2. 候補手が 4 つ以上あり、盤の幅を画面幅の KEEP_RATIO 以上に保ったまま 4 行目まで収まるなら、4 行目まで収める
 //   3. 収まらなければ、4 行目の上半分が画面の下に見える（のぞく）ようにする。ただし、のぞかせるために KEEP_RATIO 未満には縮めない
@@ -25,7 +30,24 @@ export const KEEP_RATIO = 0.85;
 /** 4 行目をのぞかせるときに見せる、行の高さの割合 */
 const PEEK_RATIO = 0.5;
 
-/** 盤の幅の上限（px）を測る。制限しないときは null */
+/**
+ * 盤（SVG）の下端から target の下端までと、画面の下に固定したもの（reserve px）を残して、盤が画面に収まる幅（px）。
+ * skip の要素（成る・成らないの小窓など、一時的に出るもの）の高さは数えない（盤の大きさが変わらないように）。
+ * 盤と操作を左右に並べる配置では null（制限しない）
+ */
+export function measureFitAbove(board: HTMLElement, target: HTMLElement | null, reserve = 0, skip: (HTMLElement | null)[] = []): number | null {
+  if (window.matchMedia(SIDE_BY_SIDE).matches || !target) return null;
+  const svg = board.querySelector<SVGSVGElement>('svg.board');
+  if (!svg) return null;
+  const svgRect = svg.getBoundingClientRect();
+  if (svgRect.width === 0 || svgRect.height === 0) return null;
+  const skipped = skip.reduce((sum, el) => sum + (el ? el.getBoundingClientRect().height : 0), 0);
+  const below = target.getBoundingClientRect().bottom - svgRect.bottom - skipped;
+  const availH = window.innerHeight - reserve - (svgRect.top + window.scrollY) - below - BOTTOM_MARGIN;
+  return Math.max(MIN_BOARD_W, Math.floor((availH * svgRect.width) / svgRect.height));
+}
+
+/** 閲覧画面：盤の幅の上限（px）を測る。制限しないときは null */
 export function measureBoardFit(board: HTMLElement, side: HTMLElement): number | null {
   if (window.matchMedia(SIDE_BY_SIDE).matches) return null;
   const svg = board.querySelector<SVGSVGElement>('svg.board');
@@ -75,18 +97,18 @@ export function measureBoardFit(board: HTMLElement, side: HTMLElement): number |
 }
 
 /**
- * 盤の幅の上限を返す（描くたびと、画面の大きさが変わったときに測り直す）。
- * 盤の幅を変えても、盤の上の部分・パンくず・候補手の高さは変わらないので、測り直しても同じ値に落ち着く。
+ * 盤の幅の上限を返す（描くたびと、画面の大きさが変わったときに測り直す）。measure は上の measure… のどれかを呼ぶ。
+ * 盤の幅を変えても、盤の上の部分・盤の下の操作の高さは変わらないので、測り直しても同じ値に落ち着く。
+ * 返した値は boardFitProps で盤を包む要素に渡す。
  */
-export function useBoardFit(boardRef: ElementRef, sideRef: ElementRef): number | null {
+export function useBoardFit(boardRef: ElementRef, measure: (board: HTMLElement) => number | null): number | null {
   const [fit, setFit] = useState<number | null>(null);
   const [tick, setTick] = useState(0);
 
   useLayoutEffect(() => {
     const board = boardRef.current;
-    const side = sideRef.current;
-    if (!board || !side) return;
-    const next = measureBoardFit(board, side);
+    if (!board) return;
+    const next = measure(board);
     if (next !== fit && !(next !== null && fit !== null && Math.abs(next - fit) < 1)) setFit(next);
   });
 
@@ -107,4 +129,9 @@ export function useBoardFit(boardRef: ElementRef, sideRef: ElementRef): number |
 
   void tick;
   return fit;
+}
+
+/** 盤を包む要素に付ける class と style（app.css の .board-fit。盤を --board-fit-w までにして左右の真ん中に置く） */
+export function boardFitProps(fit: number | null, base: string): { class: string; style?: Record<string, string> } {
+  return fit === null ? { class: base } : { class: `${base} board-fit`, style: { '--board-fit-w': `${fit}px` } };
 }

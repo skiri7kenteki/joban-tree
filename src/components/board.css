@@ -124,6 +124,12 @@ button.hand-piece.selected {
   }
 }
 
+/* 駒をタップできる盤（入力画面・復習画面など）：持ち駒の行は、駒が無いときも駒があるとき（押せる高さ 44px＋上下の余白）と同じ高さ。
+   駒を取った瞬間に行が高くなって、盤の大きさ（画面の高さに合わせて決める。boardFit.ts）が変わらないように（v0.12.4） */
+.hand:not(.compact) {
+  min-height: calc(var(--touch-min) + 2 * var(--space-1));
+}
+
 /* 閲覧画面（タップで指さない盤）：持ち駒の列を薄くして、候補手リストを上に寄せる */
 .hand.compact {
   min-height: 24px;

@@ -24,7 +24,7 @@ import { countRemoved, deleteMove, makeMainMove } from '../tree/edit';
 import { LABEL_TEXT, labelOf } from '../tree/labels';
 import type { PresetId } from '../tree/presets';
 import { closestTemplate, templateLine } from '../tree/templates';
-import { useBoardFit } from './boardFit';
+import { boardFitProps, measureBoardFit, useBoardFit } from './boardFit';
 import { availablePresets } from './engineService';
 import type { TreeData, TreeEdge } from '../tree/types';
 import {
@@ -89,7 +89,7 @@ function TreeView({ tree }: { tree: TreeData }) {
   const boardRef = useRef<HTMLDivElement>(null);
   const sideRef = useRef<HTMLDivElement>(null);
   // スマホ縦：候補手 3 行が画面に収まる盤の幅（制限しないときは null）
-  const boardFit = useBoardFit(boardRef, sideRef);
+  const boardFit = useBoardFit(boardRef, (board) => (sideRef.current ? measureBoardFit(board, sideRef.current) : null));
   const thresholds = settings.value.thresholds;
 
   const key = path[path.length - 1];
@@ -271,8 +271,7 @@ function TreeView({ tree }: { tree: TreeData }) {
       <div class="tree-layout">
         <div
           ref={boardRef}
-          class={boardFit === null ? 'tree-board' : 'tree-board board-fit'}
-          style={boardFit === null ? undefined : ({ '--board-fit-w': `${boardFit}px` } as Record<string, string>)}
+          {...boardFitProps(boardFit, 'tree-board')}
           data-fit-width={boardFit ?? undefined}
           onTouchStart={onTouchStart}
           onTouchEnd={onTouchEnd}
