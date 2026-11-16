@@ -1,5 +1,11 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" fill="#2f5d8a"/>
-  <polygon points="256,104 352,140 380,412 132,412 160,140" fill="#f7e7bf" stroke="#8a6a33" stroke-width="8" stroke-linejoin="round"/>
-  <text x="256" y="300" font-size="170" text-anchor="middle" dominant-baseline="central" fill="#1a1a1a" font-family="'Hiragino Mincho ProN','Yu Mincho','YuMincho','Noto Serif JP',serif" font-weight="bold">序</text>
+  <!-- 序盤ツリー アイコン（案D 芽）。土から伸びる芽と二枚の葉、先端のつぼみ -->
+  <rect width="512" height="512" fill="#f6f1e6"/>
+  <g transform="translate(256 256) scale(1.18) translate(-258 -300)">
+  <path d="M176 420 L336 420" fill="none" stroke="#8a6a33" stroke-width="20" stroke-linecap="round"/>
+  <path d="M256 420 L256 232" fill="none" stroke="#2e7d4f" stroke-width="24" stroke-linecap="round"/>
+  <path d="M256 330 C198 330 144 300 132 232 C196 226 248 264 256 330 Z" fill="#2e7d4f"/>
+  <path d="M256 280 C316 280 372 246 384 176 C318 172 264 212 256 280 Z" fill="#2e7d4f"/>
+  <circle cx="256" cy="204" r="34" fill="#e0661b"/>
+  </g>
 </svg>

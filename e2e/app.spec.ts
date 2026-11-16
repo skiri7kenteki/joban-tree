@@ -19,6 +19,13 @@ test('ホーム画面に追加するための manifest とアイコンがある'
     const res = await request.get(`/joban-tree/${icon.src}`);
     expect(res.ok()).toBe(true);
   }
+  // v0.12.5：新しいアイコン（クリーム色の地に芽）。ブラウザのタブのアイコンも同じ icon.svg
+  expect(manifest.background_color).toBe('#f6f1e6');
+  const tabIcon = await page.locator('link[rel="icon"]').getAttribute('href');
+  expect(tabIcon).toBe('/joban-tree/icon.svg');
+  const svg = await (await request.get(tabIcon!)).text();
+  expect(svg).toContain('fill="#f6f1e6"');
+  expect(svg).not.toContain('#2f5d8a');
 });
 
 test('棋譜を貼り付けて、手順を前後に動かせる', async ({ page }) => {
