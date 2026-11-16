@@ -12,7 +12,7 @@ import { Board } from '../components/Board';
 import { Dialog } from '../components/Dialog';
 import { PromotionBox, useMoveInput } from '../components/useMoveInput';
 import { formatScore, scoreToNumber, type Score } from '../engine/usi';
-import { moveText } from '../shogi/position';
+import { STARTPOS_SFEN, moveText } from '../shogi/position';
 import { loadTree } from '../storage/trees';
 import { fileNameOf, treeToJson } from '../tree/backup';
 import { FINISH_TEXT, countParents, excludeMove, isAfterDubiousOnly, isOpponentNode, restoreMove } from '../tree/generator';
@@ -21,6 +21,7 @@ import { MINE_MARK_TEXT, branchInfo, branchText, lastPrefixMove, lossText, mineM
 import { countRemoved, deleteMove, makeMainMove } from '../tree/edit';
 import { LABEL_TEXT, labelOf } from '../tree/labels';
 import type { PresetId } from '../tree/presets';
+import { closestTemplate, templateLine } from '../tree/templates';
 import { availablePresets } from './engineService';
 import type { TreeData, TreeEdge } from '../tree/types';
 import {
@@ -38,6 +39,7 @@ import {
 import { go } from './router';
 import { generationSettingsFor, presetLabel, settings } from './settings';
 import { OUTCOME_TEXT, copyText, shareFile } from './share';
+import { RegisterTemplateDialog, allTemplates } from './TemplateDialogs';
 
 
 export function TreeScreen({ id }: { id: string }) {
@@ -67,7 +69,7 @@ function TreeView({ tree }: { tree: TreeData }) {
   /** 戻ったときに覚えておく「進む」先（スワイプで進む用） */
   const [forward, setForward] = useState<string[]>([]);
   /** 開いている小窓（ここから展開・書き出し） */
-  const [dialog, setDialog] = useState<'expand' | 'export' | null>(null);
+  const [dialog, setDialog] = useState<'expand' | 'export' | 'register' | null>(null);
   /** 「⋯」を押した候補手（手のメニューを出す） */
   const [menuEdge, setMenuEdge] = useState<TreeEdge | null>(null);
   /** 除外した手の欄を開いているか */
@@ -89,6 +91,8 @@ function TreeView({ tree }: { tree: TreeData }) {
   const opp = isOpponentNode(tree, node);
   const incoming = path.length > 1 ? edgeBetween(tree, path[path.length - 2], key) : undefined;
   const gen = generation.value?.treeId === tree.id ? generation.value : null;
+  // 平手の初期局面から今の局面までの手順（開始局面までの手順＋そこからたどった手）
+  const movesHere = [...tree.prefix.moves, ...path.slice(1).map((k, i) => edgeBetween(tree, path[i], k)?.move ?? '')];
   const busy = isGenerating();
   // 「この手を検証」は、まだ調べていない自分の手番の局面だけ
   const canVerify = !opp && !node.searched && !node.terminal;
@@ -193,6 +197,16 @@ function TreeView({ tree }: { tree: TreeData }) {
     setNote('');
     await saveEdited(tree);
   }
+  /** 「戦型として登録」：平手の初期局面から始まるツリーだけ */
+  function openRegister() {
+    if (tree.prefix.initialSfen !== STARTPOS_SFEN) {
+      setNote('平手の初期局面から始まるツリーだけ、局面を戦型として登録できます（SFEN で途中の局面から始めたツリーは登録できません）。');
+      return;
+    }
+    setNote('');
+    setDialog('register');
+  }
+
   async function copyKif() {
     const ok = await copyText(pathToKif(tree, path, thresholds));
     setNote(ok ? 'この局面までの KIF をコピーしました。iShogi などの「クリップボードから読み込み」で貼り付けられます。' : 'コピーできませんでした');
@@ -392,6 +406,9 @@ function TreeView({ tree }: { tree: TreeData }) {
             <button type="button" class="btn" data-testid="copy-kif" onClick={() => void copyKif()}>
               KIFをコピー
             </button>
+            <button type="button" class="btn" data-testid="register-template" onClick={openRegister}>
+              戦型として登録
+            </button>
             <button type="button" class="btn" data-testid="export-open" onClick={() => setDialog('export')}>
               書き出し・共有
             </button>
@@ -496,6 +513,20 @@ function TreeView({ tree }: { tree: TreeData }) {
           </div>
           {busy && <p class="muted">生成中は除外できません。止めてから除外してください。</p>}
         </Dialog>
+      )}
+
+      {dialog === 'register' && (
+        <RegisterTemplateDialog
+          moves={movesHere}
+          mySide={tree.mySide}
+          defaultName={path.length === 1 ? tree.name : registerName(movesHere)}
+          defaultGroup={closestTemplate(allTemplates(), movesHere)?.group ?? ''}
+          onSaved={(t) => {
+            setDialog(null);
+            setNote(`「${t.name}」を戦型として登録しました。新しいツリーの「戦型から選ぶ」に出ます。`);
+          }}
+          onClose={() => setDialog(null)}
+        />
       )}
 
       {dialog === 'export' && (
@@ -640,6 +671,13 @@ function LabelChip({ diff }: { diff: number }) {
 }
 
 /** 局面 from から局面 to への矢印 */
+/** 登録する戦型の名前の初期値（例：「18手目 △８四飛まで」） */
+function registerName(moves: readonly string[]): string {
+  const r = templateLine(moves);
+  if (!r.ok || moves.length === 0) return '平手の初期局面';
+  return `${moves.length}手目 ${r.line[r.line.length - 1].text ?? ''}まで`;
+}
+
 function edgeBetween(tree: TreeData, from: string, to: string): TreeEdge | undefined {
   return tree.nodes[from]?.edges.find((e) => e.to === to);
 }

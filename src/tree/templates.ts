@@ -89,16 +89,7 @@ export function checkTemplateFile(raw: unknown): TemplateParseResult {
     if (ids.has(id)) return { ok: false, message: `ファイルの中に同じ id の戦型が 2 つあります（${id}）。` };
     ids.add(id);
   }
-  const templates = (raw.templates as OpeningTemplate[]).map((t) => ({
-    id: t.id,
-    name: t.name,
-    group: t.group,
-    mySide: t.mySide,
-    moves: [...t.moves],
-    note: t.note,
-    reviewed: t.reviewed,
-  }));
-  return { ok: true, templates };
+  return { ok: true, templates: (raw.templates as OpeningTemplate[]).map(plain) };
 }
 
 /** 同梱の戦型のファイル（ファイル名の順） */
@@ -137,4 +128,98 @@ export function templateRelation(template: OpeningTemplate, moves: readonly stri
   for (let i = 0; i < n; i++) if (template.moves[i] !== moves[i]) return 'off';
   if (moves.length < template.moves.length) return 'before';
   return moves.length === template.moves.length ? 'at' : 'after';
+}
+
+// ---- 段階5-2：自分で登録する・書き出す・取り込む ----
+
+/** 自分で登録する戦型の新しい id */
+export function newTemplateId(): string {
+  return `my-${crypto.randomUUID()}`;
+}
+
+/** 戦型のファイルの形だけを取り出す（保存用の日付などは書き出さない） */
+function plain(t: OpeningTemplate): OpeningTemplate {
+  return { id: t.id, name: t.name, group: t.group, mySide: t.mySide, moves: [...t.moves], note: t.note, reviewed: t.reviewed };
+}
+
+/** 書き出すファイルの文字列 */
+export function templatesToJson(list: readonly OpeningTemplate[]): string {
+  const file: TemplateFile = { app: TREE_APP, kind: TEMPLATE_KIND, version: TEMPLATE_FORMAT_VERSION, templates: list.map(plain) };
+  return JSON.stringify(file, null, 2);
+}
+
+/** 書き出したファイルの文字列を読む（形と手順を確かめる） */
+export function parseTemplatesJson(text: string): TemplateParseResult {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    return { ok: false, message: 'JSON として読めませんでした。戦型を書き出したファイルを選んでください。' };
+  }
+  return checkTemplateFile(raw);
+}
+
+/** 登録の入力欄（名前・グループ・メモ）を確かめる。問題が無ければ null */
+export function checkTemplateFields(f: { name: string; group: string; note: string }): string | null {
+  if (f.name.trim() === '') return '名前を入れてください。';
+  if (f.name.trim().length > 100) return '名前は 100 文字までです。';
+  if (f.group.trim() === '') return 'グループを入れてください（例：横歩取り）。';
+  if (f.group.trim().length > 50) return 'グループは 50 文字までです。';
+  if (f.note.trim().length > 1000) return 'メモは 1000 文字までです。';
+  return null;
+}
+
+function sameTemplate(a: OpeningTemplate, b: OpeningTemplate): boolean {
+  return JSON.stringify(plain(a)) === JSON.stringify(plain(b));
+}
+
+/** 取り込みの見通し */
+export interface ImportPlan {
+  /** id が重ならない戦型（そのまま足す） */
+  fresh: OpeningTemplate[];
+  /** まったく同じ戦型が既にある数（取り込まない） */
+  same: number;
+  /** id が重なり、中身が違う戦型。bundled は同梱の戦型と重なったもの（同梱の戦型は置き換えない） */
+  conflicts: { incoming: OpeningTemplate; bundled: boolean }[];
+}
+
+export function planImport(
+  incoming: readonly OpeningTemplate[],
+  mine: readonly OpeningTemplate[],
+  bundled: readonly OpeningTemplate[],
+): ImportPlan {
+  const plan: ImportPlan = { fresh: [], same: 0, conflicts: [] };
+  for (const t of incoming) {
+    const own = mine.find((m) => m.id === t.id);
+    const existing = own ?? bundled.find((b) => b.id === t.id);
+    if (!existing) plan.fresh.push(t);
+    else if (sameTemplate(existing, t)) plan.same++;
+    else plan.conflicts.push({ incoming: t, bundled: !own });
+  }
+  return plan;
+}
+
+/** id が重なったときの選び方：置き換える（自分で登録したものだけ）・両方残す（新しい id で足す）・取り込まない */
+export type ConflictChoice = 'replace' | 'both' | 'skip';
+
+/** 取り込む戦型を決める。skipped は取り込まなかった数（同じものは数えない） */
+export function resolveImport(plan: ImportPlan, choice: ConflictChoice, newId: () => string = newTemplateId): { put: OpeningTemplate[]; skipped: number } {
+  const put = [...plan.fresh];
+  let skipped = 0;
+  for (const c of plan.conflicts) {
+    if (choice === 'replace' && !c.bundled) put.push(c.incoming);
+    else if (choice === 'both') put.push({ ...c.incoming, id: newId() });
+    else skipped++;
+  }
+  return { put, skipped };
+}
+
+/** 手順がどの戦型の上にあるか（いちばん長く一致する戦型。登録するときのグループの初期値に使う） */
+export function closestTemplate(list: readonly OpeningTemplate[], moves: readonly string[]): OpeningTemplate | null {
+  let best: OpeningTemplate | null = null;
+  for (const t of list) {
+    const r = templateRelation(t, moves);
+    if ((r === 'at' || r === 'after') && (!best || t.moves.length > best.moves.length)) best = t;
+  }
+  return best;
 }

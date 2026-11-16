@@ -4,11 +4,13 @@
 // 版の履歴：
 //   1 … trees（ツリー）
 //   2 … review（復習の記録。段階3）を追加
+//   3 … templates（自分で登録した戦型。段階5-2）を追加
 
 const DB_NAME = 'joban-tree';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 export const TREES = 'trees';
 export const REVIEW = 'review';
+export const TEMPLATES = 'templates';
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -20,6 +22,7 @@ export function openDb(): Promise<IDBDatabase> {
         const db = request.result;
         if (!db.objectStoreNames.contains(TREES)) db.createObjectStore(TREES, { keyPath: 'id' });
         if (!db.objectStoreNames.contains(REVIEW)) db.createObjectStore(REVIEW, { keyPath: 'treeId' });
+        if (!db.objectStoreNames.contains(TEMPLATES)) db.createObjectStore(TEMPLATES, { keyPath: 'id' });
       };
       request.onsuccess = () => {
         const db = request.result;

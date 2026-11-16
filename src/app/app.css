@@ -806,3 +806,63 @@
   gap: var(--space-1);
   margin-bottom: var(--space-1);
 }
+
+/* 段階5-2：自分で登録した戦型 */
+.chip-mine {
+  border: 1px solid var(--color-accent);
+  color: var(--color-accent);
+}
+
+/* 戦型の行：選ぶボタンと ⋯ を横に並べる */
+.template-row {
+  display: flex;
+  align-items: center;
+}
+
+.template-row .template-item {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.template-menu {
+  flex: none;
+  min-width: var(--touch-min);
+}
+
+/* 登録した戦型の書き出し・取り込み（グループの一覧の下） */
+.template-io {
+  margin-top: var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
+}
+
+.template-io p {
+  margin: 0;
+}
+
+.template-io .btn-row {
+  margin-bottom: 0;
+}
+
+/* 登録の入力欄：今あるグループを押して選ぶ */
+.template-group-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: calc(-1 * var(--space-2)) 0 var(--space-3);
+}
+
+.template-note-input {
+  width: 100%;
+  padding: var(--space-2);
+}
+
+.template-danger {
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
+}
+
+.template-conflict-list {
+  margin: 0 0 var(--space-2);
+  padding-left: var(--space-4);
+}
