@@ -1,6 +1,7 @@
 // 同梱の戦型テンプレート（src/data/templates/*.json）をまとめて確かめるテスト（段階5-1）。
 // ほかの戦型の JSON が増えても、このフォルダに置けばここで確かめる。下書き（reviewed: false）も入れられるよう、
-// 確認済みかどうかは確かめない（横歩取りの確認済みは validate-yokofu.test.ts で確かめる）。
+// 件数と、確認済みかどうかは確かめない（以前あった横歩取りだけのテスト validate-yokofu.test.ts は、
+// 件数 6・すべて確認済みを前提にしていたので、持ち主の依頼で削除した。2026-11-16）。
 import { describe, expect, test } from 'vitest';
 import { STARTPOS_SFEN, applyUsiMove, sideToMove } from '../../src/shogi/position';
 import {

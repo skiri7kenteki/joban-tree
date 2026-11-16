@@ -4,6 +4,7 @@
 // 段階5-1：「戦型から選ぶ」（グループ → 戦型 → 選ぶ）。選んだら手順を読み込んだ状態にし、自分の側は戦型の側のまま固定
 // （手順を前後しても変えない。切り替えはできる）。戦型の出発点か、その先の局面なら、メモを盤の下に出し、ツリーの名前を戦型の名前にする。
 // 段階5-2：「この局面を戦型として登録」（平手の初期局面からの手順だけ）。
+// 段階5の手直し：戦型の出発点かその先にいるときは、盤の上の案内の行を「戦型：○○」にする（スマホ縦でスクロールしなくても見える）。
 
 import { useState } from 'preact/hooks';
 import { Position, type Move } from 'tsshogi';
@@ -206,7 +207,14 @@ export function InputScreen() {
           )}
         </div>
         <div class="input-board">
-          <p class="muted">盤の駒をタップ → 行き先をタップで指せます。</p>
+          {onTemplate ? (
+            <p class="template-current" data-testid="template-current">
+              戦型：{onTemplate.name}
+              {relation === 'after' && ` → ${current.text ?? ''}`}
+            </p>
+          ) : (
+            <p class="muted">盤の駒をタップ → 行き先をタップで指せます。</p>
+          )}
           <Board sfen={current.sfen} lastMove={current.usi} selection={input.selection} onSquare={input.onSquare} onHand={input.onHand} />
 
           <PromotionBox input={input} />
@@ -319,7 +327,10 @@ export function InputScreen() {
         <RegisterTemplateDialog
           moves={movesHere}
           mySide={mySide}
-          defaultName={templateName ?? (index === 0 ? '平手の初期局面' : `${index}手目 ${current.text ?? ''}まで`)}
+          defaultName={
+            // 戦型の出発点そのものなら空（同じ手順の戦型が既にあるので、登録画面がそれを知らせる）
+            relation === 'at' ? '' : templateName ?? (index === 0 ? '平手の初期局面' : `${index}手目 ${current.text ?? ''}まで`)
+          }
           defaultGroup={(onTemplate ?? closestTemplate(allTemplates(), movesHere))?.group ?? ''}
           onSaved={(t) => {
             setRegisterOpen(false);

@@ -2,6 +2,8 @@
 // - TemplatePicker：「戦型から選ぶ」。グループ → 戦型 → 選ぶ。自分で登録した戦型は「自分で登録」の印と ⋯（直す・消す）。
 //   グループの一覧の下に、登録した戦型の書き出し・取り込み（段階5-2）。
 // - RegisterTemplateDialog：「この局面を戦型として登録」（入力画面・閲覧画面から）。名前・グループ・メモを入れて保存する。
+//   同じ手順の戦型（同梱・自分で登録）が既にあれば、そのことを示して登録できないようにする（段階5の手直し）。
+// 一覧の名前は、グループ名で始まるならそこを省いて出す（listName。データの name はそのまま）。
 // 登録した戦型は端末の中（IndexedDB）にだけ保存する。
 
 import { signal } from '@preact/signals';
@@ -13,7 +15,9 @@ import { fileNameOf } from '../tree/backup';
 import {
   BUNDLED_TEMPLATES,
   checkTemplateFields,
+  findSameMoves,
   groupTemplates,
+  listName,
   newTemplateId,
   parseTemplatesJson,
   planImport,
@@ -244,7 +248,7 @@ export function TemplatePicker({ onPick, onClose }: { onPick: (t: OpeningTemplat
                   <button type="button" class="template-item" data-testid="template-item" onClick={() => onPick(t)}>
                     <span class="template-item-main">
                       <span class="template-item-name">
-                        {t.name}
+                        {listName(t)}
                         {own && (
                           <span class="chip chip-small chip-mine" data-testid="template-mine">
                             自分で登録
@@ -294,11 +298,14 @@ type Fields = { name: string; group: string; note: string };
 function TemplateForm({
   initial,
   saveLabel,
+  blocked = false,
   onSave,
   onCancel,
 }: {
   initial: Fields;
   saveLabel: string;
+  /** 保存できない（理由は呼ぶ側が上に出す） */
+  blocked?: boolean;
   /** 保存する（失敗したら例外） */
   onSave: (f: Fields) => Promise<void>;
   onCancel: () => void;
@@ -347,11 +354,18 @@ function TemplateForm({
           onInput={(e) => setGroup((e.target as HTMLInputElement).value)}
         />
       </label>
-      {/* 今あるグループは押すだけで選べる（新しいグループは上の欄に入れる） */}
+      {/* 今あるグループは押すだけで選べる（新しいグループは上の欄に入れる）。「登録する」と紛らわしくないよう、枠線だけのチップ */}
       {groups.length > 0 && (
-        <div class="template-group-choices">
+        <div class="template-group-choices" role="group" aria-label="今あるグループ">
           {groups.map((g) => (
-            <button type="button" key={g} class={g === group.trim() ? 'btn btn-toggle on' : 'btn btn-toggle'} onClick={() => setGroup(g)}>
+            <button
+              type="button"
+              key={g}
+              class={g === group.trim() ? 'group-choice on' : 'group-choice'}
+              aria-pressed={g === group.trim()}
+              data-testid="group-choice"
+              onClick={() => setGroup(g)}
+            >
               {g}
             </button>
           ))}
@@ -367,7 +381,7 @@ function TemplateForm({
         </p>
       )}
       <div class="dialog-actions">
-        <button type="button" class="btn btn-primary" data-testid="template-save" disabled={saving} onClick={() => void save()}>
+        <button type="button" class="btn btn-primary" data-testid="template-save" disabled={saving || blocked} onClick={() => void save()}>
           {saveLabel}
         </button>
         <button type="button" class="btn" onClick={onCancel}>
@@ -395,14 +409,30 @@ export function RegisterTemplateDialog({
   onSaved: (t: OpeningTemplate) => void;
   onClose: () => void;
 }) {
+  useEffect(() => {
+    void refreshMyTemplates().catch(() => undefined);
+  }, []);
+  // 同じ手順の戦型が既にあるか（同梱を先に見る）
+  const same = findSameMoves(allTemplates(), moves);
+  const sameIsMine = same !== null && (myTemplates.value ?? []).some((t) => t.id === same.id);
+
   return (
     <Dialog title="この局面を戦型として登録" onClose={onClose} testId="template-register">
       <p class="muted">
         平手の初期局面から {moves.length} 手の局面を、自分は{mySide === 'black' ? '☗先手' : '☖後手'}の戦型として登録します。「戦型から選ぶ」に出ます。
       </p>
+      {same && (
+        <p class="notice" role="status" data-testid="template-same">
+          この局面は「{same.name}」として、すでにあります
+          {sameIsMine
+            ? '（自分で登録した戦型）。名前やメモを直すなら、「戦型から選ぶ」の一覧の ⋯ から直してください。'
+            : '（アプリに入っている戦型）。同じ局面は登録できません。'}
+        </p>
+      )}
       <TemplateForm
         initial={{ name: defaultName, group: defaultGroup, note: '' }}
         saveLabel="登録する"
+        blocked={same !== null}
         onSave={async (f) => {
           const t: OpeningTemplate = { id: newTemplateId(), ...f, mySide, moves: [...moves], reviewed: true };
           await saveMine([t]);

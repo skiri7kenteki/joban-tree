@@ -223,3 +223,22 @@ export function closestTemplate(list: readonly OpeningTemplate[], moves: readonl
   }
   return best;
 }
+
+/**
+ * 同じ手順（平手の初期局面からの指し手の並びがまったく同じ）の戦型。登録の二重を防ぐのに使う。
+ * 自分の側・名前・グループは見ない（自分の側は戦型を選んだ後に切り替えられるので、同じ局面とみなす）。
+ */
+export function findSameMoves<T extends OpeningTemplate>(list: readonly T[], moves: readonly string[]): T | null {
+  return list.find((t) => t.moves.length === moves.length && t.moves.every((m, i) => m === moves[i])) ?? null;
+}
+
+/**
+ * 一覧に出す名前：グループ名＋区切り（空白・「・」）で始まるなら、そこを省く
+ * （例：グループ「横歩取り」の「横歩取り 青野流（▲5八玉まで）」→「青野流（▲5八玉まで）」。「相横歩取り（…）」はそのまま）。
+ * データの name とツリーの名前は省かない。
+ */
+export function listName(t: Pick<OpeningTemplate, 'name' | 'group'>): string {
+  if (!t.name.startsWith(t.group)) return t.name;
+  const m = /^[\s　・]+(.+)$/u.exec(t.name.slice(t.group.length));
+  return m ? m[1] : t.name;
+}

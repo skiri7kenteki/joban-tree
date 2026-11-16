@@ -1,8 +1,11 @@
 // 自分で登録した戦型の書き出し・取り込み（段階5-2）
 import { describe, expect, test } from 'vitest';
 import {
+  BUNDLED_TEMPLATES,
   checkTemplateFields,
   closestTemplate,
+  findSameMoves,
+  listName,
   newTemplateId,
   parseTemplatesJson,
   planImport,
@@ -94,5 +97,30 @@ describe('登録', () => {
     expect(closestTemplate([short, long], ['7g7f', '3c3d', '2g2f'])?.group).toBe('G2');
     expect(closestTemplate([short, long], ['7g7f', '8c8d'])?.group).toBe('G1');
     expect(closestTemplate([short, long], ['2g2f'])).toBeNull();
+  });
+});
+
+describe('段階5の手直し', () => {
+  test('同じ手順の判定：指し手の並びがまったく同じものだけ（自分の側・名前は見ない）', () => {
+    const white = { ...base, id: 'w', mySide: 'white' as const, name: '別名' };
+    expect(findSameMoves([white], ['7g7f', '3c3d', '2g2f'])?.id).toBe('w');
+    // 途中まで・その先・順番違いは別
+    expect(findSameMoves([base], ['7g7f', '3c3d'])).toBeNull();
+    expect(findSameMoves([base], ['7g7f', '3c3d', '2g2f', '8c8d'])).toBeNull();
+    expect(findSameMoves([base], ['2g2f', '3c3d', '7g7f'])).toBeNull();
+    // 同梱の横歩取りと同じ手順
+    const aono = BUNDLED_TEMPLATES.find((t) => t.id === 'yokofu-aono')!;
+    expect(findSameMoves(BUNDLED_TEMPLATES, [...aono.moves])?.name).toBe('横歩取り 青野流（▲5八玉まで）');
+  });
+
+  test('一覧の名前：グループ名＋区切りで始まるなら省く', () => {
+    expect(listName({ name: '横歩取り 青野流（▲5八玉まで）', group: '横歩取り' })).toBe('青野流（▲5八玉まで）');
+    expect(listName({ name: '横歩取り　全角の空白', group: '横歩取り' })).toBe('全角の空白');
+    expect(listName({ name: '横歩取り・中住まい', group: '横歩取り' })).toBe('中住まい');
+    // グループ名で始まらない・区切りが無い・グループ名だけ、はそのまま
+    expect(listName({ name: '相横歩取り（△7六飛まで）', group: '横歩取り' })).toBe('相横歩取り（△7六飛まで）');
+    expect(listName({ name: '横歩取りの研究', group: '横歩取り' })).toBe('横歩取りの研究');
+    expect(listName({ name: '横歩取り', group: '横歩取り' })).toBe('横歩取り');
+    expect(listName({ name: '横歩取り ', group: '横歩取り' })).toBe('横歩取り ');
   });
 });

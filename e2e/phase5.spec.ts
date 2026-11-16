@@ -304,3 +304,89 @@ test.describe('5-2 自分で戦型を登録する・配る', () => {
     await expect(page.getByTestId('template-register')).toHaveCount(0);
   });
 });
+
+// ---- 段階5の手直し（v0.12.0 のレビューから） ----
+
+test.describe('5 手直し', () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
+
+  test('スマホ縦：戦型を選んだ直後、スクロールせずに戦型名が見える（その先へ進めたら「→ △８四飛」）', async ({ page }) => {
+    await openNewTree(page);
+    await expect(page.getByTestId('template-current')).toHaveCount(0);
+    await pickTemplate(page, '青野流');
+    const current = page.getByTestId('template-current');
+    await expect(current).toHaveText('戦型：横歩取り 青野流（▲5八玉まで）');
+    await expect(current).toBeInViewport({ ratio: 1 });
+    // 作るボタンのバーに隠れていない
+    const bar = (await page.getByTestId('start-bar').boundingBox())!;
+    const box = (await current.boundingBox())!;
+    expect(box.y + box.height).toBeLessThanOrEqual(bar.y);
+    // 盤も、選ぶ前と同じくバーの上に収まる（案内の行と入れ替えたので高さが変わらない）
+    const board = (await page.getByTestId('board').boundingBox())!;
+    expect(board.y + board.height).toBeLessThanOrEqual(bar.y);
+
+    await page.getByTestId('input-prev').click();
+    await expect(current).toHaveCount(0);
+    await page.getByTestId('input-next').click();
+    await page.locator('[data-square="86"]').click();
+    await page.locator('[data-square="84"]').click();
+    await expect(current).toHaveText('戦型：横歩取り 青野流（▲5八玉まで） → △８四飛');
+  });
+
+  test('同梱の戦型と同じ局面は登録できない。自分で登録したものと同じなら ⋯ から直すよう案内', async ({ page }) => {
+    await openNewTree(page);
+    await pickTemplate(page, '青野流');
+    await page.getByTestId('register-template').click();
+    await expect(page.getByTestId('template-same')).toHaveText(
+      'この局面は「横歩取り 青野流（▲5八玉まで）」として、すでにあります（アプリに入っている戦型）。同じ局面は登録できません。',
+    );
+    // 出発点そのものなので、名前の初期値は空。登録するは押せない
+    await expect(page.getByTestId('template-name')).toHaveValue('');
+    await expect(page.getByTestId('template-save')).toBeDisabled();
+    await page.keyboard.press('Escape');
+
+    // 1 手進めれば登録できる → 同じ局面でもう一度登録しようとすると、自分で登録した戦型として案内
+    await page.locator('[data-square="86"]').click();
+    await page.locator('[data-square="84"]').click();
+    await register(page, { name: '青野流に△8四飛' });
+    await page.getByTestId('register-template').click();
+    await expect(page.getByTestId('template-same')).toContainText('この局面は「青野流に△8四飛」として、すでにあります（自分で登録した戦型）');
+    await expect(page.getByTestId('template-same')).toContainText('一覧の ⋯ から');
+    await expect(page.getByTestId('template-save')).toBeDisabled();
+  });
+
+  test('登録画面のグループの候補は枠線だけのチップ（「登録する」と見た目を分ける）', async ({ page }) => {
+    await openNewTree(page);
+    await pickTemplate(page, '青野流');
+    await page.locator('[data-square="86"]').click();
+    await page.locator('[data-square="84"]').click();
+    await page.getByTestId('register-template').click();
+    const chip = page.getByTestId('group-choice').filter({ hasText: '横歩取り' });
+    await expect(chip).toHaveAttribute('aria-pressed', 'true');
+    await expect(chip).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await expect(page.getByTestId('template-save')).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
+    await page.getByTestId('template-group-input').fill('別のグループ');
+    await expect(chip).toHaveAttribute('aria-pressed', 'false');
+    await chip.click();
+    await expect(page.getByTestId('template-group-input')).toHaveValue('横歩取り');
+  });
+
+  test('戦型の一覧では、名前の頭のグループ名を省く（ツリーの名前は省かない）', async ({ page }) => {
+    await openNewTree(page);
+    await page.getByTestId('template-open').click();
+    await page.getByTestId('template-group').click();
+    const names = page.getByTestId('template-item').locator('.template-item-name');
+    await expect(names).toHaveText([
+      '基本図（▲3四飛まで）',
+      '△3三角型（▲3六飛まで）',
+      '△8四飛型・中住まい',
+      '青野流（▲5八玉まで）',
+      '△4五角戦法',
+      '相横歩取り（△7六飛まで）',
+    ]);
+    await page.getByTestId('template-item').filter({ hasText: '青野流' }).click();
+    // 盤の上の戦型名・作るときのツリーの名前は元の名前のまま
+    await expect(page.getByTestId('template-current')).toHaveText('戦型：横歩取り 青野流（▲5八玉まで）');
+    await expect(page.getByTestId('template-note')).toContainText('横歩取り 青野流（▲5八玉まで）');
+  });
+});
