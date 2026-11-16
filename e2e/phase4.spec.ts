@@ -58,20 +58,75 @@ async function openTree(page: Page, tree: TreeData) {
   await expect(page.getByTestId('candidate').first()).toBeVisible();
 }
 
+// 段階4-1 の「390×844 で 3 行」を、細い・低い画面にも広げた（v0.12.2。持ち主の Android は幅 360 相当）
+for (const [width, height, label] of [
+  [360, 740, '細めの Android'],
+  [375, 667, 'iPhone SE'],
+  [412, 800, '一般的な Android'],
+  [390, 844, 'iPhone 標準'],
+  [360, 640, '幅 360・高さ 640（目標の下限）'],
+] as const) {
+  test.describe(`スマホ縦（${width}×${height}、${label}）`, () => {
+    test.use({ viewport: { width, height }, hasTouch: true });
+
+    test('盤と候補手 3 行が、スクロールなしで見える。ヘッダーのボタンは 1 行', async ({ page }) => {
+      await openTree(page, OPENING);
+      expect(await page.evaluate(() => window.scrollY)).toBe(0);
+      const header = (await page.locator('.screen-header').boundingBox())!;
+      const board = (await page.getByTestId('board').boundingBox())!;
+      const third = (await page.getByTestId('candidate').nth(2).boundingBox())!;
+      expect(header.y).toBeGreaterThanOrEqual(0);
+      expect(board.y).toBeGreaterThan(header.y);
+      expect(third.y + third.height).toBeLessThanOrEqual(height);
+      await expect(page.getByTestId('candidate').nth(2)).toBeInViewport({ ratio: 1 });
+      // 盤は画面からはみ出さず、左右の真ん中
+      expect(board.x).toBeGreaterThanOrEqual(0);
+      expect(board.x + board.width).toBeLessThanOrEqual(width);
+      expect(Math.abs(board.x + board.width / 2 - width / 2)).toBeLessThanOrEqual(2);
+      // 「‹ 一覧」「復習」は 1 行（折り返すと高さが 44px を超える）。文字も 1 行の高さ
+      for (const button of [page.getByRole('button', { name: '‹ 一覧' }), page.getByTestId('review-open')]) {
+        const box = (await button.boundingBox())!;
+        expect(box.height).toBeLessThanOrEqual(45);
+        const lines = await button.evaluate((el) => {
+          const range = document.createRange();
+          range.selectNodeContents(el);
+          return new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size;
+        });
+        expect(lines).toBe(1);
+      }
+      // 候補手のカードの見出しは 1 行
+      const head = (await page.locator('.candidates-head').boundingBox())!;
+      expect(head.height).toBeLessThanOrEqual(26);
+    });
+  });
+}
+
+test.describe('スマホ縦（360×740）で文字を大きくしたとき', () => {
+  test.use({ viewport: { width: 360, height: 740 }, hasTouch: true });
+
+  test('文字を 1.25 倍にしても、ヘッダーのボタンは折り返さず、盤が縮んで候補手 3 行が見える', async ({ page }) => {
+    await openTree(page, OPENING);
+    const before = (await page.getByTestId('board').boundingBox())!;
+    // 端末の文字の大きさの設定を、文字の大きさの変数を大きくして再現する
+    await page.addStyleTag({ content: ':root { --font-size-body: 20px; --font-size-small: 16px; --font-size-heading: 23px; }' });
+    await expect
+      .poll(async () => (await page.getByTestId('board').boundingBox())!.width)
+      .toBeLessThan(before.width);
+    const third = (await page.getByTestId('candidate').nth(2).boundingBox())!;
+    expect(third.y + third.height).toBeLessThanOrEqual(740);
+    for (const button of [page.getByRole('button', { name: '‹ 一覧' }), page.getByTestId('review-open')]) {
+      const lines = await button.evaluate((el) => {
+        const range = document.createRange();
+        range.selectNodeContents(el);
+        return new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size;
+      });
+      expect(lines).toBe(1);
+    }
+  });
+});
+
 test.describe('スマホ縦（390×844）', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
-
-  test('盤と候補手 3 行が、スクロールなしで見える', async ({ page }) => {
-    await openTree(page, OPENING);
-    expect(await page.evaluate(() => window.scrollY)).toBe(0);
-    const header = await page.locator('.screen-header').boundingBox();
-    const board = await page.getByTestId('board').boundingBox();
-    const third = await page.getByTestId('candidate').nth(2).boundingBox();
-    expect(header!.y).toBeGreaterThanOrEqual(0);
-    expect(board!.y).toBeGreaterThan(header!.y);
-    expect(third!.y + third!.height).toBeLessThanOrEqual(844);
-    await expect(page.getByTestId('candidate').nth(2)).toBeInViewport({ ratio: 1 });
-  });
 
   test('相手の応手の行に、自分の対応・ラベル（短く）・枝の先の様子が出る', async ({ page }) => {
     await openTree(page, OPENING);

@@ -6,6 +6,7 @@
 //          自分の対応の行の「⋯」から「本線にする」「消す」。
 // 生成中も、できた枝からたどれる。
 // 局面ごとの操作：「ここから展開」「この手を検証」「KIF をコピー」、ツリーの書き出し・共有。
+// v0.12.2：スマホ縦では、盤の大きさを画面の高さに合わせて決める（幅 360・高さ 640 以上で候補手 3 行がスクロールなしで見える。boardFit.ts）。
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { Board } from '../components/Board';
@@ -22,6 +23,7 @@ import { countRemoved, deleteMove, makeMainMove } from '../tree/edit';
 import { LABEL_TEXT, labelOf } from '../tree/labels';
 import type { PresetId } from '../tree/presets';
 import { closestTemplate, templateLine } from '../tree/templates';
+import { useBoardFit } from './boardFit';
 import { availablePresets } from './engineService';
 import type { TreeData, TreeEdge } from '../tree/types';
 import {
@@ -83,6 +85,10 @@ function TreeView({ tree }: { tree: TreeData }) {
   /** 操作の結果（「コピーしました」など） */
   const [note, setNote] = useState('');
   const crumbsRef = useRef<HTMLDivElement>(null);
+  const boardRef = useRef<HTMLDivElement>(null);
+  const sideRef = useRef<HTMLDivElement>(null);
+  // スマホ縦：候補手 3 行が画面に収まる盤の幅（制限しないときは null）
+  const boardFit = useBoardFit(boardRef, sideRef);
   const thresholds = settings.value.thresholds;
 
   const key = path[path.length - 1];
@@ -262,7 +268,14 @@ function TreeView({ tree }: { tree: TreeData }) {
       {gen && <GenerationPanel tree={tree} />}
 
       <div class="tree-layout">
-        <div class="tree-board" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
+        <div
+          ref={boardRef}
+          class={boardFit === null ? 'tree-board' : 'tree-board board-fit'}
+          style={boardFit === null ? undefined : ({ '--board-fit-w': `${boardFit}px` } as Record<string, string>)}
+          data-fit-width={boardFit ?? undefined}
+          onTouchStart={onTouchStart}
+          onTouchEnd={onTouchEnd}
+        >
           <Board
             sfen={node.sfen}
             lastMove={path.length > 1 ? incoming?.move : lastPrefixMove(tree)}
@@ -270,7 +283,7 @@ function TreeView({ tree }: { tree: TreeData }) {
           />
         </div>
 
-        <div class="tree-side">
+        <div class="tree-side" ref={sideRef}>
           {/* 1 手戻る＋手順のパンくずリストを 1 行に（「開始局面」のパンくずで開始局面へ戻る） */}
           <div class="crumb-row">
             <button type="button" class="crumb crumb-back" data-testid="nav-back" onClick={goBack} disabled={path.length <= 1} aria-label="1手戻る">
@@ -312,8 +325,11 @@ function TreeView({ tree }: { tree: TreeData }) {
           <div class="card candidates">
             <div class="candidates-head">
               <strong>{opp ? '相手の応手' : '自分の対応'}</strong>
-              {/* 1 行に収める（スマホ縦で候補手を上に寄せるため） */}
-              <span class="muted">評価値は{opp ? '対応の後・' : ''}{sideText}から見た値</span>
+              {/* 1 行に収める（スマホ縦で候補手を上に寄せるため）。入りきらなければ説明の方を … で縮める */}
+              <span class="muted candidates-note">
+                評価値：{opp ? '対応の後・' : ''}
+                {sideText}から
+              </span>
             </div>
             {node.edges.length === 0 && <EmptyNote tree={tree} nodeKey={key} generating={busy} />}
             <ul class="candidate-list">

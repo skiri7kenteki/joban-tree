@@ -895,3 +895,64 @@
   color: var(--color-accent);
   font-weight: bold;
 }
+
+/* v0.12.2：細い・低い画面の閲覧画面 */
+/* 画面の上の「‹ 一覧」「復習」などのボタンは折り返さない（縦書きのようにならない）。縮めるのは見出しの方（…） */
+.screen-header > .btn {
+  flex: none;
+  white-space: nowrap;
+}
+
+.screen-header h1 {
+  flex: 1 1 auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 候補手のカードの見出しは 1 行。入りきらなければ説明（評価値：…）を … で縮める */
+.candidates-head {
+  flex-wrap: nowrap;
+}
+
+.candidates-head > strong {
+  flex: none;
+  white-space: nowrap;
+}
+
+.candidates-note {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* パンくずの行は押せる高さ（44px）ちょうどに（横スクロールのつまみの分の余白をなくす） */
+.crumb-row .crumbs {
+  padding-bottom: 0;
+}
+
+/* 盤の幅を、候補手 3 行が画面に収まる幅（--board-fit-w。boardFit.ts が測る）までにして、左右の真ん中に置く。
+   --board-bleed はスマホ縦で盤を画面の端まで広げている分（board.css） */
+.tree-board {
+  --board-bleed: 0px;
+}
+
+.tree-board.board-fit .board-wrap {
+  --board-w: min(calc(100% + 2 * var(--board-bleed)), var(--board-fit-w), 560px);
+  width: var(--board-w);
+  max-width: none;
+  margin-left: calc((100% - var(--board-w)) / 2);
+  margin-right: 0;
+}
+
+@media (max-width: 600px) {
+  /* スマホ縦：画面の上の余白を詰める（16 → 8px） */
+  .main {
+    padding-top: var(--space-2);
+  }
+
+  .tree-board {
+    --board-bleed: var(--space-3);
+  }
+}
