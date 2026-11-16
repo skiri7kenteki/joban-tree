@@ -1,15 +1,19 @@
 // 局面の入力画面：棋譜を貼り付ける／盤をタップして指す → 手順を前後して局面を選ぶ →
 // 自分が先手か後手かを選ぶ → プリセット（ふつう・じっくり。PC 版は精密も）を選んで生成。
 // 段階4-2：棋譜の貼り付け欄はふだん閉じておく（読み込んだら閉じる）。作るボタンは画面の下に固定して、いつでも押せるようにする。
+// 段階5-1：「戦型から選ぶ」（グループ → 戦型 → 選ぶ）。選んだら手順を読み込んだ状態にし、自分の側は戦型の側のまま固定
+// （手順を前後しても変えない。切り替えはできる）。戦型の出発点か、その先の局面なら、メモを盤の下に出し、ツリーの名前を戦型の名前にする。
 
 import { useState } from 'preact/hooks';
 import { Position, type Move } from 'tsshogi';
 import { Board } from '../components/Board';
+import { Dialog } from '../components/Dialog';
 import { PromotionBox, useMoveInput } from '../components/useMoveInput';
 import { parseKifu, type LinePosition } from '../shogi/kifu';
 import { STARTPOS_SFEN, moveText, otherSide, sideToMove, type Side } from '../shogi/position';
 import { saveTree, newTreeId } from '../storage/trees';
 import { createTree } from '../tree/generator';
+import { BUNDLED_TEMPLATES, groupTemplates, templateLine, templateRelation, type OpeningTemplate } from '../tree/templates';
 import type { PresetId } from '../tree/presets';
 import { availablePresets, effectivePcThreads, pcEngine } from './engineService';
 import { openTree, startGeneration, isGenerating } from './generation';
@@ -27,16 +31,24 @@ export function InputScreen() {
   const [busy, setBusy] = useState(false);
   /** 棋譜の貼り付け欄を開いているか */
   const [pasteOpen, setPasteOpen] = useState(false);
+  /** 「戦型から選ぶ」の窓を開いているか */
+  const [pickerOpen, setPickerOpen] = useState(false);
+  /** 選んだ戦型（棋譜を読み込む・初期局面に戻すと外れる） */
+  const [template, setTemplate] = useState<OpeningTemplate | null>(null);
 
   const current = line[index];
   const turn = sideToMove(current.sfen);
   // 初期値は「その局面の手番の反対側」（＝相手の手番から始まる）
   const mySide: Side = sideChoice ?? otherSide(turn);
+  // 今の局面が、選んだ戦型の出発点か、その先か
+  const relation = template ? templateRelation(template, line.slice(1, index + 1).map((p) => p.usi!)) : 'off';
+  const onTemplate = template && (relation === 'at' || relation === 'after') ? template : null;
 
   function moveTo(i: number) {
     setIndex(Math.max(0, Math.min(line.length - 1, i)));
     input.clear();
-    setSideChoice(null);
+    // 戦型を選んだときは、その側のまま（手順を前後しても変えない）
+    if (!template) setSideChoice(null);
   }
 
   function loadKifu() {
@@ -49,6 +61,7 @@ export function InputScreen() {
     setIndex(result.line.length - 1);
     input.clear();
     setSideChoice(null);
+    setTemplate(null);
     setMessage(`${result.line.length - 1} 手を読み込みました。手順を動かして、研究したい局面を選んでください。`);
     setPasteOpen(false);
   }
@@ -58,6 +71,7 @@ export function InputScreen() {
     setIndex(0);
     input.clear();
     setSideChoice(null);
+    setTemplate(null);
     setMessage('');
     setPasteOpen(false);
   }
@@ -73,19 +87,42 @@ export function InputScreen() {
     setLine([...line.slice(0, index + 1), next]);
     setIndex(index + 1);
     input.clear();
-    setSideChoice(null);
+    if (!template) setSideChoice(null);
   }
 
   const input = useMoveInput(current.sfen, commit);
+
+  /** 戦型を選ぶ：手順を読み込み、出発点の局面にする */
+  function chooseTemplate(t: OpeningTemplate) {
+    setPickerOpen(false);
+    const result = templateLine(t.moves);
+    if (!result.ok) {
+      setMessage(`「${t.name}」の手順を読めませんでした（${result.index + 1} 手目）。`);
+      return;
+    }
+    setLine(result.line);
+    setIndex(result.line.length - 1);
+    input.clear();
+    setSideChoice(t.mySide);
+    setTemplate(t);
+    setMessage('');
+    setPasteOpen(false);
+  }
 
   async function start(presetId: PresetId) {
     if (busy || isGenerating()) return;
     setBusy(true);
     const settings = generationSettingsFor(presetId);
     const where = index === 0 ? '開始局面' : `${current.text}まで`;
+    // 戦型の出発点なら戦型の名前、その先なら「戦型の名前 → ○○まで」
+    const name = onTemplate
+      ? relation === 'at'
+        ? onTemplate.name
+        : `${onTemplate.name} → ${where}`
+      : `${where}（自分は${mySide === 'black' ? '先手' : '後手'}）`;
     const tree = createTree({
       id: newTreeId(),
-      name: `${where}（自分は${mySide === 'black' ? '先手' : '後手'}）`,
+      name,
       rootSfen: current.sfen,
       mySide,
       prefix: { initialSfen: line[0].sfen, moves: line.slice(1, index + 1).map((p) => p.usi!) },
@@ -117,16 +154,21 @@ export function InputScreen() {
       <div class="input-layout">
         <div class="input-paste">
           {!pasteOpen ? (
-            <button type="button" class="btn btn-wide kifu-open" data-testid="kifu-open" onClick={() => setPasteOpen(true)}>
-              棋譜を貼り付ける（KIF・KI2・CSA・SFEN・USI）
-            </button>
+            <div class="input-sources">
+              <button type="button" class="btn kifu-open" data-testid="kifu-open" onClick={() => setPasteOpen(true)}>
+                棋譜を貼り付ける
+              </button>
+              <button type="button" class="btn" data-testid="template-open" onClick={() => setPickerOpen(true)}>
+                戦型から選ぶ
+              </button>
+            </div>
           ) : (
             <div class="card kifu-box" data-testid="kifu-box">
               <textarea
                 class="kifu-input"
                 data-testid="kifu-input"
                 rows={5}
-                placeholder={'例）7g7f 3c3d 2g2f\nKIF や KI2 の棋譜をそのまま貼り付けても読めます'}
+                placeholder={'例）7g7f 3c3d 2g2f\nKIF・KI2・CSA・SFEN の棋譜をそのまま貼り付けても読めます'}
                 value={kifu}
                 onInput={(e) => setKifu((e.target as HTMLTextAreaElement).value)}
               />
@@ -185,6 +227,18 @@ export function InputScreen() {
             />
           )}
 
+          {/* 選んだ戦型の名前とメモ（スマホでは盤と手順の操作のすぐ下、iPad 横では右の列） */}
+          {onTemplate && (
+            <div class="card template-note" data-testid="template-note">
+              <p class="template-note-name">
+                <strong>{onTemplate.name}</strong>
+                {!onTemplate.reviewed && <span class="chip chip-small chip-unverified">未確認</span>}
+                {relation === 'after' && <span class="muted">からさらに進めた局面</span>}
+              </p>
+              {onTemplate.note && <p class="muted">{onTemplate.note}</p>}
+            </div>
+          )}
+
           <div class="card">
             <div class="side-choice" role="radiogroup" aria-label="自分は">
               <span>自分は</span>
@@ -237,6 +291,71 @@ export function InputScreen() {
           </div>
         </div>
       </div>
+
+      {pickerOpen && <TemplatePicker templates={BUNDLED_TEMPLATES} onPick={chooseTemplate} onClose={() => setPickerOpen(false)} />}
     </>
+  );
+}
+
+/** 「戦型から選ぶ」：グループの一覧 → 戦型の一覧 → 選ぶ */
+function TemplatePicker({
+  templates,
+  onPick,
+  onClose,
+}: {
+  templates: readonly OpeningTemplate[];
+  onPick: (t: OpeningTemplate) => void;
+  onClose: () => void;
+}) {
+  const [group, setGroup] = useState<string | null>(null);
+  const groups = groupTemplates(templates);
+  const chosen = group === null ? null : groups.find((g) => g.group === group);
+
+  return (
+    <Dialog title={chosen ? chosen.group : '戦型から選ぶ'} onClose={onClose} testId="template-picker">
+      {!chosen ? (
+        <>
+          <p class="muted">戦型の出発点の局面から始めます。選んだ後に、手順を前後したり盤上で指したりもできます。</p>
+          <ul class="template-list">
+            {groups.map((g) => (
+              <li key={g.group}>
+                <button type="button" class="template-item" data-testid="template-group" onClick={() => setGroup(g.group)}>
+                  <span class="template-item-main">
+                    <span class="template-item-name">{g.group}</span>
+                  </span>
+                  <span class="muted num">{g.templates.length}</span>
+                  <span aria-hidden="true">›</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        <>
+          <button type="button" class="btn btn-ghost" data-testid="template-back" onClick={() => setGroup(null)}>
+            ‹ グループ
+          </button>
+          <ul class="template-list">
+            {chosen.templates.map((t) => (
+              <li key={t.id}>
+                <button type="button" class="template-item" data-testid="template-item" onClick={() => onPick(t)}>
+                  <span class="template-item-main">
+                    <span class="template-item-name">
+                      {t.name}
+                      {!t.reviewed && (
+                        <span class="chip chip-small chip-unverified" data-testid="template-unreviewed">
+                          未確認
+                        </span>
+                      )}
+                    </span>
+                    {t.note && <span class="template-item-note muted">{t.note}</span>}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </Dialog>
   );
 }
