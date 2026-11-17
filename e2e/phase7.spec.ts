@@ -371,6 +371,51 @@ test.describe('7-2 研究手順（スマホ縦 360×740）', () => {
     await expect(page.getByTestId('tab-studies')).toContainText('研究手順 0');
   });
 
+  test('トップ画面の研究手順の ⋯ から、名前・メモを直す・消す（確認あり。ツリーの局面は消えない）', async ({ page }) => {
+    await openHome(page);
+    const s1: Study = { id: 's-1', name: '研究A', note: 'もとのメモ', moves: ['7g7f', '3c3d', '2g2f'], createdAt: 1, updatedAt: 2 };
+    const s2: Study = { id: 's-2', name: '研究B', note: '', moves: ['2g2f', '8c8d'], createdAt: 1, updatedAt: 1 };
+    await importAll(page, [lineTree('line3', '整理するツリー', [s1, s2])]);
+    await page.getByTestId('tab-studies').click();
+    const items = page.getByTestId('study-item');
+    await expect(items).toHaveText([/研究A/, /研究B/]);
+
+    // 直す
+    await page.getByTestId('study-menu').first().click();
+    await expect(page.getByTestId('study-menu-dialog')).toContainText('整理するツリー');
+    await page.getByTestId('study-menu-edit').click();
+    await expect(page.getByTestId('study-moves')).toHaveText('▲７六歩 △３四歩 ▲２六歩');
+    await expect(page.getByTestId('study-name')).toHaveValue('研究A');
+    await page.getByTestId('study-name').fill('研究A（直した）');
+    await page.getByTestId('study-note').fill('新しいメモ');
+    await page.getByTestId('study-save').click();
+    await expect(page.getByTestId('home-message')).toContainText('「研究A（直した）」を直しました');
+    await expect(items.first()).toContainText('研究A（直した）');
+    await expect(items.first().getByTestId('study-item-note')).toHaveText('新しいメモ');
+
+    // 消す：確認でやめると残る → 消すと 1 つになる
+    const b = items.filter({ hasText: '研究B' });
+    await page.getByTestId('study-menu').nth(1).click();
+    await page.getByTestId('study-menu-delete').click();
+    await expect(page.getByTestId('study-menu-dialog')).toContainText('この研究手順を消しますか？');
+    await page.getByTestId('study-menu-dialog').getByRole('button', { name: 'やめる' }).click();
+    await page.getByTestId('study-menu-delete').click();
+    await page.getByTestId('study-menu-delete-ok').click();
+    await expect(page.getByTestId('home-message')).toContainText('「研究B」を消しました');
+    await expect(b).toHaveCount(0);
+    await expect(items).toHaveCount(1);
+    await expect(page.getByTestId('tab-studies')).toContainText('研究手順 1');
+
+    // ツリーの局面は消えていない（▲2六歩 △8四歩 はたどれる）。直した名前は閲覧画面にも出る
+    await page.getByTestId('tab-trees').click();
+    await page.getByTestId('tree-item').click();
+    await page.getByTestId('candidate').filter({ hasText: '▲２六歩' }).click();
+    await expect(page.getByTestId('candidate')).toHaveText([/△８四歩/]);
+    await page.getByTestId('crumb-start').click();
+    for (const m of ['▲７六歩', '△３四歩', '▲２六歩']) await page.getByTestId('candidate').filter({ hasText: m }).click();
+    await expect(page.getByTestId('study-here')).toHaveText('★ 研究A（直した）');
+  });
+
   test('途中までしかたどれない研究手順：一覧に「途中まで」、開くとたどれるところまで開いて知らせる（消さない）', async ({ page }) => {
     await openHome(page);
     const broken: Study = { id: 's-broken', name: '△4四歩の研究', note: '', moves: ['7g7f', '3c3d', '6g6f', '4c4d'], createdAt: 1, updatedAt: 1 };

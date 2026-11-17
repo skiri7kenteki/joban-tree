@@ -1,6 +1,7 @@
 // トップ画面：新しいツリーを作るボタン、保存してあるツリーの一覧（名前の変更・共有・削除）、ファイルからの取り込み。
 // 段階7-1：ツリーを「戦型のグループ × 自分の側」でまとめる（開閉でき、状態は端末に覚える）。名前で絞り込む。最近開いた 3 件。
 // 段階7-2：「ツリー｜研究手順」の切り替え。研究手順も同じグループでまとめ、タップでそのツリーのその局面を開く。絞り込みは研究手順の名前・メモにも当てる。
+//          研究手順の行の ⋯ から、名前・メモを直す・消す（確認あり）（持ち主の依頼 2026-11-17）。
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { Dialog } from '../components/Dialog';
@@ -8,13 +9,14 @@ import { deleteTree, listTrees, loadTree, newTreeId, saveTree, type StudySummary
 import { fileNameOf, parseTreeJson, treeToJson } from '../tree/backup';
 import { latestBundled } from '../tree/bundledCatalog';
 import { RECENT_MIN_TREES, filterByName, groupStudies, groupTrees, normalizeForSearch, recentItems, type TreeGroup } from '../tree/organize';
-import { firstLine } from '../tree/studies';
-import type { TreeData } from '../tree/types';
-import { generation, isGenerating, openTree, treeVersion } from './generation';
+import { defaultStudyName, firstLine, removeStudy, updateStudy } from '../tree/studies';
+import type { Study, TreeData } from '../tree/types';
+import { generation, isGenerating, openTree, saveEdited, treeVersion } from './generation';
 import { collapsedGroups, forgetOpened, homeTab, recentOpened, setHomeTab, toggleGroup } from './recent';
 import { go } from './router';
 import { OUTCOME_TEXT, shareFile } from './share';
 import { allTemplates, myTemplates, refreshMyTemplates } from './TemplateDialogs';
+import { StudyEditDialog } from './StudyDialogs';
 
 export function HomeScreen({ isolationMessage }: { isolationMessage: string | null }) {
   const [trees, setTrees] = useState<TreeSummary[] | null>(null);
@@ -24,6 +26,8 @@ export function HomeScreen({ isolationMessage }: { isolationMessage: string | nu
   const [reload, setReload] = useState(0);
   /** ⋯ を押したツリー（メニューを出す） */
   const [menuTree, setMenuTree] = useState<TreeData | null>(null);
+  /** ⋯ を押した研究手順（直す・消すのメニューを出す） */
+  const [menuStudy, setMenuStudy] = useState<{ tree: TreeData; study: Study } | null>(null);
   /** 取り込もうとしたツリーが既にあるとき */
   const [conflict, setConflict] = useState<TreeData | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -59,6 +63,14 @@ export function HomeScreen({ isolationMessage }: { isolationMessage: string | nu
     // 共有ボタンを押した直後に共有メニューを出せるよう、先に読み込んでおく（iPad の Safari 対策）
     const tree = openTree.value?.id === id ? openTree.value : await loadTree(id);
     if (tree) setMenuTree(tree);
+  }
+
+  async function openStudyMenu(treeId: string, studyId: string) {
+    setMessage('');
+    // 開いている（生成中かもしれない）ツリーなら、そのものを書き換える（自動保存で元に戻らないように）
+    const tree = openTree.value?.id === treeId ? openTree.value : await loadTree(treeId);
+    const study = tree?.studies?.find((s) => s.id === studyId);
+    if (tree && study) setMenuStudy({ tree, study });
   }
 
   async function onFile(e: Event) {
@@ -193,7 +205,7 @@ export function HomeScreen({ isolationMessage }: { isolationMessage: string | nu
           {studyGroups.map((g) => (
             <GroupSection key={g.key} group={g} open={searching || !collapsed.includes(g.key)} searching={searching}>
               {g.items.map((x) => (
-                <StudyRow key={x.study.id} study={x.study} treeId={x.treeId} treeName={x.treeName} />
+                <StudyRow key={x.study.id} study={x.study} treeId={x.treeId} treeName={x.treeName} onMenu={() => void openStudyMenu(x.treeId, x.study.id)} />
               ))}
             </GroupSection>
           ))}
@@ -207,6 +219,19 @@ export function HomeScreen({ isolationMessage }: { isolationMessage: string | nu
         <input ref={fileRef} type="file" accept=".json,application/json" hidden data-testid="import-file" onChange={(e) => void onFile(e)} />
       </div>
       <p class="muted">仲間から受け取ったツリー（このアプリで書き出した JSON）を開けます。</p>
+
+      {menuStudy && (
+        <StudyMenu
+          tree={menuStudy.tree}
+          study={menuStudy.study}
+          onClose={() => setMenuStudy(null)}
+          onDone={(text) => {
+            setMenuStudy(null);
+            setMessage(text);
+            setReload((n) => n + 1);
+          }}
+        />
+      )}
 
       {menuTree && (
         <TreeMenu
@@ -289,7 +314,7 @@ function GroupSection<T>({ group: g, open, searching, children }: { group: TreeG
 }
 
 /** 研究手順の 1 行（名前・メモの最初の 1 行・属するツリーの名前・日付）。タップでそのツリーのその局面を開く */
-function StudyRow({ study, treeId, treeName }: { study: StudySummary; treeId: string; treeName: string }) {
+function StudyRow({ study, treeId, treeName, onMenu }: { study: StudySummary; treeId: string; treeName: string; onMenu: () => void }) {
   const note = firstLine(study.note);
   return (
     <li class="tree-row">
@@ -314,7 +339,67 @@ function StudyRow({ study, treeId, treeName }: { study: StudySummary; treeId: st
           {treeName}・{formatShortDate(study.updatedAt)}
         </span>
       </button>
+      <button type="button" class="btn tree-menu-btn" aria-label={`「${study.name}」の操作`} data-testid="study-menu" onClick={onMenu}>
+        ⋯
+      </button>
     </li>
+  );
+}
+
+/** 研究手順の行の ⋯ のメニュー：名前・メモを直す・消す（確認あり。ツリーの手や局面は消さない） */
+function StudyMenu({ tree, study, onClose, onDone }: { tree: TreeData; study: Study; onClose: () => void; onDone: (message: string) => void }) {
+  const [editing, setEditing] = useState(false);
+  const [confirm, setConfirm] = useState(false);
+
+  async function save(f: { name: string; note: string }) {
+    updateStudy(tree, study.id, f, Date.now());
+    await saveEdited(tree);
+    onDone(`研究手順「${f.name.trim()}」を直しました`);
+  }
+
+  async function remove() {
+    removeStudy(tree, study.id);
+    await saveEdited(tree);
+    onDone(`研究手順「${study.name}」を消しました`);
+  }
+
+  if (editing) {
+    return (
+      <StudyEditDialog
+        study={study}
+        defaultName={study.name}
+        movesText={defaultStudyName(tree, study.moves, Infinity)}
+        onSave={(f) => void save(f)}
+        onClose={onClose}
+      />
+    );
+  }
+  return (
+    <Dialog title={`★ ${study.name}`} onClose={onClose} testId="study-menu-dialog">
+      <p class="muted">{tree.name}</p>
+      <div class="dialog-actions dialog-actions-column">
+        <button type="button" class="btn btn-primary" data-testid="study-menu-edit" onClick={() => setEditing(true)}>
+          名前・メモを直す
+        </button>
+      </div>
+      <div class="dialog-actions">
+        {!confirm ? (
+          <button type="button" class="btn btn-danger" data-testid="study-menu-delete" onClick={() => setConfirm(true)}>
+            消す…
+          </button>
+        ) : (
+          <>
+            <span>この研究手順を消しますか？元に戻せません（ツリーの手や局面は消えません）。</span>
+            <button type="button" class="btn btn-danger" data-testid="study-menu-delete-ok" onClick={() => void remove()}>
+              消す
+            </button>
+            <button type="button" class="btn" onClick={() => setConfirm(false)}>
+              やめる
+            </button>
+          </>
+        )}
+      </div>
+    </Dialog>
   );
 }
 
