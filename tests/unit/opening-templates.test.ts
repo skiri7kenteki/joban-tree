@@ -57,6 +57,25 @@ describe('同梱の戦型テンプレート（全ファイル）', () => {
   test('アプリに全部読み込まれている', () => {
     expect(BUNDLED_TEMPLATES.length).toBe(all.length);
   });
+
+  test('横歩取り △3三角（後手番）（段階6-1）：持ち主の指定どおりの 16 手で、後手が自分・先手番で始まる', () => {
+    const t = BUNDLED_TEMPLATES.find((x) => x.id === 'yokofu-33kaku-gote')!;
+    expect(t).toBeDefined();
+    expect(t.name).toBe('横歩取り △3三角（後手番）');
+    expect(t.group).toBe('横歩取り');
+    expect(t.mySide).toBe('white');
+    expect(t.reviewed).toBe(true);
+    expect(t.moves.join(' ')).toBe('7g7f 3c3d 2g2f 8c8d 2f2e 8d8e 6i7h 4a3b 2e2d 2c2d 2h2d 8e8f 8g8f 8b8f 2d3d 2b3c');
+    const r = templateLine(t.moves);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    // 画面の表記は全角の数字と「同　歩」。持ち主の書いた表記（半角・空白なし）にそろえて比べる
+    const plain = (s: string) => s.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0)).replace(/　/g, '');
+    expect(r.line.slice(1).map((p) => plain(p.text!)).join(' ')).toBe(
+      '▲7六歩 △3四歩 ▲2六歩 △8四歩 ▲2五歩 △8五歩 ▲7八金 △3二金 ▲2四歩 △同歩 ▲同飛 △8六歩 ▲同歩 △同飛 ▲3四飛 △3三角',
+    );
+    expect(sideToMove(r.line[r.line.length - 1].sfen)).toBe('black');
+  });
 });
 
 describe('戦型テンプレートの扱い', () => {

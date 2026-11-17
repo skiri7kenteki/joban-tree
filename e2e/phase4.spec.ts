@@ -504,7 +504,7 @@ for (const [width, height] of [
 
       await page.getByTestId('template-open').click();
       await page.getByTestId('template-group').click();
-      await page.getByTestId('template-item').filter({ hasText: '青野流' }).click();
+      await page.getByTestId('template-item').filter({ hasText: '青野流（▲5八玉' }).click();
       await expectInputAboveBar(page, height);
 
       await page.getByTestId('kifu-open').click();

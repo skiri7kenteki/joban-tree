@@ -26,10 +26,10 @@ test.describe('5-1 戦型から選ぶ', () => {
   test('グループ → 戦型 → 選ぶと、手順を読み込んだ状態になり、メモが盤の下に出る', async ({ page }) => {
     await openNewTree(page);
     await page.getByTestId('template-open').click();
-    // グループの一覧（今は横歩取りだけ、6 つ）
-    await expect(page.getByTestId('template-group')).toHaveText(/横歩取り\s*6/);
+    // グループの一覧（今は横歩取りだけ、7 つ）
+    await expect(page.getByTestId('template-group')).toHaveText(/横歩取り\s*7/);
     await page.getByTestId('template-group').click();
-    await expect(page.getByTestId('template-item')).toHaveCount(6);
+    await expect(page.getByTestId('template-item')).toHaveCount(7);
     // 確認済みなので「未確認」は出ない
     await expect(page.getByTestId('template-unreviewed')).toHaveCount(0);
     // 戻ってグループの一覧に
@@ -89,7 +89,7 @@ test.describe('5-1 戦型から選ぶ', () => {
     test('戦型から作ったツリーの名前は戦型の名前', async ({ page }) => {
       test.setTimeout(120_000);
       await openNewTree(page);
-      await pickTemplate(page, '青野流');
+      await pickTemplate(page, '青野流（▲5八玉');
       await page.getByTestId('start-normal').click();
       await expect(page.getByRole('heading', { name: '横歩取り 青野流（▲5八玉まで）' })).toBeVisible({ timeout: 30_000 });
       await expect(page.getByTestId('gen-status')).toHaveAttribute('data-phase', /running|done/, { timeout: 60_000 });
@@ -170,9 +170,9 @@ test.describe('5-2 自分で戦型を登録する・配る', () => {
 
     // 「戦型から選ぶ」に、同梱のものと並ぶ（自分で登録の印）
     await page.getByTestId('template-open').click();
-    await expect(page.getByTestId('template-group')).toHaveText(/横歩取り\s*7/);
+    await expect(page.getByTestId('template-group')).toHaveText(/横歩取り\s*8/);
     await page.getByTestId('template-group').click();
-    await expect(page.getByTestId('template-item')).toHaveCount(7);
+    await expect(page.getByTestId('template-item')).toHaveCount(8);
     await expect(page.getByTestId('template-mine')).toHaveCount(1);
     await expect(page.getByTestId('template-item').last()).toContainText('マイ8四飛');
     await expect(page.getByTestId('template-menu')).toHaveCount(1);
@@ -313,7 +313,7 @@ test.describe('5 手直し', () => {
   test('スマホ縦：戦型を選んだ直後、スクロールせずに戦型名が見える（その先へ進めたら「→ △８四飛」）', async ({ page }) => {
     await openNewTree(page);
     await expect(page.getByTestId('template-current')).toHaveCount(0);
-    await pickTemplate(page, '青野流');
+    await pickTemplate(page, '青野流（▲5八玉');
     const current = page.getByTestId('template-current');
     await expect(current).toHaveText('戦型：横歩取り 青野流（▲5八玉まで）');
     await expect(current).toBeInViewport({ ratio: 1 });
@@ -335,7 +335,7 @@ test.describe('5 手直し', () => {
 
   test('同梱の戦型と同じ局面は登録できない。自分で登録したものと同じなら ⋯ から直すよう案内', async ({ page }) => {
     await openNewTree(page);
-    await pickTemplate(page, '青野流');
+    await pickTemplate(page, '青野流（▲5八玉');
     await page.getByTestId('register-template').click();
     await expect(page.getByTestId('template-same')).toHaveText(
       'この局面は「横歩取り 青野流（▲5八玉まで）」として、すでにあります（アプリに入っている戦型）。同じ局面は登録できません。',
@@ -357,7 +357,7 @@ test.describe('5 手直し', () => {
 
   test('登録画面のグループの候補は枠線だけのチップ（「登録する」と見た目を分ける）', async ({ page }) => {
     await openNewTree(page);
-    await pickTemplate(page, '青野流');
+    await pickTemplate(page, '青野流（▲5八玉');
     await page.locator('[data-square="86"]').click();
     await page.locator('[data-square="84"]').click();
     await page.getByTestId('register-template').click();
@@ -378,13 +378,14 @@ test.describe('5 手直し', () => {
     const names = page.getByTestId('template-item').locator('.template-item-name');
     await expect(names).toHaveText([
       '基本図（▲3四飛まで）',
+      '△3三角（後手番）',
       '△3三角型（▲3六飛まで）',
       '△8四飛型・中住まい',
       '青野流（▲5八玉まで）',
       '△4五角戦法',
       '相横歩取り（△7六飛まで）',
     ]);
-    await page.getByTestId('template-item').filter({ hasText: '青野流' }).click();
+    await page.getByTestId('template-item').filter({ hasText: '青野流（▲5八玉' }).click();
     // 盤の上の戦型名・作るときのツリーの名前は元の名前のまま
     await expect(page.getByTestId('template-current')).toHaveText('戦型：横歩取り 青野流（▲5八玉まで）');
     await expect(page.getByTestId('template-note')).toContainText('横歩取り 青野流（▲5八玉まで）');
