@@ -465,3 +465,86 @@ test.describe('7-2 研究手順（スマホ縦 360×740）', () => {
     await expect(page.getByTestId('study-item').filter({ hasText: 'たどれる研究' })).toHaveCount(2);
   });
 });
+
+// ---- 研究手順だけを復習する（2026-11-17） ----
+
+test.describe('研究手順だけを復習する（スマホ縦 360×740）', () => {
+  test.use({ viewport: { width: 360, height: 740 }, hasTouch: true });
+
+  const s1: Study = { id: 's-1', name: '研究1', note: 'メモの 1 行目\n2 行目', moves: ['7g7f', '3c3d', '2g2f', '8c8d'], createdAt: 1, updatedAt: 3 };
+  const s2: Study = { id: 's-2', name: '研究2', note: '', moves: ['2g2f', '8c8d'], createdAt: 1, updatedAt: 2 };
+  const broken: Study = { id: 's-3', name: '途中まで', note: '', moves: ['7g7f', '3c3d', '6g6f', '4c4d'], createdAt: 1, updatedAt: 1 };
+
+  async function play(page: Page, from: string, to: string) {
+    await page.locator(`[data-square="${from}"]`).click();
+    await page.locator(`[data-square="${to}"]`).click();
+  }
+
+  test('復習画面の「研究手順だけ」：相手は研究手順どおり、自分の手番で研究手順の手を答える。終わるとメモを出す', async ({ page }) => {
+    await openHome(page);
+    await importAll(page, [lineTree('rv', '復習するツリー', [s1, s2])]);
+    await page.getByTestId('tree-item').click();
+    await page.getByTestId('review-open').click();
+    await expect(page.getByTestId('review-mode-all')).toHaveAttribute('aria-selected', 'true');
+    await page.getByTestId('review-mode-studies').click();
+    await expect(page).toHaveURL(/#\/review\/rv\/study$/);
+    await expect(page.getByTestId('review-summary')).toContainText('研究手順 2 本・問題 3（まだ 3');
+    const prompt = page.getByTestId('review-prompt');
+    await expect(prompt).toHaveAttribute('data-phase', 'ask');
+    // どちらの研究手順が選ばれても、最後まで答える
+    const opponent = page.getByTestId('review-opponent');
+    if ((await opponent.textContent())?.includes('▲７六歩')) {
+      await play(page, '33', '34');
+      await expect(opponent).toContainText('▲２六歩');
+    }
+    await play(page, '83', '84');
+    await expect(page.getByTestId('review-end')).toContainText('を最後まで答えました');
+    await expect(page.getByTestId('review-next')).toHaveText('次の研究手順へ');
+    await page.getByTestId('review-next').click();
+    await expect(prompt).toHaveAttribute('data-phase', 'ask');
+    // 全部に戻せる
+    await page.getByTestId('review-mode-all').click();
+    await expect(page).toHaveURL(/#\/review\/rv$/);
+    await expect(page.getByTestId('review-summary')).not.toContainText('研究手順');
+  });
+
+  test('1 本だけ（トップ画面の研究手順の ⋯ から）：まちがえたら「もう一度」。終わりに結果とメモ、「もう一度」', async ({ page }) => {
+    await openHome(page);
+    await importAll(page, [lineTree('rv2', '復習するツリー', [s1, s2])]);
+    await page.getByTestId('tab-studies').click();
+    await page.getByTestId('study-item').filter({ hasText: '研究1' }).locator('..').getByTestId('study-menu').click();
+    await page.getByTestId('study-menu-review').click();
+    await expect(page).toHaveURL(/#\/review\/rv2\/study\/s-1$/);
+    await expect(page.getByTestId('review-summary')).toContainText('研究「研究1」だけ・問題 2（まだ 2');
+    await expect(page.getByTestId('review-opponent')).toHaveText('相手は ▲７六歩');
+    await play(page, '33', '34');
+    await expect(page.getByTestId('review-answer')).toContainText('正解！');
+    await expect(page.getByTestId('review-opponent')).toHaveText('相手は ▲２六歩');
+    // まちがえる（△1四歩）→ もう一度 → △8四歩
+    await play(page, '13', '14');
+    await expect(page.getByTestId('review-wrong')).toContainText('△１四歩 ではありません');
+    await page.getByTestId('review-retry').click();
+    await play(page, '83', '84');
+    await expect(page.getByTestId('review-end')).toHaveText('研究「研究1」を最後まで答えました（2 問中 1 問、1 回目で正解）。');
+    await expect(page.getByTestId('review-study-note')).toHaveText('メモの 1 行目\n2 行目');
+    await expect(page.getByTestId('review-prompt')).toBeInViewport();
+    await expect(page.getByTestId('review-next')).toHaveText('もう一度');
+    // 記録：1 問正解・1 問まちがい
+    await expect(page.getByTestId('review-summary')).toContainText('問題 2（まだ 0・前回まちがい 1');
+    await page.getByTestId('review-next').click();
+    await expect(page.getByTestId('review-opponent')).toHaveText('相手は ▲７六歩');
+  });
+
+  test('途中までしかたどれない研究手順は、たどれるところまで出して知らせる。研究手順が無いツリーでは切り替えを出さない', async ({ page }) => {
+    await openHome(page);
+    await importAll(page, [lineTree('rv3', '途中までのツリー', [broken]), lineTree('rv4', '研究なしのツリー')]);
+    await page.goto('./#/review/rv3/study/s-3');
+    await expect(page.getByTestId('review-opponent')).toHaveText('相手は ▲７六歩');
+    await play(page, '33', '34');
+    await expect(page.getByTestId('review-end')).toContainText('研究「途中まで」をたどれるところまで答えました（1 問中 1 問');
+    await expect(page.getByTestId('review-study-broken')).toContainText('4 手のうち 3 手目まで');
+    await page.goto('./#/review/rv4');
+    await expect(page.getByTestId('review-prompt')).toHaveAttribute('data-phase', 'ask');
+    await expect(page.getByTestId('review-mode-all')).toHaveCount(0);
+  });
+});

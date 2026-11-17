@@ -1,7 +1,7 @@
 // トップ画面：新しいツリーを作るボタン、保存してあるツリーの一覧（名前の変更・共有・削除）、ファイルからの取り込み。
 // 段階7-1：ツリーを「戦型のグループ × 自分の側」でまとめる（開閉でき、状態は端末に覚える）。名前で絞り込む。最近開いた 3 件。
 // 段階7-2：「ツリー｜研究手順」の切り替え。研究手順も同じグループでまとめ、タップでそのツリーのその局面を開く。絞り込みは研究手順の名前・メモにも当てる。
-//          研究手順の行の ⋯ から、名前・メモを直す・消す（確認あり）（持ち主の依頼 2026-11-17）。
+//          研究手順の行の ⋯ から、名前・メモを直す・消す（確認あり）（持ち主の依頼 2026-11-17）、この研究手順を復習。
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { Dialog } from '../components/Dialog';
@@ -378,7 +378,10 @@ function StudyMenu({ tree, study, onClose, onDone }: { tree: TreeData; study: St
     <Dialog title={`★ ${study.name}`} onClose={onClose} testId="study-menu-dialog">
       <p class="muted">{tree.name}</p>
       <div class="dialog-actions dialog-actions-column">
-        <button type="button" class="btn btn-primary" data-testid="study-menu-edit" onClick={() => setEditing(true)}>
+        <button type="button" class="btn btn-primary" data-testid="study-menu-review" onClick={() => go(`/review/${tree.id}/study/${study.id}`)}>
+          この研究手順を復習
+        </button>
+        <button type="button" class="btn" data-testid="study-menu-edit" onClick={() => setEditing(true)}>
           名前・メモを直す
         </button>
       </div>

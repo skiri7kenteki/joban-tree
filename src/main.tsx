@@ -32,7 +32,7 @@ function App() {
         {r.name === 'new' && <InputScreen />}
         {r.name === 'tree' && <TreeScreen id={r.id} studyId={r.study} />}
         {r.name === 'settings' && <SettingsScreen />}
-        {r.name === 'review' && <ReviewScreen id={r.id} />}
+        {r.name === 'review' && <ReviewScreen key={r.id} id={r.id} studies={r.studies} study={r.study} />}
       </main>
       <Footer />
     </div>

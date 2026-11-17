@@ -1154,3 +1154,21 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* 復習画面の「全部／研究手順だけ」（トップ画面の切り替えと同じ見た目） */
+.review-modes {
+  display: flex;
+  margin: 0 0 var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-button);
+  overflow: hidden;
+}
+
+/* 研究手順を出し終わったときのメモ（長ければカードの中でスクロール） */
+.review-study-note {
+  max-height: 8em;
+  overflow-y: auto;
+  padding: var(--space-2);
+  border-left: 3px solid var(--color-accent);
+  background: var(--color-bg);
+}
