@@ -170,8 +170,9 @@ describe('JSON（形式 3）', () => {
     const tree = await built();
     const key = keyAfter('7g7f');
     await new TreeGenerator(new MockEngine(script()), tree, settings).explore(key, '8c8d', 500);
-    tree.version = TREE_FORMAT_VERSION;
-    expect(TREE_FORMAT_VERSION).toBe(3);
+    // 形式 3 のファイル（段階6-3 で形式 4 になったが、3 もそのまま読める）
+    tree.version = 3;
+    expect(TREE_FORMAT_VERSION).toBeGreaterThanOrEqual(3);
     const parsed = parseTreeJson(treeToJson(tree));
     expect(parsed.ok && parsed.tree.nodes[key].edges[0]).toMatchObject({ userChosen: true, loss: 80 });
 

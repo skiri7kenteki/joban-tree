@@ -215,6 +215,16 @@
   - 見込み（`pc/bake/estimate.ts`）：終わった往復の相手の局面の数の伸びと、相手の局面 1 つあたりの自分の局面の数から、残りの局面と時間を出す
   - 実行中は PowerShell で `SetThreadExecutionState`（ES_CONTINUOUS | ES_SYSTEM_REQUIRED）を出し続けてスリープを止める
   - できあがり：`ドキュメント\joban-tree-bake\<id>\<id>.v<版>.json`（`{app, kind:'bundled-tree', version:1, bundle:作った条件の記録, tree:TreeData}`）。書き出す前に `checkBundledTree` で点検
+- アプリに入れる（段階6-3）：できあがりを `public/trees/` に置き、`node scripts/bundled-catalog.mjs` で一覧 `src/data/bundled-trees.json` を作り直す。
+  `tests/unit/bundled-trees.test.ts` が、一覧とファイルの一致・点検（合法手・出発点・形・記録）を確かめる
+  - アプリ本体には一覧だけ（`src/tree/bundledCatalog.ts`）。中身は「用意済みのツリーを開く」で取りに行き（`src/app/bundledTrees.ts`）、キャッシュ `joban-tree-trees` に保存（service worker もキャッシュ優先）。
+    `joban-tree-big` に入れない（古いエンジン・評価関数を消す処理が、ほかのファイルも消すため）。事前キャッシュ（precache）にも入れない（json は対象外）
+  - 開くと**利用者のツリーとしてコピー**する（`copyBundledTree`。新しい id、名前は戦型の名前、生成の条件は端末の「ふつう」、`source: {kind:'bundled', id, version, finishedAt}`）。ツリーの形式 4 は `source` を足しただけ
+  - 入力画面：今の局面・自分の側から始まる同梱ツリーがあれば（`bundledFor`）、作るボタンの上に「用意済みのツリーを開く」（色付き・幅いっぱい。そのとき「ふつう」は色無し、説明の行は省く）。
+    `bundledStatus`：コピーが無い→取ってきてコピー、今の版のコピー→いちばん最近使ったコピーを開く（横に「新しくコピー」）、前の版のコピーだけ→「新しい版があります」と、新しいコピーを作る（前のコピーは上書きしない）
+  - 一覧：コピーに「用意済み」、前の版なら「新しい版あり」の印
+  - **同梱ツリーを作り直すときは版を上げて、ファイル名も変える**（`<id>.v<版>.json`。端末に保存した古い版の URL と分けるため。古いファイルは public/trees/ から消してよい）
+- **局面の数の上限（`maxNodes`）は「1 回の生成で増やす数」**（段階6-3〜。`TreeGenerator.run` の開始時の数から数える）
 - `bake.bat` も**英数字だけ**・CRLF
 - 色は CSS 変数（`src/styles/tokens.css`）から使い、直書きしない
 - ユーザーが入力した文字（棋譜・ツリー名）を HTML として解釈させない。`dangerouslySetInnerHTML` は使わない
@@ -232,6 +242,7 @@ src/components/Footer.tsx   バージョンと「気づきを送る」
 src/shogi/                  局面・指し手の小さな関数（tsshogi を包む）、棋譜の貼り付けの読み取り
 src/tree/                   ツリーのデータの形・生成ロジック（モックでテスト）・ラベル・プリセット・KIF 書き出し・JSON の読み書き・戦型テンプレート・同梱ツリーの形と点検（bundled.ts）
 src/data/templates/         同梱の戦型テンプレート（JSON。段階5）
+src/data/bundled-trees.json 同梱ツリーの一覧（段階6-3。scripts/bundled-catalog.mjs が作る）
 src/storage/                IndexedDB への保存（db.ts が開く。trees.ts・review.ts・templates.ts）
 src/review/                 復習モードのロジック（出題の選び方・記録）
 src/bench/                  速度測定ページ
@@ -247,6 +258,7 @@ src/sw.ts                   service worker
 src/styles/                 CSS（tokens.css に色などの変数）
 public/manifest.webmanifest ホーム画面用の設定（アイコンは public/*.png。scripts/make-icons.mjs で icon.svg から作る）
 public/eval/                評価関数（nn.bin・progress.bin・ライセンス。リポジトリに含める）
+public/trees/               同梱ツリー（<id>.v<版>.json。開くときに取りに行く。段階6-3）
 engine/                     やねうら王のビルド（コミット固定・パッチ・build.sh・smoke.mjs、PC 用は build-windows.sh・pc-manifest.mjs）
 tests/unit/                 Vitest（mock-engine.ts が偽物のエンジン）
 e2e/                        Playwright

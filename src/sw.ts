@@ -11,6 +11,7 @@
 //    - それ以外（Vite がハッシュ付きの名前を付ける JS/CSS）は「キャッシュ優先」
 // 3. エンジン（engine/）と評価関数（eval/）は大きいので、最初に使ったときに保存し、以後は「キャッシュ優先」
 //    （URL にバージョンが入っているので、更新は URL が変わることで届く）
+//    同梱ツリー（trees/<id>.v<版>.json。段階6-3）も同じく、開いたときに保存し、以後は「キャッシュ優先」
 
 // このファイルを「モジュール」として扱わせる（下の self の型宣言を、全体の self とぶつけないため）
 export {};
@@ -35,6 +36,8 @@ function hashManifest(): string {
 const APP_CACHE = `joban-tree-app-${hashManifest()}`;
 /** src/engine/config.ts の BIG_CACHE と同じ名前 */
 const BIG_CACHE = 'joban-tree-big';
+/** src/app/bundledTrees.ts の TREES_CACHE と同じ名前 */
+const TREES_CACHE = 'joban-tree-trees';
 
 const scopeUrl = () => new URL(self.registration.scope);
 
@@ -80,6 +83,9 @@ async function handle(request: Request, url: URL): Promise<Response> {
   }
   if (path.startsWith('engine/') || path.startsWith('eval/')) {
     return cacheFirst(request, BIG_CACHE);
+  }
+  if (path.startsWith('trees/')) {
+    return cacheFirst(request, TREES_CACHE);
   }
   // ignoreVary：保存した応答の Vary ヘッダ（Origin・Accept-Encoding など）が、ページからの読み込みと食い違っても使う。
   // URL にハッシュ（版）が入っているので、URL が同じなら中身も同じ。これが無いとオフラインで JS/CSS が読めなかった

@@ -7,14 +7,18 @@
 // v0.12.4：スマホ縦では、盤・持ち駒の行・手順の操作（‹ ›）が、下に固定した作るボタンのバーの上にスクロールせず収まるよう、
 // 盤の大きさを画面の高さに合わせて決める（boardFit.ts。貼り付け欄を開いている間はしない）。
 // 段階5の手直し：戦型の出発点かその先にいるときは、盤の上の案内の行を「戦型：○○」にする（スマホ縦でスクロールしなくても見える）。
+// 段階6-3：同梱ツリー（用意済みのツリー）がある局面・側なら、作るボタンの上に「用意済みのツリーを開く」を大きく出す。
+// 開くとツリー一覧にコピーする（2 回目からはそのコピーを開く。新しい版が出たら知らせて、新しいコピーを作る）。
 
-import { useRef, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { Position, type Move } from 'tsshogi';
 import { Board } from '../components/Board';
 import { PromotionBox, useMoveInput } from '../components/useMoveInput';
 import { parseKifu, type LinePosition } from '../shogi/kifu';
-import { STARTPOS_SFEN, moveText, otherSide, sideToMove, type Side } from '../shogi/position';
-import { saveTree, newTreeId } from '../storage/trees';
+import { STARTPOS_SFEN, moveText, otherSide, sfenKey, sideToMove, type Side } from '../shogi/position';
+import { listTrees, saveTree, newTreeId, type TreeSummary } from '../storage/trees';
+import { bundledStatus, type BundledTreeMeta } from '../tree/bundled';
+import { bundledFor } from '../tree/bundledCatalog';
 import { createTree } from '../tree/generator';
 import { closestTemplate, templateLine, templateRelation, type OpeningTemplate } from '../tree/templates';
 import type { PresetId } from '../tree/presets';
@@ -24,6 +28,7 @@ import { go } from './router';
 import { generationSettingsFor, presetLabel } from './settings';
 import { RegisterTemplateDialog, TemplatePicker, allTemplates } from './TemplateDialogs';
 import { boardFitProps, measureFitAbove, useBoardFit } from './boardFit';
+import { copyBundledToList } from './bundledTrees';
 
 const SIDE_TEXT: Record<Side, string> = { black: '☗先手', white: '☖後手' };
 
@@ -56,6 +61,8 @@ export function InputScreen() {
   // 戦型の出発点なら戦型の名前、その先なら「戦型の名前 → ○○まで」
   const templateName = onTemplate ? (relation === 'at' ? onTemplate.name : `${onTemplate.name} → ${where}`) : null;
   const movesHere = line.slice(1, index + 1).map((p) => p.usi!);
+  // この局面・この側から始まる同梱ツリー（用意済みのツリー）
+  const bundled = bundledFor(sfenKey(current.sfen), mySide);
 
   function moveTo(i: number) {
     setIndex(Math.max(0, Math.min(line.length - 1, i)));
@@ -106,6 +113,41 @@ export function InputScreen() {
   }
 
   const input = useMoveInput(current.sfen, commit);
+
+  /** 端末にあるツリーの一覧（同梱ツリーのコピーがあるかを見るため。同梱ツリーがある局面でだけ読む） */
+  const [savedTrees, setSavedTrees] = useState<TreeSummary[] | null>(null);
+  const [bundledBusy, setBundledBusy] = useState(false);
+  useEffect(() => {
+    if (!bundled) return;
+    let alive = true;
+    listTrees()
+      .then((t) => alive && setSavedTrees(t))
+      .catch(() => alive && setSavedTrees([]));
+    return () => {
+      alive = false;
+    };
+  }, [bundled?.id, bundled?.version]);
+  const status = bundled && savedTrees ? bundledStatus(bundled, savedTrees) : null;
+
+  /** 用意済みのツリーを開く（fresh：コピーがあっても新しくコピーする） */
+  async function openBundled(meta: BundledTreeMeta, fresh: boolean) {
+    if (bundledBusy || !status) return;
+    if (!fresh && status.kind === 'copy') {
+      go(`/tree/${status.treeId}`);
+      return;
+    }
+    setBundledBusy(true);
+    try {
+      const tree = await copyBundledToList(meta);
+      openTree.value = tree;
+      go(`/tree/${tree.id}`);
+    } catch (e) {
+      setMessage(
+        `用意済みのツリーを読み込めませんでした（${e instanceof Error ? e.message : String(e)}）。通信できるところで、もう一度押してください（一度開けば、通信なしでも開けます）。`,
+      );
+      setBundledBusy(false);
+    }
+  }
 
   // スマホ縦：盤・持ち駒の行・手順の操作が、作るボタンのバーの上に収まる盤の幅（成る・成らないの小窓は数えない）
   const boardRef = useRef<HTMLDivElement>(null);
@@ -320,15 +362,27 @@ export function InputScreen() {
 
         {/* 作るボタン：画面の下に固定（ホーム画面アプリでは、下の端のバーを避ける） */}
         <div class="start-bar" ref={barRef} data-testid="start-bar">
-          <p class="start-bar-caption muted">
-            {index === 0 ? '開始局面' : `${index}手目 ${current.text ?? ''}`}から作る（自分は{SIDE_TEXT[mySide]}）
-          </p>
+          {bundled && (
+            <BundledOffer
+              meta={bundled}
+              status={status}
+              busy={bundledBusy}
+              onOpen={(fresh) => void openBundled(bundled, fresh)}
+              onOpenOld={(id) => go(`/tree/${id}`)}
+            />
+          )}
+          {/* 用意済みのツリーがあるときは、作るボタンの説明の行を省く（小さい画面で盤を隠さないため。局面は盤の上、側は下の欄にある） */}
+          {!bundled && (
+            <p class="start-bar-caption muted">
+              {index === 0 ? '開始局面' : `${index}手目 ${current.text ?? ''}`}から作る（自分は{SIDE_TEXT[mySide]}）
+            </p>
+          )}
           <div class="preset-buttons">
             {availablePresets().map((id) => (
               <button
                 type="button"
                 key={id}
-                class={id === 'normal' ? 'btn btn-primary' : 'btn'}
+                class={id === 'normal' && !bundled ? 'btn btn-primary' : 'btn'}
                 data-testid={`start-${id}`}
                 onClick={() => void start(id)}
                 disabled={busy || isGenerating()}
@@ -361,5 +415,54 @@ export function InputScreen() {
         />
       )}
     </>
+  );
+}
+
+/** 作るボタンの上の「用意済みのツリーを開く」（作るボタンより目立たせる。深さ・局面の数・作った日を小さく添える） */
+function BundledOffer({
+  meta,
+  status,
+  busy,
+  onOpen,
+  onOpenOld,
+}: {
+  meta: BundledTreeMeta;
+  status: ReturnType<typeof bundledStatus> | null;
+  busy: boolean;
+  onOpen: (fresh: boolean) => void;
+  onOpenOld: (treeId: string) => void;
+}) {
+  const d = new Date(meta.finishedAt);
+  const facts = `${meta.maxRounds} 往復（${meta.maxRounds * 2} 手先）・${meta.nodeCount.toLocaleString('ja-JP')} 局面・${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()} 作成`;
+  return (
+    <div class="bundled-offer" data-testid="bundled-offer">
+      {status?.kind === 'outdated' && (
+        <p class="bundled-new" data-testid="bundled-new-version">
+          新しい版があります。開くと新しい版をコピーします（前の版のコピーはそのまま残ります）
+        </p>
+      )}
+      <div class="bundled-row">
+        <button type="button" class="btn btn-primary bundled-open" data-testid="bundled-open" disabled={busy || !status} onClick={() => onOpen(false)}>
+          <span class="bundled-open-title">{busy ? '読み込み中…' : '用意済みのツリーを開く'}</span>
+          <span class="bundled-open-facts num" data-testid="bundled-facts">
+            {facts}
+          </span>
+        </button>
+        {status?.kind === 'copy' && (
+          <button type="button" class="btn bundled-copy" data-testid="bundled-copy-again" disabled={busy} onClick={() => onOpen(true)}>
+            新しく
+            <br />
+            コピー
+          </button>
+        )}
+        {status?.kind === 'outdated' && (
+          <button type="button" class="btn bundled-copy" data-testid="bundled-open-old" disabled={busy} onClick={() => onOpenOld(status.treeId)}>
+            前の版
+            <br />
+            を開く
+          </button>
+        )}
+      </div>
+    </div>
   );
 }

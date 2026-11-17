@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { Dialog } from '../components/Dialog';
 import { deleteTree, listTrees, loadTree, newTreeId, saveTree, type TreeSummary } from '../storage/trees';
 import { fileNameOf, parseTreeJson, treeToJson } from '../tree/backup';
+import { latestBundled } from '../tree/bundledCatalog';
 import type { TreeData } from '../tree/types';
 import { generation, isGenerating, openTree, treeVersion } from './generation';
 import { go } from './router';
@@ -96,7 +97,19 @@ export function HomeScreen({ isolationMessage }: { isolationMessage: string | nu
         {trees?.map((t) => (
           <li key={t.id} class="tree-row">
             <button type="button" class="tree-item" data-testid="tree-item" onClick={() => go(`/tree/${t.id}`)}>
-              <span class="tree-item-name">{t.name}</span>
+              <span class="tree-item-title">
+                <span class="tree-item-name">{t.name}</span>
+                {t.source?.kind === 'bundled' && (
+                  <span class="chip chip-small chip-bundled" data-testid="bundled-chip">
+                    用意済み
+                  </span>
+                )}
+                {t.source?.kind === 'bundled' && (latestBundled(t.source.id)?.version ?? 0) > t.source.version && (
+                  <span class="chip chip-small chip-unverified" data-testid="bundled-newer-chip">
+                    新しい版あり
+                  </span>
+                )}
+              </span>
               <span class="tree-item-meta" data-testid="tree-item-position">
                 自分：{t.mySide === 'black' ? '☗先手' : '☖後手'}・{t.prefixText}
               </span>

@@ -126,12 +126,15 @@ export class TreeGenerator {
     const baseRound = isOpponentNode(this.tree, start) ? start.round : start.round + 1;
     this.roundLimit = baseRound + this.settings.maxRounds;
     this.collectFrontier(startKey);
+    // 局面の数の上限は「この 1 回の生成で増やせる数」（段階6-3〜。それまではツリー全体の数だったので、
+    // 大きな同梱ツリーから「ここから展開」できなかった）
+    const baseCount = Object.keys(this.tree.nodes).length;
 
     while (this.queue.length > 0) {
       if (this.stopped) return 'stopped';
       const elapsed = this.now() - this.startedAt;
       if (elapsed >= this.settings.totalMs) return 'time';
-      if (Object.keys(this.tree.nodes).length >= this.settings.maxNodes) return 'nodes';
+      if (Object.keys(this.tree.nodes).length - baseCount >= this.settings.maxNodes) return 'nodes';
 
       const item = this.queue.shift()!;
       this.queued.delete(item.key);

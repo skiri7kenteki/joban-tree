@@ -14,6 +14,8 @@ export interface TreeSummary {
   mySide: TreeData['mySide'];
   /** 開始局面までの最後の数手（例：「…▲２六歩 △３四歩」） */
   prefixText: string;
+  /** 同梱ツリーからコピーしたものなら、その同梱ツリー（段階6-3） */
+  source?: TreeData['source'];
 }
 
 /** ツリーを保存する（同じ id なら上書き） */
@@ -41,6 +43,7 @@ export async function listTrees(): Promise<TreeSummary[]> {
       nodeCount: Object.keys(t.nodes).length,
       mySide: t.mySide,
       prefixText: prefixSummary(t),
+      source: t.source,
     }))
     .sort((a, b) => b.updatedAt - a.updatedAt);
 }

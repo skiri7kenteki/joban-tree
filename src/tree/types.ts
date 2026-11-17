@@ -7,9 +7,10 @@ import type { Side } from '../shogi/position';
 export const TREE_APP = 'joban-tree';
 /**
  * 形式の版。1：段階1〜。2：段階4-3 A〜（局面に「除外した手」excluded を足した）。
- * 3：段階4-3 B〜（自分の手に userChosen・loss を足した）。1・2 の形はそのまま 3 として読める
+ * 3：段階4-3 B〜（自分の手に userChosen・loss を足した）。4：段階6-3〜（ツリーに source を足した）。
+ * 1〜3 の形はそのまま 4 として読める
  */
-export const TREE_FORMAT_VERSION = 3;
+export const TREE_FORMAT_VERSION = 4;
 
 /** 生成の条件（プリセットから決まる） */
 export interface GenerationSettings {
@@ -21,7 +22,7 @@ export interface GenerationSettings {
   multiPV: number;
   /** 深さの上限（自分と相手の往復の数） */
   maxRounds: number;
-  /** 局面の数の上限 */
+  /** 1 回の生成で増やす局面の数の上限（段階6-3〜。それまではツリー全体の局面の数の上限） */
   maxNodes: number;
   /** 最善手から何点以内の応手を採用するか */
   windowCp: number;
@@ -82,6 +83,17 @@ export interface TreeNode {
   excluded?: TreeEdge[];
 }
 
+/** 同梱ツリー（用意済みのツリー）からコピーしたツリーの、元の同梱ツリー（形式 4〜） */
+export interface TreeSource {
+  kind: 'bundled';
+  /** 同梱ツリーの id */
+  id: string;
+  /** コピーした同梱ツリーの版（新しい版が出ても、コピーは上書きしない） */
+  version: number;
+  /** 同梱ツリーを作り終わった日時（ミリ秒） */
+  finishedAt: number;
+}
+
 /** 保存されるツリー全体 */
 export interface TreeData {
   app: typeof TREE_APP;
@@ -103,4 +115,6 @@ export interface TreeData {
   settings: GenerationSettings;
   /** 生成の記録 */
   generation?: { elapsedMs: number; searched: number; finishedReason?: string };
+  /** 同梱ツリーからコピーしたものなら、その同梱ツリー（一覧の「用意済み」の印・新しい版の知らせに使う） */
+  source?: TreeSource;
 }

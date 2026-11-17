@@ -3,7 +3,7 @@
 
 import { applyUsiMove, sfenKey, sideToMove, STARTPOS_SFEN } from '../shogi/position';
 import { isOpponentNode } from './generator';
-import type { GenerationSettings, TreeData, TreeNode } from './types';
+import { TREE_FORMAT_VERSION, type GenerationSettings, type TreeData, type TreeNode } from './types';
 
 export const BUNDLED_TREE_KIND = 'bundled-tree';
 export const BUNDLED_TREE_FILE_VERSION = 1;
@@ -205,4 +205,98 @@ export function checkBundledTree(file: unknown, expectedMoves?: readonly string[
   const mine = unverifiedMine(tree, b.maxRounds);
   if (mine.length > 0) problems.push(`確定していない自分の手が ${mine.length} 個あります`);
   return problems;
+}
+
+// ---------------------------------------------------------------------------
+// アプリで開く（段階6-3）
+
+/** 同梱ツリーの一覧（src/data/bundled-trees.json。scripts/bundled-catalog.mjs が作る）の 1 本分 */
+export interface BundledTreeMeta {
+  id: string;
+  templateId: string;
+  version: number;
+  /** public/trees/ の中のファイル名 */
+  file: string;
+  name: string;
+  mySide: TreeData['mySide'];
+  /** 出発点の局面のキー */
+  rootKey: string;
+  maxRounds: number;
+  nodeCount: number;
+  finishedAt: number;
+  /** ファイルの大きさ（バイト） */
+  bytes: number;
+}
+
+/**
+ * 取ってきた同梱ツリーのファイルを読む。アプリに入れたファイルなので、手の合法性までは見ない
+ * （それは tests/unit/bundled-trees.test.ts で確かめる）。一覧と食い違う・形が違うときは理由を返す
+ */
+export function parseBundledFile(text: string, meta: BundledTreeMeta): BundledTreeFile | string {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(text);
+  } catch {
+    return 'ファイルを JSON として読めませんでした';
+  }
+  const f = raw as Partial<BundledTreeFile> | null;
+  if (!f || f.app !== 'joban-tree' || f.kind !== BUNDLED_TREE_KIND || f.version !== BUNDLED_TREE_FILE_VERSION) {
+    return '用意済みのツリーのファイルではありません';
+  }
+  if (!f.bundle || f.bundle.id !== meta.id || f.bundle.version !== meta.version) return 'ファイルの版が一覧と違います';
+  const tree = f.tree;
+  if (!tree || tree.app !== 'joban-tree' || tree.rootKey !== meta.rootKey || typeof tree.nodes !== 'object' || !tree.nodes || !tree.nodes[tree.rootKey]) {
+    return 'ツリーの中身が壊れています';
+  }
+  return f as BundledTreeFile;
+}
+
+/**
+ * 同梱ツリーを、利用者のツリーとしてコピーする（「ここから展開」などがそのまま使えるよう、普通のツリーと同じ形）。
+ * 生成の条件は端末の「ふつう」（作ったときの条件は 30 日・100 万局面などなので、そのままだと「ここから展開」に使えない）
+ */
+export function copyBundledTree(file: BundledTreeFile, args: { id: string; name: string; now: number; settings: GenerationSettings }): TreeData {
+  const tree = structuredClone(file.tree);
+  return {
+    ...tree,
+    version: TREE_FORMAT_VERSION,
+    id: args.id,
+    name: args.name,
+    createdAt: args.now,
+    updatedAt: args.now,
+    settings: { ...args.settings },
+    source: { kind: 'bundled', id: file.bundle.id, version: file.bundle.version, finishedAt: file.bundle.finishedAt },
+  };
+}
+
+/** 端末にある、その同梱ツリーのコピー（一覧の要約で十分） */
+export interface BundledCopy {
+  id: string;
+  updatedAt: number;
+  source?: TreeData['source'];
+}
+
+/**
+ * 「用意済みのツリーを開く」を押したときにどうするか。
+ * - none：まだコピーが無い → 取ってきてコピーする
+ * - copy：いまの版のコピーがある → それを開く（いちばん最近使ったもの）
+ * - outdated：前の版のコピーだけある → 「新しい版があります」と知らせ、新しい版をコピーする（前のコピーは上書きしない）
+ */
+export type BundledStatus = { kind: 'none' } | { kind: 'copy'; treeId: string } | { kind: 'outdated'; treeId: string; copyVersion: number };
+
+export function bundledStatus(meta: BundledTreeMeta, trees: readonly BundledCopy[]): BundledStatus {
+  const copies = trees
+    .filter((t) => t.source?.kind === 'bundled' && t.source.id === meta.id)
+    .sort((a, b) => b.updatedAt - a.updatedAt);
+  const current = copies.find((t) => t.source!.version === meta.version);
+  if (current) return { kind: 'copy', treeId: current.id };
+  const older = copies.filter((t) => t.source!.version < meta.version).sort((a, b) => b.source!.version - a.source!.version)[0];
+  if (older) return { kind: 'outdated', treeId: older.id, copyVersion: older.source!.version };
+  return { kind: 'none' };
+}
+
+/** 同じ同梱ツリーのコピーの数（2 つ目からは名前に番号を付ける） */
+export function copyName(meta: BundledTreeMeta, trees: readonly BundledCopy[]): string {
+  const n = trees.filter((t) => t.source?.kind === 'bundled' && t.source.id === meta.id).length;
+  return n === 0 ? meta.name : `${meta.name}（${n + 1}）`;
 }

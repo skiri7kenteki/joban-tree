@@ -120,7 +120,7 @@ export function SettingsScreen() {
           testId="good-max"
           onChange={(v) => set({ thresholds: { ...s.thresholds, goodMax: v } })}
         />
-        <NumberField label="局面の数の上限" value={s.maxNodes} unit="局面" testId="max-nodes" onChange={(v) => set({ maxNodes: v })} />
+        <NumberField label="1 回で増やす局面の数の上限" value={s.maxNodes} unit="局面" testId="max-nodes" onChange={(v) => set({ maxNodes: v })} />
         <NumberField
           label="「この手を検証」で調べる時間"
           value={s.verifyMs / 1000}

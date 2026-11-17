@@ -35,8 +35,8 @@ export function parseTreeJson(text: string): ParseResult {
   if (!isNumber(raw.version) || raw.version > TREE_FORMAT_VERSION) {
     return { ok: false, message: 'アプリより新しい形式のファイルです。アプリを最新にしてから読み込んでください。' };
   }
-  // 形式 1〜3 の確認（2 は局面に excluded、3 は自分の手に userChosen・loss が足せるだけなので、古い形もそのまま読める。
-  // 形を変えたときは、ここで古い形から新しい形に直す）
+  // 形式 1〜4 の確認（2 は局面に excluded、3 は自分の手に userChosen・loss、4 はツリーに source が足せるだけなので、
+  // 古い形もそのまま読める。形を変えたときは、ここで古い形から新しい形に直す）
   const problem = checkV1(raw);
   if (problem) return { ok: false, message: `ファイルの中身が壊れています（${problem}）。` };
   return { ok: true, tree: raw as unknown as TreeData };
@@ -53,6 +53,10 @@ function checkV1(t: Record<string, unknown>): string | null {
   }
   if (!Position.newBySFEN(t.prefix.initialSfen)) return '初期局面';
   if (!isObject(t.settings)) return '生成の条件';
+  if (t.source !== undefined) {
+    const s = t.source;
+    if (!isObject(s) || s.kind !== 'bundled' || !isString(s.id) || !isNumber(s.version) || !isNumber(s.finishedAt)) return '用意済みのツリーの記録';
+  }
   if (!isObject(t.nodes)) return '局面';
   for (const [key, node] of Object.entries(t.nodes)) {
     if (!isObject(node) || node.key !== key || !isString(node.sfen) || !isNumber(node.round) || !Array.isArray(node.edges)) {
