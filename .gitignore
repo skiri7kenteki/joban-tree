@@ -13,3 +13,5 @@ playwright-report/
 test-results/
 # 型チェックのキャッシュ
 *.tsbuildinfo
+# 同梱ツリーを作るコマンドをまとめたもの（pc/bake.bat が毎回作る）
+pc/bake/dist/

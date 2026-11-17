@@ -10,18 +10,15 @@
 // - この PC の中（127.0.0.1）からしか接続できない
 // - Host ヘッダが localhost / 127.0.0.1 でなければ断る（よそのサイトからの「DNS の付け替え」対策）
 // - pc-api は合図のヘッダ（X-Joban-Tree）が無いと断る（よそのサイトのページからは付けられない）
-// - 動かすのは、manifest.json に書かれた sha256 と一致したエンジンだけ
+// - 動かすのは、manifest.json に書かれた sha256 と一致したエンジンだけ（engine-files.mjs。PC で同梱用のツリーを作る bake と共通）
 //
 // データ（ツリー）はこのサーバーを通らない。ブラウザの中（この PC の IndexedDB）に保存される。
 
 import { spawn } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import { existsSync } from 'node:fs';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import http from 'node:http';
 import os from 'node:os';
-import path from 'node:path';
 import { Readable } from 'node:stream';
+import { BASE, DATA_DIR, DEFAULT_UPSTREAM, createEngineFiles } from './engine-files.mjs';
 
 // ---- 設定 ----------------------------------------------------------------
 
@@ -34,11 +31,8 @@ const option = (name, fallback) => {
 /** ポート番号。変えると別のサイト扱いになり、保存したツリーが見えなくなるので変えない */
 const PORT = Number(option('--port', '18765'));
 /** アプリの取り寄せ元 */
-const UPSTREAM = option('--upstream', 'https://skiri7kenteki.github.io').replace(/\/$/, '');
-const BASE = '/joban-tree/';
+const UPSTREAM = option('--upstream', DEFAULT_UPSTREAM).replace(/\/$/, '');
 const API = `${BASE}pc-api/`;
-/** エンジンと評価関数を置く場所（例：C:\Users\<名前>\AppData\Local\joban-tree-pc） */
-const DATA_DIR = path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), '.local', 'share'), 'joban-tree-pc');
 const VERSION = 1;
 
 const ALLOWED_HOSTS = new Set([`localhost:${PORT}`, `127.0.0.1:${PORT}`]);
@@ -64,71 +58,9 @@ async function readBody(req, limit = 1_000_000) {
   return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
 }
 
-const sha256 = (buf) => createHash('sha256').update(buf).digest('hex');
+// ---- エンジンと評価関数を PC に用意する（engine-files.mjs） -----------------
 
-// ---- エンジンと評価関数を PC に用意する -----------------------------------
-
-let manifestPromise = null;
-
-/** エンジンの一覧（manifest.json）を取ってくる。ネットにつながらなければ前回の分を使う */
-function loadManifest() {
-  manifestPromise ??= (async () => {
-    const local = path.join(DATA_DIR, 'manifest.json');
-    try {
-      const res = await fetch(`${UPSTREAM}${BASE}pc-engine/manifest.json`, { cache: 'no-store' });
-      if (!res.ok) throw new Error(`manifest.json の取得に失敗（${res.status}）`);
-      const text = await res.text();
-      const manifest = JSON.parse(text);
-      if (manifest.app !== 'joban-tree-pc-engine') throw new Error('manifest.json の形が違います');
-      await mkdir(DATA_DIR, { recursive: true });
-      await writeFile(local, text);
-      return manifest;
-    } catch (error) {
-      if (existsSync(local)) {
-        log('エンジンの一覧を取得できなかったので、前回の分を使います：', error.message);
-        return JSON.parse(await readFile(local, 'utf8'));
-      }
-      manifestPromise = null;
-      throw error;
-    }
-  })();
-  return manifestPromise;
-}
-
-/** 1 つのファイルを用意する（無いか中身が違えば取ってくる。sha256 で確かめる） */
-async function ensureFile(file, dest, onStatus) {
-  if (existsSync(dest) && sha256(await readFile(dest)) === file.sha256) return;
-  onStatus(`${path.basename(dest)} をダウンロード中`);
-  const res = await fetch(`${UPSTREAM}${BASE}${file.path}`);
-  if (!res.ok) throw new Error(`${file.path} の取得に失敗（${res.status}）`);
-  const buf = Buffer.from(await res.arrayBuffer());
-  if (sha256(buf) !== file.sha256) throw new Error(`${file.path} の中身が一覧と一致しません`);
-  await mkdir(path.dirname(dest), { recursive: true });
-  const tmp = `${dest}.download`;
-  await writeFile(tmp, buf);
-  await rename(tmp, dest);
-}
-
-const prepared = new Map();
-
-/** 評価関数ごとに「エンジン本体＋ eval フォルダ」を用意し、そのフォルダを返す */
-function prepareEngine(evalId, onStatus) {
-  if (!prepared.has(evalId)) {
-    const p = (async () => {
-      const manifest = await loadManifest();
-      const entry = manifest.engines?.[evalId];
-      if (!entry) throw new Error(`評価関数 ${evalId} のエンジンがありません`);
-      const dir = path.join(DATA_DIR, manifest.id, evalId);
-      await ensureFile(entry.exe, path.join(dir, 'engine.exe'), onStatus);
-      await ensureFile(entry.nn, path.join(dir, 'eval', 'nn.bin'), onStatus);
-      await ensureFile(entry.progress, path.join(dir, 'eval', 'progress.bin'), onStatus);
-      return { dir, id: manifest.id };
-    })();
-    prepared.set(evalId, p);
-    p.catch(() => prepared.delete(evalId));
-  }
-  return prepared.get(evalId);
-}
+const { prepareEngine } = createEngineFiles({ upstream: UPSTREAM, log });
 
 // ---- エンジンの実行（同時に 1 つだけ） ------------------------------------
 
@@ -152,8 +84,8 @@ function stopCurrent(reason) {
 
 async function startEngine(evalId) {
   stopCurrent('新しく起動するため');
-  const { dir, id } = await prepareEngine(evalId, (text) => log(text));
-  const child = spawn(path.join(dir, 'engine.exe'), [], { cwd: dir, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
+  const { dir, id, exe } = await prepareEngine(evalId, (text) => log(text));
+  const child = spawn(exe, [], { cwd: dir, windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
   try {
     // ほかの作業の邪魔をしないよう、優先度を少し下げる
     os.setPriority(child.pid, os.constants.priority.PRIORITY_BELOW_NORMAL);

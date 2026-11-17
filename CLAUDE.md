@@ -202,6 +202,20 @@
 
 ## コードの方針
 - 初心者が読んで追えること。短い関数＋日本語コメント
+
+## 同梱ツリー（段階6）
+- PC で時間をかけて作ったツリーを、アプリに最初から入れておく。まず「横歩取り △3三角（後手番）」（`yokofu-33kaku-gote`）の 1 本
+- 作るのは `pc/bake.bat` → `pc/bake/main.ts`（Node.js。Vite で `pc/bake/dist/bake.mjs` にまとめて動かす。`npm run bake` も同じ）。ブラウザは使わない
+  - ツリー生成は `src/tree/generator.ts`（TreeGenerator）を**そのまま**使い、`src/engine/engine.ts` の UsiEngine をネイティブの `engine.exe` に直接つなぐ（`pc/bake/nodeEngine.ts`）
+  - エンジンと評価関数の用意は `pc/engine-files.mjs`（`pc/server.mjs` と共通）
+  - 作り方（戦型・版・評価関数・設定）は `pc/bake/specs.ts`。時間と局面の数の上限は付けず、深さの上限まで作りきる
+  - **1 局面調べるたびに** `%LOCALAPPDATA%\joban-tree-pc\bake\<id>\progress.json` に保存（別名で書いてから名前を変える）。同じコマンドで続きから（TreeGenerator の collectFrontier がまだ調べていない局面を拾い直す）。
+    設定が違う途中経過からは続けない（`--fresh` で作り直し、前のものは名前を変えて残す）
+  - 作り終わったら `unverifiedMine`（`src/tree/bundled.ts`）で、自分の局面に確定した手が無いものを点検し、あれば `verify` してその先も作る（`pc/bake/baker.ts`）
+  - 見込み（`pc/bake/estimate.ts`）：終わった往復の相手の局面の数の伸びと、相手の局面 1 つあたりの自分の局面の数から、残りの局面と時間を出す
+  - 実行中は PowerShell で `SetThreadExecutionState`（ES_CONTINUOUS | ES_SYSTEM_REQUIRED）を出し続けてスリープを止める
+  - できあがり：`ドキュメント\joban-tree-bake\<id>\<id>.v<版>.json`（`{app, kind:'bundled-tree', version:1, bundle:作った条件の記録, tree:TreeData}`）。書き出す前に `checkBundledTree` で点検
+- `bake.bat` も**英数字だけ**・CRLF
 - 色は CSS 変数（`src/styles/tokens.css`）から使い、直書きしない
 - ユーザーが入力した文字（棋譜・ツリー名）を HTML として解釈させない。`dangerouslySetInnerHTML` は使わない
 - パスは `import.meta.env.BASE_URL` を基準にする（先頭 `/` の絶対パスはサブパスで壊れる）
@@ -216,7 +230,7 @@ src/components/Board.tsx    将棋盤（SVG）と持ち駒
 src/components/Dialog.tsx   重ねて出す小窓（確認・メニュー）
 src/components/Footer.tsx   バージョンと「気づきを送る」
 src/shogi/                  局面・指し手の小さな関数（tsshogi を包む）、棋譜の貼り付けの読み取り
-src/tree/                   ツリーのデータの形・生成ロジック（モックでテスト）・ラベル・プリセット・KIF 書き出し・JSON の読み書き・戦型テンプレート
+src/tree/                   ツリーのデータの形・生成ロジック（モックでテスト）・ラベル・プリセット・KIF 書き出し・JSON の読み書き・戦型テンプレート・同梱ツリーの形と点検（bundled.ts）
 src/data/templates/         同梱の戦型テンプレート（JSON。段階5）
 src/storage/                IndexedDB への保存（db.ts が開く。trees.ts・review.ts・templates.ts）
 src/review/                 復習モードのロジック（出題の選び方・記録）
@@ -226,7 +240,8 @@ src/engine/engine.ts        エンジンを包むモジュール（コマンド�
 src/engine/yaneuraou.worker.ts  エンジンを動かす Web Worker
 src/engine/config.ts        エンジン・評価関数のファイルの場所
 src/engine/pcEngine.ts      PC 版：pc/server.mjs 経由で Windows 版やねうら王とやり取りする
-pc/                         PC 版（start.bat・server.mjs）
+pc/                         PC 版（start.bat・server.mjs・engine-files.mjs）
+pc/bake/                    同梱ツリーを PC で作るコマンド（bake.bat から。段階6）
 src/isolation.ts            service worker の登録と cross-origin isolated の確保
 src/sw.ts                   service worker
 src/styles/                 CSS（tokens.css に色などの変数）
