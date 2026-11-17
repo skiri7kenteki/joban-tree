@@ -189,7 +189,10 @@ export function InputScreen() {
     setBusy(true);
     const settings = generationSettingsFor(presetId);
     const name = templateName ?? `${where}（自分は${mySide === 'black' ? '先手' : '後手'}）`;
+    // どの戦型から作ったか（段階7-1）：選んだ戦型の上なら、その戦型。そうでなければ、手順がいちばん長く一致する戦型
+    const templateId = onTemplate?.id ?? (line[0].sfen === STARTPOS_SFEN ? closestTemplate(allTemplates(), movesHere)?.id : undefined);
     const tree = createTree({
+      templateId,
       id: newTreeId(),
       name,
       rootSfen: current.sfen,

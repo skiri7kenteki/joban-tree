@@ -105,14 +105,25 @@
   font-variant-numeric: tabular-nums;
 }
 
-button.hand-piece {
-  min-height: var(--touch-min);
-  min-width: var(--touch-min);
+/* タップで打てる持ち駒（段階7-1）：見た目は閲覧画面と同じ小さな札。押せる範囲は札のまわりを含めて高さ 32px
+   （CLAUDE.md の「押せるもの 44px 以上」の例外。持ち主の判断 2026-11-17：低い画面で盤を大きくするため） */
+button.hand-tap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0 2px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
   cursor: pointer;
 }
 
-button.hand-piece.selected {
+button.hand-tap.selected .hand-piece {
   background: var(--color-selected);
+  outline: 2px solid var(--color-accent);
 }
 
 /* スマホ縦向き：盤を画面の幅いっぱいに（左右の余白を最小に） */
@@ -124,14 +135,22 @@ button.hand-piece.selected {
   }
 }
 
-/* 駒をタップできる盤（入力画面・復習画面など）：持ち駒の行は、駒が無いときも駒があるとき（押せる高さ 44px＋上下の余白）と同じ高さ。
+/* 持ち駒の列は小さな札（閲覧画面は v0.7、入力画面・復習画面は段階7-1 から同じ）。
+   駒をタップできる盤（入力画面・復習画面など）の行は、駒が無いときも駒があるとき（押せる高さ 32px）と同じ高さ。
    駒を取った瞬間に行が高くなって、盤の大きさ（画面の高さに合わせて決める。boardFit.ts）が変わらないように（v0.12.4） */
-.hand:not(.compact) {
-  min-height: calc(var(--touch-min) + 2 * var(--space-1));
+.hand.tappable {
+  height: 32px;
+  min-height: 32px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding: 0 var(--space-1);
+  gap: 0;
+  font-size: var(--font-size-small);
+  line-height: 1.3;
 }
 
-/* 閲覧画面（タップで指さない盤）：持ち駒の列を薄くして、候補手リストを上に寄せる */
-.hand.compact {
+.hand.compact,
+.hand.tappable {
   min-height: 24px;
   padding: 0 var(--space-1);
   gap: 2px;
@@ -139,7 +158,8 @@ button.hand-piece.selected {
   line-height: 1.3;
 }
 
-.hand.compact .hand-piece {
+.hand.compact .hand-piece,
+.hand.tappable .hand-piece {
   min-width: 24px;
   min-height: 20px;
   padding: 0 3px;

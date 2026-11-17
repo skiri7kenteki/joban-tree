@@ -265,6 +265,7 @@ export function copyBundledTree(file: BundledTreeFile, args: { id: string; name:
     createdAt: args.now,
     updatedAt: args.now,
     settings: { ...args.settings },
+    templateId: file.bundle.templateId,
     source: { kind: 'bundled', id: file.bundle.id, version: file.bundle.version, finishedAt: file.bundle.finishedAt },
   };
 }

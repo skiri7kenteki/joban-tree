@@ -16,6 +16,9 @@ export interface TreeSummary {
   prefixText: string;
   /** 同梱ツリーからコピーしたものなら、その同梱ツリー（段階6-3） */
   source?: TreeData['source'];
+  /** どの戦型から作ったか・開始局面までの手順（トップ画面のグループ分け。段階7-1） */
+  templateId?: string;
+  prefix: TreeData['prefix'];
 }
 
 /** ツリーを保存する（同じ id なら上書き） */
@@ -44,6 +47,8 @@ export async function listTrees(): Promise<TreeSummary[]> {
       mySide: t.mySide,
       prefixText: prefixSummary(t),
       source: t.source,
+      templateId: t.templateId,
+      prefix: t.prefix,
     }))
     .sort((a, b) => b.updatedAt - a.updatedAt);
 }

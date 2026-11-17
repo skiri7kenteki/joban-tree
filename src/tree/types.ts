@@ -8,9 +8,9 @@ export const TREE_APP = 'joban-tree';
 /**
  * 形式の版。1：段階1〜。2：段階4-3 A〜（局面に「除外した手」excluded を足した）。
  * 3：段階4-3 B〜（自分の手に userChosen・loss を足した）。4：段階6-3〜（ツリーに source を足した）。
- * 1〜3 の形はそのまま 4 として読める
+ * 5：段階7-1〜（ツリーに templateId を足した）。1〜4 の形はそのまま 5 として読める
  */
-export const TREE_FORMAT_VERSION = 4;
+export const TREE_FORMAT_VERSION = 5;
 
 /** 生成の条件（プリセットから決まる） */
 export interface GenerationSettings {
@@ -117,4 +117,9 @@ export interface TreeData {
   generation?: { elapsedMs: number; searched: number; finishedReason?: string };
   /** 同梱ツリーからコピーしたものなら、その同梱ツリー（一覧の「用意済み」の印・新しい版の知らせに使う） */
   source?: TreeSource;
+  /**
+   * どの戦型テンプレートから作ったか（形式 5〜。同梱・自分で登録した戦型の id）。トップ画面のグループ分けに使う。
+   * 無いとき（形式 4 までのツリー・どの戦型にも当てはまらなかったツリー）は、開始局面までの手順から推定する（src/tree/organize.ts）
+   */
+  templateId?: string;
 }

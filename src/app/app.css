@@ -555,6 +555,62 @@
   font-size: var(--font-size-small);
 }
 
+/* 段階7-1：トップ画面の絞り込み・最近開いた・戦型ごとのグループ */
+.home-filter {
+  width: 100%;
+  min-height: var(--touch-min);
+  padding: 0 var(--space-3);
+  margin: 0 0 var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-button);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.tree-group {
+  margin-bottom: var(--space-2);
+}
+
+.tree-group-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--touch-min);
+  padding: 0 var(--space-1);
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  font-weight: bold;
+  text-align: left;
+  cursor: pointer;
+}
+
+.tree-group-head:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.tree-group-caret {
+  width: 1.2em;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-small);
+}
+
+.tree-group-label {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-group-count {
+  color: var(--color-text-muted);
+  font-weight: normal;
+}
+
 /* 一覧の「用意済み」の印 */
 .tree-item-title {
   display: flex;
@@ -802,6 +858,9 @@
   flex: 1 1 0;
   margin-bottom: 0;
   justify-content: center;
+  /* 幅 360 でも「棋譜を貼り付ける」を 1 行に（段階7-1） */
+  padding: 0 var(--space-2);
+  white-space: nowrap;
 }
 
 /* 戦型の一覧（グループ・戦型） */

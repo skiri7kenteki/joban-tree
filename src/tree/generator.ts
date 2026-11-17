@@ -59,6 +59,8 @@ export function createTree(args: {
   prefix: { initialSfen: string; moves: string[] };
   settings: GenerationSettings;
   now: number;
+  /** どの戦型テンプレートから作ったか（段階7-1） */
+  templateId?: string;
 }): TreeData {
   const rootKey = sfenKey(args.rootSfen);
   const isOpp = sideToMove(args.rootSfen) !== args.mySide;
@@ -74,6 +76,7 @@ export function createTree(args: {
     prefix: args.prefix,
     nodes: { [rootKey]: { key: rootKey, sfen: args.rootSfen, round: isOpp ? 0 : -1, edges: [] } },
     settings: args.settings,
+    ...(args.templateId ? { templateId: args.templateId } : {}),
   };
 }
 

@@ -126,7 +126,7 @@ export function Board({ sfen, lastMove, selection, onSquare, onHand }: BoardProp
     );
   }
 
-  // タップで指さない盤は、持ち駒の列を薄くする
+  // 持ち駒の列は、どの盤も小さな札（段階7-1）。タップで打てる盤は、札のまわりも押せる（高さ 32px）
   const compact = !onHand;
   return (
     <div class="board-wrap">
@@ -182,15 +182,15 @@ function HandRow({
   const hand = position.hand(side === 'black' ? Color.BLACK : Color.WHITE);
   const pieces = HAND_ORDER.filter((t) => hand.count(t) > 0);
   return (
-    <div class={compact ? 'hand compact' : 'hand'} data-testid={`hand-${side}`}>
+    <div class={compact ? 'hand compact' : 'hand tappable'} data-testid={`hand-${side}`}>
       <span class="hand-mark">{side === 'black' ? '☗' : '☖'}</span>
       {pieces.length === 0 && <span class="hand-empty">持ち駒なし</span>}
       {pieces.map((t) => {
         const selected = selection?.kind === 'hand' && selection.pieceType === t;
         const label = `${pieceTypeToStringForBoard(t)}${hand.count(t) > 1 ? hand.count(t) : ''}`;
         return onHand ? (
-          <button type="button" key={t} class={selected ? 'hand-piece selected' : 'hand-piece'} onClick={() => onHand(side, t)}>
-            {label}
+          <button type="button" key={t} class={selected ? 'hand-tap selected' : 'hand-tap'} aria-pressed={selected} onClick={() => onHand(side, t)}>
+            <span class="hand-piece">{label}</span>
           </button>
         ) : (
           <span key={t} class="hand-piece">

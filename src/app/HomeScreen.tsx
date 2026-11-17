@@ -1,14 +1,18 @@
 // トップ画面：新しいツリーを作るボタン、保存してあるツリーの一覧（名前の変更・共有・削除）、ファイルからの取り込み。
+// 段階7-1：ツリーを「戦型のグループ × 自分の側」でまとめる（開閉でき、状態は端末に覚える）。名前で絞り込む。最近開いた 3 件。
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { Dialog } from '../components/Dialog';
 import { deleteTree, listTrees, loadTree, newTreeId, saveTree, type TreeSummary } from '../storage/trees';
 import { fileNameOf, parseTreeJson, treeToJson } from '../tree/backup';
 import { latestBundled } from '../tree/bundledCatalog';
+import { RECENT_MIN_TREES, filterByName, groupTrees, normalizeForSearch, recentItems } from '../tree/organize';
 import type { TreeData } from '../tree/types';
 import { generation, isGenerating, openTree, treeVersion } from './generation';
+import { collapsedGroups, forgetOpened, recentOpened, toggleGroup } from './recent';
 import { go } from './router';
 import { OUTCOME_TEXT, shareFile } from './share';
+import { allTemplates, myTemplates, refreshMyTemplates } from './TemplateDialogs';
 
 export function HomeScreen({ isolationMessage }: { isolationMessage: string | null }) {
   const [trees, setTrees] = useState<TreeSummary[] | null>(null);
@@ -21,8 +25,15 @@ export function HomeScreen({ isolationMessage }: { isolationMessage: string | nu
   /** 取り込もうとしたツリーが既にあるとき */
   const [conflict, setConflict] = useState<TreeData | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  /** 名前で絞り込む文字 */
+  const [query, setQuery] = useState('');
   // 生成が進んだら一覧（局面の数）も新しくする
   const version = treeVersion.value;
+  // 自分で登録した戦型も、グループ分けに使う（読み込んだら描き直す）
+  void myTemplates.value;
+  useEffect(() => {
+    if (!myTemplates.value) void refreshMyTemplates().catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     listTrees()
@@ -31,6 +42,12 @@ export function HomeScreen({ isolationMessage }: { isolationMessage: string | nu
   }, [version, reload]);
 
   const running = isGenerating() ? generation.value!.treeId : null;
+  const searching = normalizeForSearch(query) !== '';
+  const groups = trees ? groupTrees(filterByName(trees, query), allTemplates()) : [];
+  // 最近開いた：ツリーが 4 つ以上あり、絞り込んでいないときだけ
+  const recent = trees && !searching && trees.length >= RECENT_MIN_TREES ? recentItems(trees, recentOpened.value) : [];
+  const collapsed = collapsedGroups.value;
+  const rowProps = (t: TreeSummary) => ({ tree: t, running: running === t.id, onMenu: () => void openMenu(t.id) });
 
   async function openMenu(id: string) {
     setMessage('');
@@ -84,6 +101,29 @@ export function HomeScreen({ isolationMessage }: { isolationMessage: string | nu
         </button>
       </div>
 
+      {trees && trees.length > 0 && (
+        <input
+          type="search"
+          class="home-filter"
+          placeholder="名前で絞り込む…"
+          aria-label="名前で絞り込む"
+          data-testid="tree-filter"
+          value={query}
+          onInput={(e) => setQuery((e.target as HTMLInputElement).value)}
+        />
+      )}
+
+      {recent.length > 0 && (
+        <section class="home-recent" data-testid="recent">
+          <h2>最近開いた</h2>
+          <ul class="tree-list">
+            {recent.map((t) => (
+              <TreeRow key={t.id} {...rowProps(t)} testId="recent-item" dateText={`開いた ${formatShortDate(t.openedAt)}`} />
+            ))}
+          </ul>
+        </section>
+      )}
+
       <h2>保存したツリー</h2>
       {error && <p class="status-ng">{error}</p>}
       {message && (
@@ -93,36 +133,42 @@ export function HomeScreen({ isolationMessage }: { isolationMessage: string | nu
       )}
       {trees === null && !error && <p class="muted">読み込み中…</p>}
       {trees?.length === 0 && <p class="muted">まだありません。「新しいツリーを作る」から始めてください。</p>}
-      <ul class="tree-list">
-        {trees?.map((t) => (
-          <li key={t.id} class="tree-row">
-            <button type="button" class="tree-item" data-testid="tree-item" onClick={() => go(`/tree/${t.id}`)}>
-              <span class="tree-item-title">
-                <span class="tree-item-name">{t.name}</span>
-                {t.source?.kind === 'bundled' && (
-                  <span class="chip chip-small chip-bundled" data-testid="bundled-chip">
-                    用意済み
-                  </span>
-                )}
-                {t.source?.kind === 'bundled' && (latestBundled(t.source.id)?.version ?? 0) > t.source.version && (
-                  <span class="chip chip-small chip-unverified" data-testid="bundled-newer-chip">
-                    新しい版あり
-                  </span>
-                )}
+      {searching && groups.length === 0 && (
+        <p class="muted" data-testid="filter-empty">
+          「{query.trim()}」が名前に入っているツリーはありません。
+        </p>
+      )}
+      {groups.map((g) => {
+        // 絞り込んでいる間は、全部のグループを開く
+        const open = searching || !collapsed.includes(g.key);
+        return (
+          <section key={g.key} class="tree-group" data-testid="tree-group" data-key={g.key}>
+            <button
+              type="button"
+              class="tree-group-head"
+              aria-expanded={open}
+              data-testid="tree-group-head"
+              disabled={searching}
+              onClick={() => toggleGroup(g.key)}
+            >
+              <span class="tree-group-caret" aria-hidden="true">
+                {open ? '▼' : '▶'}
               </span>
-              <span class="tree-item-meta" data-testid="tree-item-position">
-                自分：{t.mySide === 'black' ? '☗先手' : '☖後手'}・{t.prefixText}
-              </span>
-              <span class="tree-item-meta num">
-                {formatDate(t.updatedAt)}・{t.nodeCount} 局面{running === t.id ? '・生成中' : ''}
+              <span class="tree-group-label">{g.label}</span>
+              <span class="tree-group-count num" data-testid="tree-group-count">
+                {g.items.length}
               </span>
             </button>
-            <button type="button" class="btn tree-menu-btn" aria-label={`「${t.name}」の操作`} data-testid="tree-menu" onClick={() => void openMenu(t.id)}>
-              ⋯
-            </button>
-          </li>
-        ))}
-      </ul>
+            {open && (
+              <ul class="tree-list">
+                {g.items.map((t) => (
+                  <TreeRow key={t.id} {...rowProps(t)} testId="tree-item" />
+                ))}
+              </ul>
+            )}
+          </section>
+        );
+      })}
 
       <div class="btn-row home-import">
         <button type="button" class="btn" data-testid="import-json" onClick={() => fileRef.current?.click()}>
@@ -187,6 +233,51 @@ export function HomeScreen({ isolationMessage }: { isolationMessage: string | nu
   );
 }
 
+/** ツリーの 1 行（名前・印・自分の側と手順・日付と局面の数・⋯） */
+function TreeRow({
+  tree: t,
+  running,
+  onMenu,
+  testId,
+  dateText,
+}: {
+  tree: TreeSummary;
+  running: boolean;
+  onMenu: () => void;
+  testId: string;
+  /** 日付の欄（初期値は更新日） */
+  dateText?: string;
+}) {
+  return (
+    <li class="tree-row">
+      <button type="button" class="tree-item" data-testid={testId} onClick={() => go(`/tree/${t.id}`)}>
+        <span class="tree-item-title">
+          <span class="tree-item-name">{t.name}</span>
+          {t.source?.kind === 'bundled' && (
+            <span class="chip chip-small chip-bundled" data-testid="bundled-chip">
+              用意済み
+            </span>
+          )}
+          {t.source?.kind === 'bundled' && (latestBundled(t.source.id)?.version ?? 0) > t.source.version && (
+            <span class="chip chip-small chip-unverified" data-testid="bundled-newer-chip">
+              新しい版あり
+            </span>
+          )}
+        </span>
+        <span class="tree-item-meta" data-testid="tree-item-position">
+          自分：{t.mySide === 'black' ? '☗先手' : '☖後手'}・{t.prefixText}
+        </span>
+        <span class="tree-item-meta num">
+          {dateText ?? formatDate(t.updatedAt)}・{t.nodeCount} 局面{running ? '・生成中' : ''}
+        </span>
+      </button>
+      <button type="button" class="btn tree-menu-btn" aria-label={`「${t.name}」の操作`} data-testid="tree-menu" onClick={onMenu}>
+        ⋯
+      </button>
+    </li>
+  );
+}
+
 /** 一覧の ⋯ のメニュー：名前の変更・JSON で共有・削除 */
 function TreeMenu({
   tree,
@@ -225,6 +316,7 @@ function TreeMenu({
 
   async function remove() {
     await deleteTree(tree.id);
+    forgetOpened(tree.id);
     if (openTree.value?.id === tree.id) openTree.value = null;
     onDone(`「${tree.name}」を削除しました`);
   }
@@ -277,4 +369,17 @@ function formatDate(ms: number): string {
   const d = new Date(ms);
   const pad = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** 「今日 14:05」「昨日」「11/17」「2025/11/17」のような短い日付（最近開いた用） */
+function formatShortDate(ms: number, now: number = Date.now()): string {
+  const d = new Date(ms);
+  const today = new Date(now);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const dayStart = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const days = Math.round((dayStart(today) - dayStart(d)) / 86_400_000);
+  if (days === 0) return `今日 ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  if (days === 1) return '昨日';
+  if (d.getFullYear() === today.getFullYear()) return `${d.getMonth() + 1}/${d.getDate()}`;
+  return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
 }

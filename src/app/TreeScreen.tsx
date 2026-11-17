@@ -39,6 +39,7 @@ import {
   stopGeneration,
   treeVersion,
 } from './generation';
+import { markOpened } from './recent';
 import { go } from './router';
 import { generationSettingsFor, presetLabel, settings } from './settings';
 import { OUTCOME_TEXT, copyText, shareFile } from './share';
@@ -48,6 +49,11 @@ import { RegisterTemplateDialog, allTemplates } from './TemplateDialogs';
 export function TreeScreen({ id }: { id: string }) {
   const [error, setError] = useState('');
   const tree = openTree.value?.id === id ? openTree.value : null;
+
+  // 最近開いたツリーとして、端末に記録する（段階7-1）
+  useEffect(() => {
+    markOpened(id);
+  }, [id]);
 
   useEffect(() => {
     if (tree) return;
