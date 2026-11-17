@@ -156,7 +156,7 @@ describe('ツリーに作った戦型を記録する（形式 5）', () => {
     const base = { id: 'x', name: 'x', rootSfen: STARTPOS_SFEN, mySide: 'white' as const, prefix: { initialSfen: STARTPOS_SFEN, moves: [] }, settings: SETTINGS, now: 0 };
     const tree = createTree({ ...base, templateId: 'yokofu-kihon' });
     expect(tree.version).toBe(TREE_FORMAT_VERSION);
-    expect(TREE_FORMAT_VERSION).toBe(5);
+    expect(TREE_FORMAT_VERSION).toBeGreaterThanOrEqual(5);
     expect(tree.templateId).toBe('yokofu-kihon');
     const back = parseTreeJson(treeToJson(tree));
     expect(back.ok && back.tree.templateId).toBe('yokofu-kihon');

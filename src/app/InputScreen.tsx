@@ -16,8 +16,11 @@ import { Board } from '../components/Board';
 import { PromotionBox, useMoveInput } from '../components/useMoveInput';
 import { parseKifu, type LinePosition } from '../shogi/kifu';
 import { STARTPOS_SFEN, moveText, otherSide, sfenKey, sideToMove, type Side } from '../shogi/position';
-import { listTrees, saveTree, newTreeId, type TreeSummary } from '../storage/trees';
-import { bundledStatus, type BundledTreeMeta } from '../tree/bundled';
+import { listTrees, loadTree, saveTree, newTreeId, type TreeSummary } from '../storage/trees';
+import { bundledStatus, type BundledTreeFile, type BundledTreeMeta } from '../tree/bundled';
+import { carryStudies } from '../tree/studies';
+import type { Study } from '../tree/types';
+import { Dialog } from '../components/Dialog';
 import { bundledFor } from '../tree/bundledCatalog';
 import { createTree } from '../tree/generator';
 import { closestTemplate, templateLine, templateRelation, type OpeningTemplate } from '../tree/templates';
@@ -28,7 +31,7 @@ import { go } from './router';
 import { generationSettingsFor, presetLabel } from './settings';
 import { RegisterTemplateDialog, TemplatePicker, allTemplates } from './TemplateDialogs';
 import { boardFitProps, measureFitAbove, useBoardFit } from './boardFit';
-import { copyBundledToList } from './bundledTrees';
+import { copyBundledToList, fetchBundledFile } from './bundledTrees';
 
 const SIDE_TEXT: Record<Side, string> = { black: '☗先手', white: '☖後手' };
 
@@ -117,6 +120,8 @@ export function InputScreen() {
   /** 端末にあるツリーの一覧（同梱ツリーのコピーがあるかを見るため。同梱ツリーがある局面でだけ読む） */
   const [savedTrees, setSavedTrees] = useState<TreeSummary[] | null>(null);
   const [bundledBusy, setBundledBusy] = useState(false);
+  /** 新しい版をコピーするときに、前の版のコピーの研究手順を引き継ぐかを聞いているところ（段階7-2） */
+  const [carry, setCarry] = useState<{ meta: BundledTreeMeta; file: BundledTreeFile; oldName: string; carried: Study[]; lost: Study[] } | null>(null);
   useEffect(() => {
     if (!bundled) return;
     let alive = true;
@@ -138,15 +143,36 @@ export function InputScreen() {
     }
     setBundledBusy(true);
     try {
-      const tree = await copyBundledToList(meta);
-      openTree.value = tree;
-      go(`/tree/${tree.id}`);
+      // 新しい版：前の版のコピーに研究手順があれば、引き継ぐかを聞く（たどれるものだけ引き継げる）
+      if (status.kind === 'outdated') {
+        const old = await loadTree(status.treeId);
+        if (old?.studies && old.studies.length > 0) {
+          const file = await fetchBundledFile(meta);
+          setCarry({ meta, file, oldName: old.name, ...carryStudies(old.studies, file.tree) });
+          setBundledBusy(false);
+          return;
+        }
+      }
+      await finishBundledCopy(meta);
     } catch (e) {
-      setMessage(
-        `用意済みのツリーを読み込めませんでした（${e instanceof Error ? e.message : String(e)}）。通信できるところで、もう一度押してください（一度開けば、通信なしでも開けます）。`,
-      );
-      setBundledBusy(false);
+      bundledFailed(e);
     }
+  }
+
+  /** コピーを作って開く（引き継ぐ研究手順があれば一緒に） */
+  async function finishBundledCopy(meta: BundledTreeMeta, file?: BundledTreeFile, studies?: Study[]) {
+    setBundledBusy(true);
+    const tree = await copyBundledToList(meta, { file, studies });
+    openTree.value = tree;
+    go(`/tree/${tree.id}`);
+  }
+
+  function bundledFailed(e: unknown) {
+    setCarry(null);
+    setMessage(
+      `用意済みのツリーを読み込めませんでした（${e instanceof Error ? e.message : String(e)}）。通信できるところで、もう一度押してください（一度開けば、通信なしでも開けます）。`,
+    );
+    setBundledBusy(false);
   }
 
   // スマホ縦：盤・持ち駒の行・手順の操作が、作るボタンのバーの上に収まる盤の幅（成る・成らないの小窓は数えない）
@@ -396,6 +422,51 @@ export function InputScreen() {
           </div>
         </div>
       </div>
+
+      {carry && (
+        <Dialog title="研究手順を引き継ぎますか？" onClose={() => setCarry(null)} testId="carry-dialog">
+          <p data-testid="carry-summary">
+            前の版のコピー「{carry.oldName}」に研究手順が {carry.carried.length + carry.lost.length} 件あります。
+            新しい版でも手順がたどれる <strong>{carry.carried.length} 件</strong>を引き継げます。
+          </p>
+          {carry.lost.length > 0 && (
+            <p class="muted" data-testid="carry-lost">
+              新しい版ではたどれないもの（{carry.lost.length} 件）：{carry.lost.map((s) => `「${s.name}」`).join('')}（前の版のコピーには残ります）
+            </p>
+          )}
+          <div class="dialog-actions dialog-actions-column">
+            {carry.carried.length > 0 && (
+              <button
+                type="button"
+                class="btn btn-primary"
+                data-testid="carry-yes"
+                onClick={() => {
+                  const c = carry;
+                  setCarry(null);
+                  void finishBundledCopy(c.meta, c.file, c.carried).catch(bundledFailed);
+                }}
+              >
+                引き継いで開く
+              </button>
+            )}
+            <button
+              type="button"
+              class="btn"
+              data-testid="carry-no"
+              onClick={() => {
+                const c = carry;
+                setCarry(null);
+                void finishBundledCopy(c.meta, c.file).catch(bundledFailed);
+              }}
+            >
+              引き継がずに開く
+            </button>
+            <button type="button" class="btn btn-ghost" onClick={() => setCarry(null)}>
+              やめる
+            </button>
+          </div>
+        </Dialog>
+      )}
 
       {pickerOpen && <TemplatePicker onPick={chooseTemplate} onClose={() => setPickerOpen(false)} />}
       {registerOpen && (

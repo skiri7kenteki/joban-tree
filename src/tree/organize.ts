@@ -100,9 +100,37 @@ export function matchesQuery(texts: readonly string[], query: string): boolean {
   return texts.some((t) => normalizeForSearch(t).includes(q));
 }
 
-/** 名前で絞り込む（空なら全部） */
-export function filterByName<T extends Pick<OrganizeItem, 'name'>>(items: readonly T[], query: string): T[] {
-  return items.filter((t) => matchesQuery([t.name], query));
+/** 名前で絞り込む（空なら全部）。研究手順（段階7-2）があれば、その名前とメモにも当てる */
+export function filterByName<T extends Pick<OrganizeItem, 'name'> & { studies?: readonly { name: string; note: string }[] }>(items: readonly T[], query: string): T[] {
+  return items.filter((t) => matchesQuery([t.name, ...(t.studies ?? []).flatMap((s) => [s.name, s.note])], query));
+}
+
+/** 研究手順の一覧の 1 行（どのツリーのものか付き） */
+export interface StudyListItem<S> {
+  study: S;
+  treeId: string;
+  treeName: string;
+}
+
+/**
+ * 研究手順の一覧（段階7-2）：ツリーと同じグループ（戦型 × 自分の側）でまとめ、グループの中は直した日の新しい順。
+ * 絞り込みは、研究手順の名前・メモと、属するツリーの名前に当てる
+ */
+export function groupStudies<T extends OrganizeItem & { studies: readonly { name: string; note: string; updatedAt: number }[] }>(
+  trees: readonly T[],
+  templates: readonly OpeningTemplate[],
+  query: string,
+): TreeGroup<StudyListItem<T['studies'][number]>>[] {
+  return groupTrees(trees, templates)
+    .map((g) => ({
+      key: `study:${g.key}`,
+      label: g.label,
+      items: g.items
+        .flatMap((t) => t.studies.map((study) => ({ study, treeId: t.id, treeName: t.name })))
+        .filter((x) => matchesQuery([x.study.name, x.study.note, x.treeName], query))
+        .sort((a, b) => b.study.updatedAt - a.study.updatedAt),
+    }))
+    .filter((g) => g.items.length > 0);
 }
 
 /** 最近開いた記録（端末にだけ保存する。src/app/recent.ts） */

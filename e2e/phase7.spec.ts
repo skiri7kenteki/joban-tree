@@ -1,7 +1,10 @@
 // 段階7-1：トップ画面を戦型ごとに整理する（グループ・開閉・件数・最近開いた・絞り込み）と、小さな不具合 2 つ
+// 段階7-2：研究手順（閲覧画面で保存 → トップ画面の一覧 → タップでその局面をパンくずリストごと開く → 直す → 消す）
 import { expect, test, type Page } from '@playwright/test';
+import { readFileSync } from 'node:fs';
 import { STARTPOS_SFEN, applyUsiMove, sfenKey, type Side } from '../src/shogi/position';
-import { TREE_APP, TREE_FORMAT_VERSION, type TreeData } from '../src/tree/types';
+import type { BundledTreeFile } from '../src/tree/bundled';
+import { TREE_APP, TREE_FORMAT_VERSION, type Study, type TreeData, type TreeEdge, type TreeNode } from '../src/tree/types';
 
 const YOKOFU = '7g7f 3c3d 2g2f 8c8d 2f2e 8d8e 6i7h 4a3b 2e2d 2c2d 2h2d 8e8f 8g8f 8b8f 2d3d'.split(' ');
 
@@ -145,7 +148,7 @@ test.describe('7-1 トップ画面（スマホ縦 360×740）', () => {
 
     await page.getByTestId('tree-filter').fill('相掛かり');
     await expect(page.getByTestId('tree-item')).toHaveCount(0);
-    await expect(page.getByTestId('filter-empty')).toContainText('「相掛かり」が名前に入っているツリーはありません');
+    await expect(page.getByTestId('filter-empty')).toContainText('「相掛かり」に当てはまるツリーはありません');
 
     // 消すと元どおり（閉じたグループは閉じたまま、最近開いたも出る）
     await page.getByTestId('tree-filter').fill('');
@@ -210,5 +213,210 @@ test.describe('小さな不具合', () => {
     await expect(piece).toHaveAttribute('aria-pressed', 'true');
     await page.locator('[data-square="55"]').click();
     await expect(page.getByTestId('input-position')).toContainText('5手目');
+  });
+});
+
+// ---- 段階7-2：研究手順 ----
+
+/**
+ * 小さなツリー（自分は後手）：
+ *   開始局面 ─▲7六歩─ △3四歩 ─┬▲2六歩─ △8四歩
+ *                              └▲6六歩（自分の手なし）
+ *            ─▲2六歩─ △8四歩
+ */
+function lineTree(id: string, name: string, studies?: Study[]): TreeData {
+  const nodes: Record<string, TreeNode> = {};
+  const put = (sfen: string, round: number) => {
+    const key = sfenKey(sfen);
+    nodes[key] ??= { key, sfen, round, edges: [] };
+    return nodes[key];
+  };
+  const link = (from: TreeNode, move: string, round: number, diff?: number): TreeNode => {
+    const next = applyUsiMove(from.sfen, move)!.sfen;
+    const to = put(next, round);
+    const edge: TreeEdge = { move, to: to.key, score: { kind: 'cp', value: -30 }, ...(diff !== undefined ? { diff } : {}) };
+    from.edges.push(edge);
+    return to;
+  };
+  const root = put(STARTPOS_SFEN, 0);
+  const a = link(root, '7g7f', 0, 0);
+  const c = link(a, '3c3d', 1);
+  const d = link(c, '2g2f', 1, 0);
+  link(d, '8c8d', 2);
+  link(c, '6g6f', 1, 20);
+  const b = link(root, '2g2f', 0, 10);
+  link(b, '8c8d', 1);
+  return {
+    app: TREE_APP,
+    version: TREE_FORMAT_VERSION,
+    id,
+    name,
+    createdAt: 1_700_000_000_000,
+    updatedAt: 1_700_000_000_000,
+    mySide: 'white',
+    rootKey: root.key,
+    prefix: { initialSfen: STARTPOS_SFEN, moves: [] },
+    nodes,
+    settings: { totalMs: 30_000, movetimeMs: 400, multiPV: 3, maxRounds: 3, maxNodes: 3000, windowCp: 300, replyMs: 300, dubiousCp: 150 },
+    ...(studies ? { studies } : {}),
+  };
+}
+
+test.describe('7-2 研究手順（スマホ縦 360×740）', () => {
+  test.use({ viewport: { width: 360, height: 740 }, hasTouch: true });
+
+  test('閲覧画面で保存 → トップ画面の研究手順に出る → タップでその局面がパンくずリストごと開く → メモを直す → 消す', async ({ page }) => {
+    await openHome(page);
+    await importAll(page, [lineTree('line', '研究用ツリー')]);
+    await page.getByTestId('tree-item').click();
+    await expect(page.locator('h1')).toContainText('研究用ツリー');
+    // 開始局面では保存できない
+    await expect(page.getByTestId('study-open')).toBeDisabled();
+
+    // ▲7六歩 △3四歩 ▲2六歩 まで進めて保存
+    const cand = page.getByTestId('candidate');
+    await cand.filter({ hasText: '▲７六歩' }).click();
+    await cand.filter({ hasText: '△３四歩' }).click();
+    await cand.filter({ hasText: '▲２六歩' }).click();
+    await expect(page.getByTestId('crumb')).toHaveText(['▲７六歩', '△３四歩', '▲２六歩']);
+    await expect(page.getByTestId('study-open')).toHaveText('この手順を研究として保存');
+    await page.getByTestId('study-open').click();
+    await expect(page.getByTestId('study-dialog')).toContainText('研究手順として保存');
+    // 名前の初期値は最後の 3 手、メモは空
+    await expect(page.getByTestId('study-name')).toHaveValue('▲７六歩 △３四歩 ▲２六歩');
+    await expect(page.getByTestId('study-note')).toHaveValue('');
+    await page.getByTestId('study-note').fill('狙い：早めに△8四歩\n2 行目のメモ');
+    await page.getByTestId('study-save').click();
+    await expect(page.getByTestId('tree-note')).toContainText('保存しました');
+    // 終わりの局面：候補手の見出しの行に「★ 名前」
+    await expect(page.getByTestId('study-here')).toHaveText('★ ▲７六歩 △３四歩 ▲２六歩');
+    await expect(page.getByTestId('study-open')).toHaveText('研究手順を直す');
+
+    // 開始局面に戻ると、研究手順の手（▲7六歩）にだけ★
+    await page.getByTestId('crumb-start').click();
+    await expect(page.getByTestId('study-here')).toHaveCount(0);
+    await expect(cand.filter({ hasText: '▲７六歩' }).getByTestId('study-star')).toHaveCount(1);
+    await expect(cand.filter({ hasText: '▲２六歩' }).getByTestId('study-star')).toHaveCount(0);
+    // 同じ局面にもう一度来て保存を押すと、新しく作らずに直す画面
+    await cand.filter({ hasText: '▲７六歩' }).click();
+    await cand.filter({ hasText: '△３四歩' }).click();
+    await expect(cand.filter({ hasText: '▲２六歩' }).getByTestId('study-star')).toHaveCount(1);
+    await expect(cand.filter({ hasText: '▲６六歩' }).getByTestId('study-star')).toHaveCount(0);
+    await cand.filter({ hasText: '▲２六歩' }).click();
+    await page.getByTestId('study-open').click();
+    await expect(page.getByTestId('study-dialog')).toContainText('研究手順を直す');
+    await expect(page.getByTestId('study-name')).toHaveValue('▲７六歩 △３四歩 ▲２六歩');
+    await page.getByTestId('study-dialog').getByRole('button', { name: 'やめる' }).click();
+
+    // トップ画面の「研究手順」
+    await page.goto('./');
+    await expect(page.getByTestId('tab-studies')).toContainText('研究手順 1');
+    await page.getByTestId('tab-studies').click();
+    const item = page.getByTestId('study-item');
+    await expect(item).toHaveCount(1);
+    await expect(item).toContainText('▲７六歩 △３四歩 ▲２六歩');
+    await expect(item.getByTestId('study-item-note')).toHaveText('狙い：早めに△8四歩');
+    await expect(item).toContainText('研究用ツリー');
+    await expect(page.getByTestId('tree-group-head')).toHaveText([/その他\s*1/]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+
+    // タップ → そのツリーのその局面（パンくずリストごと）
+    await item.click();
+    await expect(page).toHaveURL(/#\/tree\/line\/study\/s-[\w-]+$/);
+    await expect(page.getByTestId('crumb')).toHaveText(['▲７六歩', '△３四歩', '▲２六歩']);
+    await expect(page.getByTestId('candidate')).toHaveText([/△８四歩/]);
+    // パンくずで戻ったり進んだりもできる
+    await page.getByTestId('crumb').nth(1).click();
+    await expect(page.getByTestId('crumb')).toHaveText(['▲７六歩', '△３四歩']);
+    await page.getByTestId('crumb').nth(1).click();
+    await cand.filter({ hasText: '▲２六歩' }).click();
+
+    // メモを見る → 直す
+    await page.getByTestId('study-here').click();
+    await expect(page.getByTestId('study-view-note')).toHaveText('狙い：早めに△8四歩\n2 行目のメモ');
+    await page.getByTestId('study-edit').click();
+    await page.getByTestId('study-name').fill('早めの△8四歩');
+    await page.getByTestId('study-note').fill('直したメモ');
+    await page.getByTestId('study-save').click();
+    await expect(page.getByTestId('study-here')).toHaveText('★ 早めの△8四歩');
+
+    // トップ画面：直した名前。研究手順の一覧のまま（戻ってきたときも同じ方）。絞り込みは名前・メモに当たる
+    await page.goto('./');
+    await expect(page.getByTestId('tab-studies')).toHaveAttribute('aria-selected', 'true');
+    await expect(item).toContainText('早めの△8四歩');
+    await page.getByTestId('tree-filter').fill('直した');
+    await expect(item).toHaveCount(1);
+    await page.getByTestId('tree-filter').fill('相掛かり');
+    await expect(item).toHaveCount(0);
+    await expect(page.getByTestId('filter-empty')).toContainText('当てはまる研究手順はありません');
+    // ツリーの一覧の絞り込みも、研究手順の名前に当たる
+    await page.getByTestId('tab-trees').click();
+    await page.getByTestId('tree-filter').fill('早めの');
+    await expect(page.getByTestId('tree-item')).toHaveText([/研究用ツリー/]);
+    await page.getByTestId('tree-filter').fill('');
+
+    // 消す（確認あり）
+    await page.getByTestId('tab-studies').click();
+    await item.click();
+    await page.getByTestId('study-here').click();
+    await page.getByTestId('study-delete').click();
+    await expect(page.getByTestId('study-view')).toContainText('この研究手順を消しますか？');
+    await page.getByTestId('study-delete-ok').click();
+    await expect(page.getByTestId('study-here')).toHaveCount(0);
+    await expect(page.getByTestId('tree-note')).toContainText('消しました');
+    // 局面は消えない
+    await expect(page.getByTestId('candidate')).toHaveText([/△８四歩/]);
+    await page.goto('./');
+    await expect(page.getByTestId('studies-empty')).toBeVisible();
+    await expect(page.getByTestId('tab-studies')).toContainText('研究手順 0');
+  });
+
+  test('途中までしかたどれない研究手順：一覧に「途中まで」、開くとたどれるところまで開いて知らせる（消さない）', async ({ page }) => {
+    await openHome(page);
+    const broken: Study = { id: 's-broken', name: '△4四歩の研究', note: '', moves: ['7g7f', '3c3d', '6g6f', '4c4d'], createdAt: 1, updatedAt: 1 };
+    await importAll(page, [lineTree('line2', '取り込んだツリー', [broken])]);
+    await page.getByTestId('tab-studies').click();
+    await expect(page.getByTestId('study-item').getByTestId('study-broken')).toHaveText('途中まで');
+    await page.getByTestId('study-item').click();
+    await expect(page.getByTestId('crumb')).toHaveText(['▲７六歩', '△３四歩', '▲６六歩']);
+    await expect(page.getByTestId('tree-note')).toContainText('途中までしかたどれません（4 手のうち 3 手目まで）');
+  });
+
+  test('用意済みのツリーの新しい版：前の版のコピーの研究手順のうち、たどれるものを引き継げる（たどれないものの数と名前を知らせる）', async ({ page }) => {
+    await openHome(page);
+    const file = JSON.parse(readFileSync(new URL('../public/trees/yokofu-33kaku-gote.v1.json', import.meta.url), 'utf8')) as BundledTreeFile;
+    const root = file.tree.nodes[file.tree.rootKey];
+    const first = root.edges[0];
+    const reply = file.tree.nodes[first.to].edges[0];
+    const old = {
+      ...file.tree,
+      version: TREE_FORMAT_VERSION,
+      id: 'old-copy',
+      name: '前の版のコピー',
+      source: { kind: 'bundled', id: file.bundle.id, version: 0, finishedAt: 1 },
+      studies: [
+        { id: 's-ok', name: 'たどれる研究', note: 'メモ', moves: [first.move, reply.move], createdAt: 1, updatedAt: 1 },
+        { id: 's-ng', name: 'たどれない研究', note: '', moves: [first.move, '1c1d'], createdAt: 2, updatedAt: 2 },
+      ],
+    };
+    await page.getByTestId('import-file').setInputFiles({ name: 'old.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(old)) });
+    await expect(page.getByTestId('home-message')).toContainText('取り込みました');
+    await page.getByTestId('new-tree').click();
+    await page.getByTestId('template-open').click();
+    await page.getByTestId('template-group').filter({ hasText: '横歩取り' }).click();
+    await page.getByTestId('template-item').filter({ hasText: '△3三角（後手番）' }).click();
+    await page.getByTestId('bundled-open').click();
+    await expect(page.getByTestId('carry-summary')).toContainText('研究手順が 2 件');
+    await expect(page.getByTestId('carry-summary')).toContainText('1 件');
+    await expect(page.getByTestId('carry-lost')).toContainText('「たどれない研究」');
+    await page.getByTestId('carry-yes').click();
+    await expect(page).toHaveURL(/#\/tree\/[\w-]+$/);
+    expect(page.url()).not.toMatch(/old-copy/);
+    await expect(page.getByTestId('candidate').first().getByTestId('study-star')).toHaveCount(1);
+    // トップ画面：前の版のコピーに 2 件（そのまま）、新しいコピーに 1 件
+    await page.goto('./');
+    await page.getByTestId('tab-studies').click();
+    await expect(page.getByTestId('study-item')).toHaveCount(3);
+    await expect(page.getByTestId('study-item').filter({ hasText: 'たどれる研究' })).toHaveCount(2);
   });
 });

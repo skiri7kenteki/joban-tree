@@ -30,7 +30,7 @@ function App() {
       <main class="main">
         {r.name === 'home' && <HomeScreen isolationMessage={isolationMessage(isolation)} />}
         {r.name === 'new' && <InputScreen />}
-        {r.name === 'tree' && <TreeScreen id={r.id} />}
+        {r.name === 'tree' && <TreeScreen id={r.id} studyId={r.study} />}
         {r.name === 'settings' && <SettingsScreen />}
         {r.name === 'review' && <ReviewScreen id={r.id} />}
       </main>

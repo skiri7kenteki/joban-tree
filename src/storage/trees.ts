@@ -1,6 +1,7 @@
 // ツリーを端末の中（IndexedDB）に保存する。データは端末の外へは送らない。
 
 import { prefixSummary } from '../tree/browse';
+import { traceStudy } from '../tree/studies';
 import type { TreeData } from '../tree/types';
 import { REVIEW, TREES, done, finished, openDb } from './db';
 
@@ -19,6 +20,18 @@ export interface TreeSummary {
   /** どの戦型から作ったか・開始局面までの手順（トップ画面のグループ分け。段階7-1） */
   templateId?: string;
   prefix: TreeData['prefix'];
+  /** 研究手順（段階7-2。一覧に出す分と、最後までたどれるか） */
+  studies: StudySummary[];
+}
+
+export interface StudySummary {
+  id: string;
+  name: string;
+  note: string;
+  updatedAt: number;
+  /** 手順の手の数・たどれた手の数 */
+  total: number;
+  reached: number;
 }
 
 /** ツリーを保存する（同じ id なら上書き） */
@@ -49,6 +62,10 @@ export async function listTrees(): Promise<TreeSummary[]> {
       source: t.source,
       templateId: t.templateId,
       prefix: t.prefix,
+      studies: (t.studies ?? []).map((s) => {
+        const trace = traceStudy(t, s.moves);
+        return { id: s.id, name: s.name, note: s.note, updatedAt: s.updatedAt, total: s.moves.length, reached: trace.reached };
+      }),
     }))
     .sort((a, b) => b.updatedAt - a.updatedAt);
 }

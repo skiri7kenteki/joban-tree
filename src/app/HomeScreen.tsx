@@ -1,15 +1,17 @@
 // トップ画面：新しいツリーを作るボタン、保存してあるツリーの一覧（名前の変更・共有・削除）、ファイルからの取り込み。
 // 段階7-1：ツリーを「戦型のグループ × 自分の側」でまとめる（開閉でき、状態は端末に覚える）。名前で絞り込む。最近開いた 3 件。
+// 段階7-2：「ツリー｜研究手順」の切り替え。研究手順も同じグループでまとめ、タップでそのツリーのその局面を開く。絞り込みは研究手順の名前・メモにも当てる。
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { Dialog } from '../components/Dialog';
-import { deleteTree, listTrees, loadTree, newTreeId, saveTree, type TreeSummary } from '../storage/trees';
+import { deleteTree, listTrees, loadTree, newTreeId, saveTree, type StudySummary, type TreeSummary } from '../storage/trees';
 import { fileNameOf, parseTreeJson, treeToJson } from '../tree/backup';
 import { latestBundled } from '../tree/bundledCatalog';
-import { RECENT_MIN_TREES, filterByName, groupTrees, normalizeForSearch, recentItems } from '../tree/organize';
+import { RECENT_MIN_TREES, filterByName, groupStudies, groupTrees, normalizeForSearch, recentItems, type TreeGroup } from '../tree/organize';
+import { firstLine } from '../tree/studies';
 import type { TreeData } from '../tree/types';
 import { generation, isGenerating, openTree, treeVersion } from './generation';
-import { collapsedGroups, forgetOpened, recentOpened, toggleGroup } from './recent';
+import { collapsedGroups, forgetOpened, homeTab, recentOpened, setHomeTab, toggleGroup } from './recent';
 import { go } from './router';
 import { OUTCOME_TEXT, shareFile } from './share';
 import { allTemplates, myTemplates, refreshMyTemplates } from './TemplateDialogs';
@@ -43,7 +45,10 @@ export function HomeScreen({ isolationMessage }: { isolationMessage: string | nu
 
   const running = isGenerating() ? generation.value!.treeId : null;
   const searching = normalizeForSearch(query) !== '';
+  const tab = homeTab.value;
   const groups = trees ? groupTrees(filterByName(trees, query), allTemplates()) : [];
+  const studyGroups = trees ? groupStudies(trees, allTemplates(), query) : [];
+  const studyCount = trees?.reduce((n, t) => n + t.studies.length, 0) ?? 0;
   // 最近開いた：ツリーが 4 つ以上あり、絞り込んでいないときだけ
   const recent = trees && !searching && trees.length >= RECENT_MIN_TREES ? recentItems(trees, recentOpened.value) : [];
   const collapsed = collapsedGroups.value;
@@ -102,29 +107,41 @@ export function HomeScreen({ isolationMessage }: { isolationMessage: string | nu
       </div>
 
       {trees && trees.length > 0 && (
-        <input
-          type="search"
-          class="home-filter"
-          placeholder="名前で絞り込む…"
-          aria-label="名前で絞り込む"
-          data-testid="tree-filter"
-          value={query}
-          onInput={(e) => setQuery((e.target as HTMLInputElement).value)}
-        />
+        <>
+          <div class="home-tabs" role="tablist" aria-label="一覧の切り替え">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'trees'}
+              class={tab === 'trees' ? 'home-tab on' : 'home-tab'}
+              data-testid="tab-trees"
+              onClick={() => setHomeTab('trees')}
+            >
+              ツリー <span class="num">{trees.length}</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={tab === 'studies'}
+              class={tab === 'studies' ? 'home-tab on' : 'home-tab'}
+              data-testid="tab-studies"
+              onClick={() => setHomeTab('studies')}
+            >
+              研究手順 <span class="num">{studyCount}</span>
+            </button>
+          </div>
+          <input
+            type="search"
+            class="home-filter"
+            placeholder={tab === 'trees' ? '名前で絞り込む…（研究手順の名前・メモも）' : '名前・メモで絞り込む…'}
+            aria-label="名前で絞り込む"
+            data-testid="tree-filter"
+            value={query}
+            onInput={(e) => setQuery((e.target as HTMLInputElement).value)}
+          />
+        </>
       )}
 
-      {recent.length > 0 && (
-        <section class="home-recent" data-testid="recent">
-          <h2>最近開いた</h2>
-          <ul class="tree-list">
-            {recent.map((t) => (
-              <TreeRow key={t.id} {...rowProps(t)} testId="recent-item" dateText={`開いた ${formatShortDate(t.openedAt)}`} />
-            ))}
-          </ul>
-        </section>
-      )}
-
-      <h2>保存したツリー</h2>
       {error && <p class="status-ng">{error}</p>}
       {message && (
         <p class="muted" role="status" data-testid="home-message">
@@ -133,42 +150,55 @@ export function HomeScreen({ isolationMessage }: { isolationMessage: string | nu
       )}
       {trees === null && !error && <p class="muted">読み込み中…</p>}
       {trees?.length === 0 && <p class="muted">まだありません。「新しいツリーを作る」から始めてください。</p>}
-      {searching && groups.length === 0 && (
-        <p class="muted" data-testid="filter-empty">
-          「{query.trim()}」が名前に入っているツリーはありません。
-        </p>
-      )}
-      {groups.map((g) => {
-        // 絞り込んでいる間は、全部のグループを開く
-        const open = searching || !collapsed.includes(g.key);
-        return (
-          <section key={g.key} class="tree-group" data-testid="tree-group" data-key={g.key}>
-            <button
-              type="button"
-              class="tree-group-head"
-              aria-expanded={open}
-              data-testid="tree-group-head"
-              disabled={searching}
-              onClick={() => toggleGroup(g.key)}
-            >
-              <span class="tree-group-caret" aria-hidden="true">
-                {open ? '▼' : '▶'}
-              </span>
-              <span class="tree-group-label">{g.label}</span>
-              <span class="tree-group-count num" data-testid="tree-group-count">
-                {g.items.length}
-              </span>
-            </button>
-            {open && (
+
+      {tab === 'trees' || !trees || trees.length === 0 ? (
+        <>
+          {recent.length > 0 && (
+            <section class="home-recent" data-testid="recent">
+              <h2>最近開いた</h2>
               <ul class="tree-list">
-                {g.items.map((t) => (
-                  <TreeRow key={t.id} {...rowProps(t)} testId="tree-item" />
+                {recent.map((t) => (
+                  <TreeRow key={t.id} {...rowProps(t)} testId="recent-item" dateText={`開いた ${formatShortDate(t.openedAt)}`} />
                 ))}
               </ul>
-            )}
-          </section>
-        );
-      })}
+            </section>
+          )}
+
+          {trees && trees.length > 0 && <h2>保存したツリー</h2>}
+          {searching && groups.length === 0 && (
+            <p class="muted" data-testid="filter-empty">
+              「{query.trim()}」に当てはまるツリーはありません。
+            </p>
+          )}
+          {groups.map((g) => (
+            <GroupSection key={g.key} group={g} open={searching || !collapsed.includes(g.key)} searching={searching}>
+              {g.items.map((t) => (
+                <TreeRow key={t.id} {...rowProps(t)} testId="tree-item" />
+              ))}
+            </GroupSection>
+          ))}
+        </>
+      ) : (
+        <>
+          {studyCount === 0 && (
+            <p class="muted" data-testid="studies-empty">
+              研究手順はまだありません。ツリーの閲覧画面で、気になる局面まで進めて「この手順を研究として保存」を押すと、ここに出ます。
+            </p>
+          )}
+          {searching && studyCount > 0 && studyGroups.length === 0 && (
+            <p class="muted" data-testid="filter-empty">
+              「{query.trim()}」に当てはまる研究手順はありません。
+            </p>
+          )}
+          {studyGroups.map((g) => (
+            <GroupSection key={g.key} group={g} open={searching || !collapsed.includes(g.key)} searching={searching}>
+              {g.items.map((x) => (
+                <StudyRow key={x.study.id} study={x.study} treeId={x.treeId} treeName={x.treeName} />
+              ))}
+            </GroupSection>
+          ))}
+        </>
+      )}
 
       <div class="btn-row home-import">
         <button type="button" class="btn" data-testid="import-json" onClick={() => fileRef.current?.click()}>
@@ -230,6 +260,61 @@ export function HomeScreen({ isolationMessage }: { isolationMessage: string | nu
         </Dialog>
       )}
     </>
+  );
+}
+
+/** グループ（見出しの ▼／▶・名前・件数と、開いていれば中身） */
+function GroupSection<T>({ group: g, open, searching, children }: { group: TreeGroup<T>; open: boolean; searching: boolean; children: preact.ComponentChildren }) {
+  return (
+    <section class="tree-group" data-testid="tree-group" data-key={g.key}>
+      <button
+        type="button"
+        class="tree-group-head"
+        aria-expanded={open}
+        data-testid="tree-group-head"
+        disabled={searching}
+        onClick={() => toggleGroup(g.key)}
+      >
+        <span class="tree-group-caret" aria-hidden="true">
+          {open ? '▼' : '▶'}
+        </span>
+        <span class="tree-group-label">{g.label}</span>
+        <span class="tree-group-count num" data-testid="tree-group-count">
+          {g.items.length}
+        </span>
+      </button>
+      {open && <ul class="tree-list">{children}</ul>}
+    </section>
+  );
+}
+
+/** 研究手順の 1 行（名前・メモの最初の 1 行・属するツリーの名前・日付）。タップでそのツリーのその局面を開く */
+function StudyRow({ study, treeId, treeName }: { study: StudySummary; treeId: string; treeName: string }) {
+  const note = firstLine(study.note);
+  return (
+    <li class="tree-row">
+      <button type="button" class="tree-item" data-testid="study-item" onClick={() => go(`/tree/${treeId}/study/${study.id}`)}>
+        <span class="tree-item-title">
+          <span class="study-star" aria-hidden="true">
+            ★
+          </span>
+          <span class="tree-item-name">{study.name}</span>
+          {study.reached < study.total && (
+            <span class="chip chip-small chip-unverified" data-testid="study-broken">
+              途中まで
+            </span>
+          )}
+        </span>
+        {note && (
+          <span class="tree-item-meta study-item-note" data-testid="study-item-note">
+            {note}
+          </span>
+        )}
+        <span class="tree-item-meta">
+          {treeName}・{formatShortDate(study.updatedAt)}
+        </span>
+      </button>
+    </li>
   );
 }
 

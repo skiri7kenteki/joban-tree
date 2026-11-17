@@ -2,20 +2,21 @@
 //   #/           … 一覧（トップ）
 //   #/new        … 新しいツリー（局面の入力）
 //   #/tree/<id>  … ツリーの閲覧
+//   #/tree/<id>/study/<研究手順の id> … ツリーの閲覧（研究手順の終わりの局面を、パンくずリストごと開く。段階7-2）
 //   #/settings   … 設定
 //   #/review/<id> … 復習モード
 
 import { signal } from '@preact/signals';
 
-export type Route = { name: 'home' } | { name: 'new' } | { name: 'settings' } | { name: 'tree'; id: string }
+export type Route = { name: 'home' } | { name: 'new' } | { name: 'settings' } | { name: 'tree'; id: string; study?: string }
   | { name: 'review'; id: string };
 
 function parse(hash: string): Route {
   const path = hash.replace(/^#/, '');
   if (path === '/new') return { name: 'new' };
   if (path === '/settings') return { name: 'settings' };
-  const tree = /^\/tree\/([\w-]+)$/.exec(path);
-  if (tree) return { name: 'tree', id: tree[1] };
+  const tree = /^\/tree\/([\w-]+)(?:\/study\/([\w-]+))?$/.exec(path);
+  if (tree) return tree[2] ? { name: 'tree', id: tree[1], study: tree[2] } : { name: 'tree', id: tree[1] };
   const review = /^\/review\/([\w-]+)$/.exec(path);
   if (review) return { name: 'review', id: review[1] };
   return { name: 'home' };

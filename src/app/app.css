@@ -1079,3 +1079,78 @@
     --board-bleed: var(--space-3);
   }
 }
+
+/* 段階7-2：研究手順 */
+/* 研究手順の上の候補手の印 */
+.study-star {
+  color: var(--color-accent);
+  font-size: var(--font-size-small);
+  margin-right: 2px;
+}
+
+/* 研究手順の終わりの局面：候補手の見出しの行に「★ 名前」（行の高さを変えずに、押せる範囲は上下に広げる） */
+.study-here {
+  min-width: 0;
+  margin: -8px -8px -8px 0;
+  padding: 8px 8px;
+  border: none;
+  background: transparent;
+  color: var(--color-accent);
+  font: inherit;
+  font-size: var(--font-size-small);
+  font-weight: bold;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.study-note {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.study-moves {
+  overflow-wrap: anywhere;
+}
+
+.study-note-input {
+  width: 100%;
+  resize: vertical;
+}
+
+/* トップ画面の「ツリー｜研究手順」の切り替え（段階7-2） */
+.home-tabs {
+  display: flex;
+  margin: 0 0 var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-button);
+  overflow: hidden;
+}
+
+.home-tab {
+  flex: 1 1 0;
+  min-height: var(--touch-min);
+  border: none;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.home-tab + .home-tab {
+  border-left: 1px solid var(--color-border);
+}
+
+.home-tab.on {
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+  font-weight: bold;
+}
+
+.study-item-note {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

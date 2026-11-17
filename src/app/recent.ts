@@ -7,6 +7,7 @@ import { addRecent, type RecentEntry } from '../tree/organize';
 
 const RECENT_KEY = 'joban-tree.recent';
 const COLLAPSED_KEY = 'joban-tree.home-collapsed';
+const TAB_KEY = 'joban-tree.home-tab';
 
 function read<T>(key: string, fallback: T, check: (v: unknown) => v is T): T {
   try {
@@ -50,6 +51,16 @@ export function forgetOpened(id: string): void {
 
 /** 閉じているグループの key（初めては全部開いている） */
 export const collapsedGroups = signal<string[]>(hasStorage ? read(COLLAPSED_KEY, [], isStrings) : []);
+
+/** トップ画面の「ツリー｜研究手順」のどちらを見ているか（段階7-2。研究手順を開いて戻ったときも同じ方を出す） */
+export type HomeTab = 'trees' | 'studies';
+const isTab = (v: unknown): v is HomeTab => v === 'trees' || v === 'studies';
+export const homeTab = signal<HomeTab>(hasStorage ? read(TAB_KEY, 'trees', isTab) : 'trees');
+
+export function setHomeTab(tab: HomeTab): void {
+  homeTab.value = tab;
+  write(TAB_KEY, tab);
+}
 
 export function toggleGroup(key: string): void {
   const now = collapsedGroups.value;

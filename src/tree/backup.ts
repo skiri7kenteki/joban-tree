@@ -35,7 +35,7 @@ export function parseTreeJson(text: string): ParseResult {
   if (!isNumber(raw.version) || raw.version > TREE_FORMAT_VERSION) {
     return { ok: false, message: 'アプリより新しい形式のファイルです。アプリを最新にしてから読み込んでください。' };
   }
-  // 形式 1〜5 の確認（2 は局面に excluded、3 は自分の手に userChosen・loss、4 はツリーに source、5 は templateId が足せるだけなので、
+  // 形式 1〜6 の確認（2 は局面に excluded、3 は自分の手に userChosen・loss、4 はツリーに source、5 は templateId、6 は studies が足せるだけなので、
   // 古い形もそのまま読める。形を変えたときは、ここで古い形から新しい形に直す）
   const problem = checkV1(raw);
   if (problem) return { ok: false, message: `ファイルの中身が壊れています（${problem}）。` };
@@ -54,6 +54,14 @@ function checkV1(t: Record<string, unknown>): string | null {
   if (!Position.newBySFEN(t.prefix.initialSfen)) return '初期局面';
   if (!isObject(t.settings)) return '生成の条件';
   if (t.templateId !== undefined && (!isString(t.templateId) || t.templateId.length > 200)) return '戦型';
+  if (t.studies !== undefined) {
+    // 研究手順：形だけ確かめる（たどれない手順があってもよい。画面で「途中までしかたどれません」と出す）
+    if (!Array.isArray(t.studies)) return '研究手順';
+    for (const s of t.studies as unknown[]) {
+      if (!isObject(s) || !isString(s.id) || !isString(s.name) || !isString(s.note) || !isNumber(s.createdAt) || !isNumber(s.updatedAt)) return '研究手順';
+      if (!Array.isArray(s.moves) || !s.moves.every(isString)) return `研究手順「${s.name}」の手順`;
+    }
+  }
   if (t.source !== undefined) {
     const s = t.source;
     if (!isObject(s) || s.kind !== 'bundled' || !isString(s.id) || !isNumber(s.version) || !isNumber(s.finishedAt)) return '用意済みのツリーの記録';

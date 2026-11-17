@@ -4,7 +4,7 @@
 
 import { listTrees, newTreeId, saveTree } from '../storage/trees';
 import { copyBundledTree, copyName, parseBundledFile, type BundledTreeFile, type BundledTreeMeta } from '../tree/bundled';
-import type { TreeData } from '../tree/types';
+import type { Study, TreeData } from '../tree/types';
 import { generationSettingsFor } from './settings';
 
 /** src/sw.ts の TREES_CACHE と同じ名前（エンジン用の joban-tree-big とは分ける：あちらは古い版を消す処理があるため） */
@@ -39,15 +39,19 @@ export async function fetchBundledFile(meta: BundledTreeMeta): Promise<BundledTr
   return parsed;
 }
 
-/** 同梱ツリーを取ってきて、新しいコピーとして保存する（生成の条件は端末の「ふつう」） */
-export async function copyBundledToList(meta: BundledTreeMeta): Promise<TreeData> {
-  const file = await fetchBundledFile(meta);
+/**
+ * 同梱ツリーを取ってきて、新しいコピーとして保存する（生成の条件は端末の「ふつう」）。
+ * studies：前の版のコピーから引き継ぐ研究手順（段階7-2。新しい版でたどれるものだけ渡す）
+ */
+export async function copyBundledToList(meta: BundledTreeMeta, opts: { file?: BundledTreeFile; studies?: readonly Study[] } = {}): Promise<TreeData> {
+  const file = opts.file ?? (await fetchBundledFile(meta));
   const tree = copyBundledTree(file, {
     id: newTreeId(),
     name: copyName(meta, await listTrees()),
     now: Date.now(),
     settings: generationSettingsFor('normal'),
   });
+  if (opts.studies && opts.studies.length > 0) tree.studies = opts.studies.map((s) => ({ ...s, moves: [...s.moves] }));
   await saveTree(tree);
   return tree;
 }
