@@ -14,6 +14,7 @@ import { SettingsScreen } from './app/SettingsScreen';
 import { ReviewScreen } from './app/ReviewScreen';
 import { StudyScreen } from './app/StudyScreen';
 import { StudyReviewScreen } from './app/StudyReviewScreen';
+import { StudyKifImportScreen } from './app/StudyKifImportScreen';
 
 function App() {
   const [isolation, setIsolation] = useState<IsolationState | 'checking'>('checking');
@@ -34,6 +35,7 @@ function App() {
         {r.name === 'new' && <InputScreen key={r.study ? 'study' : 'tree'} forStudy={r.study} />}
         {r.name === 'tree' && <TreeScreen id={r.id} studyId={r.study} ply={r.ply} />}
         {r.name === 'study' && <StudyScreen key={r.id} id={r.id} />}
+        {r.name === 'study-import' && <StudyKifImportScreen />}
         {r.name === 'settings' && <SettingsScreen />}
         {r.name === 'review' && !r.studies && <ReviewScreen key={r.id} id={r.id} />}
         {r.name === 'review' && r.studies && <StudyReviewScreen key={`tree/${r.id}`} target={{ kind: 'tree', treeId: r.id }} />}

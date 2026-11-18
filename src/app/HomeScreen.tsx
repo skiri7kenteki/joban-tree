@@ -2,7 +2,7 @@
 // 段階7-1：ツリーを「戦型のグループ × 自分の側」でまとめる（開閉でき、状態は端末に覚える）。名前で絞り込む。最近開いた 3 件。
 // 段階7-2：「ツリー｜研究手順」の切り替え。
 // 段階8-1：研究手順はツリーから独立したデータ（src/tree/studies.ts）。研究手順のタブ：
-//   - 「＋ 研究手順を登録」（盤で指す・棋譜を貼る／JSON を取り込む）、「書き出し」（選んで JSON・KIF）
+//   - 「＋ 研究手順を登録」（盤で指す・棋譜を貼る／変化付き KIF からまとめて取り込む（段階8-2）／JSON を取り込む）、「書き出し」（選んで JSON・KIF）
 //   - 研究手順も戦型のグループ × 自分の側でまとめる。グループの ⋯ から「このグループの研究手順を復習」「このグループを書き出す」
 //   - 行をタップで研究手順の画面（#/study/<id>）。行の ⋯：この研究手順を復習・名前・メモを直す・書き出す・消す（確認あり）
 //   - ツリーの JSON（形式 6 まで）を取り込むと、中の研究手順も研究手順として取り込む（同じ手順がすでにあれば足さない）
@@ -24,12 +24,17 @@ import { go, groupReviewPath } from './router';
 import { OUTCOME_TEXT, shareFile } from './share';
 import { allTemplates, myTemplates, refreshMyTemplates } from './TemplateDialogs';
 import { StudyEditDialog, StudyExportDialog, shareStudies } from './StudyDialogs';
-import { ensureStudies, importLiftedStudies, library, removeStudy, saveStudies, updateStudyFields } from './studies';
+import { ensureStudies, homeNotice, importLiftedStudies, library, removeStudy, saveStudies, updateStudyFields } from './studies';
 
 export function HomeScreen({ isolationMessage }: { isolationMessage: string | null }) {
   const [trees, setTrees] = useState<TreeSummary[] | null>(null);
   const [error, setError] = useState('');
-  const [message, setMessage] = useState('');
+  // KIF から取り込んだ後などの一言（一度だけ）
+  const [message, setMessage] = useState(() => {
+    const notice = homeNotice.value;
+    homeNotice.value = null;
+    return notice ?? '';
+  });
   /** 一覧を読み直す合図 */
   const [reload, setReload] = useState(0);
   /** ⋯ を押したツリー（メニューを出す） */
@@ -310,11 +315,16 @@ export function HomeScreen({ isolationMessage }: { isolationMessage: string | nu
             <button type="button" class="btn btn-primary" data-testid="study-register-board" onClick={() => go('/new/study')}>
               盤で指す・棋譜を貼る（1 本）
             </button>
+            <button type="button" class="btn" data-testid="study-register-kif" onClick={() => go('/study-import')}>
+              変化付き KIF からまとめて取り込む
+            </button>
             <button type="button" class="btn" data-testid="study-register-json" onClick={() => studyFileRef.current?.click()}>
               JSON を取り込む
             </button>
           </div>
-          <p class="muted">登録にエンジンは使いません。JSON は、このアプリの研究手順の「書き出し」で作ったファイルです。</p>
+          <p class="muted">
+            登録にエンジンは使いません。変化付き KIF は、本譜とそれぞれの変化が 1 本ずつの研究手順になります（ShogiHome などで作った KIF）。JSON は、このアプリの研究手順の「書き出し」で作ったファイルです。
+          </p>
         </Dialog>
       )}
 
@@ -496,10 +506,13 @@ function StudyRow({ study, onMenu }: { study: Study; onMenu: () => void }) {
     <li class="tree-row">
       <button type="button" class="tree-item" data-testid="study-item" onClick={() => go(`/study/${study.id}`)}>
         <span class="tree-item-title">
-          <span class="study-star" aria-hidden="true">
-            ★
+          {/* ★ は名前の中に入れる（長い名前が折り返しても、★ だけの行にならないように） */}
+          <span class="tree-item-name">
+            <span class="study-star" aria-hidden="true">
+              ★
+            </span>
+            {study.name}
           </span>
-          <span class="tree-item-name">{study.name}</span>
         </span>
         {note && (
           <span class="tree-item-meta study-item-note" data-testid="study-item-note">

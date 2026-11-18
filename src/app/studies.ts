@@ -5,6 +5,9 @@ import { deleteStudy, listStudies, putStudies } from '../storage/studies';
 import { findSameStudy, missingStudies } from '../tree/studies';
 import type { Study } from '../tree/types';
 
+/** トップ画面に一度だけ出す一言（KIF から取り込んだ後など） */
+export const homeNotice = signal<string | null>(null);
+
 /** 研究手順の一覧（読み込む前は null） */
 export const library = signal<Study[] | null>(null);
 

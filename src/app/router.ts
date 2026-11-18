@@ -5,6 +5,7 @@
 //   #/tree/<id>  … ツリーの閲覧
 //   #/tree/<id>/study/<研究手順の id>[/<手数>] … ツリーの閲覧（研究手順の終わり、または平手から「手数」手目の局面を、パンくずリストごと開く）
 //   #/study/<研究手順の id> … 研究手順を開く（軽い見返しの画面。段階8-1）
+//   #/study-import … 変化付き KIF から研究手順をまとめて取り込む（段階8-2）
 //   #/settings   … 設定
 //   #/review/<id> … 復習モード
 //   #/review/<id>/study … 研究手順だけの復習（そのツリーの開始局面を通る研究手順）
@@ -20,6 +21,7 @@ export type Route =
   | { name: 'settings' }
   | { name: 'tree'; id: string; study?: string; ply?: number }
   | { name: 'study'; id: string }
+  | { name: 'study-import' }
   | { name: 'review'; id: string; studies?: boolean }
   | { name: 'study-review'; study?: string; group?: string };
 
@@ -28,6 +30,7 @@ function parse(hash: string): Route {
   if (path === '/new') return { name: 'new' };
   if (path === '/new/study') return { name: 'new', study: true };
   if (path === '/settings') return { name: 'settings' };
+  if (path === '/study-import') return { name: 'study-import' };
   const tree = /^\/tree\/([\w-]+)(?:\/study\/([\w-]+)(?:\/(\d+))?)?$/.exec(path);
   if (tree) {
     if (!tree[2]) return { name: 'tree', id: tree[1] };

@@ -43,8 +43,8 @@ export function parseKifu(input: string): ParseResult {
   return { ok: true, line: mainLine(record) };
 }
 
-/** 形式を見分けて tsshogi の Record にする */
-function toRecord(text: string): Record | Error {
+/** 形式を見分けて tsshogi の Record にする（変化付き KIF のまとめての取り込み、段階8-2 でも使う） */
+export function toRecord(text: string): Record | Error {
   // 指し手だけ・SFEN だけ・「startpos moves ...」は tsshogi の形式判定が苦手なので先に見分ける
   if (BARE_USI_MOVES.test(text)) return Record.newByUSI(`position startpos moves ${text}`);
   if (/^(startpos|sfen)\b/.test(text)) return Record.newByUSI(`position ${text}`);

@@ -88,9 +88,12 @@ export function defaultStudyName(
   templates: readonly OpeningTemplate[],
   branchAt?: number,
 ): string {
-  const template = studyTemplate(study, templates);
+  return nameFromTexts(moveTexts(study.moves), studyTemplate(study, templates), branchAt);
+}
+
+/** 名前の初期値を、手の文字（平手から 1 手ずつ）と戦型から作る（defaultStudyName の中身。文字を作り直さずに済むように分けた） */
+export function nameFromTexts(texts: readonly string[], template: Pick<OpeningTemplate, 'name' | 'moves'> | null, branchAt?: number): string {
   const start = template?.moves.length ?? 0;
-  const texts = moveTexts(study.moves);
   const rest = texts.slice(start);
   if (rest.length === 0) return template?.name ?? '平手の初期局面';
   if (rest.length <= 4) return rest.join(' ');
