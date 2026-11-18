@@ -12,6 +12,8 @@ import { InputScreen } from './app/InputScreen';
 import { TreeScreen } from './app/TreeScreen';
 import { SettingsScreen } from './app/SettingsScreen';
 import { ReviewScreen } from './app/ReviewScreen';
+import { StudyScreen } from './app/StudyScreen';
+import { StudyReviewScreen } from './app/StudyReviewScreen';
 
 function App() {
   const [isolation, setIsolation] = useState<IsolationState | 'checking'>('checking');
@@ -29,10 +31,18 @@ function App() {
     <div class="app" data-testid="isolation" data-state={isolation}>
       <main class="main">
         {r.name === 'home' && <HomeScreen isolationMessage={isolationMessage(isolation)} />}
-        {r.name === 'new' && <InputScreen />}
-        {r.name === 'tree' && <TreeScreen id={r.id} studyId={r.study} />}
+        {r.name === 'new' && <InputScreen key={r.study ? 'study' : 'tree'} forStudy={r.study} />}
+        {r.name === 'tree' && <TreeScreen id={r.id} studyId={r.study} ply={r.ply} />}
+        {r.name === 'study' && <StudyScreen key={r.id} id={r.id} />}
         {r.name === 'settings' && <SettingsScreen />}
-        {r.name === 'review' && <ReviewScreen key={r.id} id={r.id} studies={r.studies} study={r.study} />}
+        {r.name === 'review' && !r.studies && <ReviewScreen key={r.id} id={r.id} />}
+        {r.name === 'review' && r.studies && <StudyReviewScreen key={`tree/${r.id}`} target={{ kind: 'tree', treeId: r.id }} />}
+        {r.name === 'study-review' && (
+          <StudyReviewScreen
+            key={`${r.study ?? ''}/${r.group ?? ''}`}
+            target={r.group !== undefined ? { kind: 'group', key: r.group } : { kind: 'one', studyId: r.study ?? '' }}
+          />
+        )}
       </main>
       <Footer />
     </div>

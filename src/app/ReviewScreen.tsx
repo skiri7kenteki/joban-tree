@@ -3,9 +3,8 @@
 // 自分の手番では盤をタップして答える。正解はツリーの先頭の手。記録は端末の中（IndexedDB）に残す。
 // 段階4-2：相手が直前に指した手を、盤（最終手のマス）と一言「相手は △９四歩」ではっきり示す。
 // v0.12.4：スマホ縦では、盤と問題のカードがスクロールせずに 1 画面に収まるよう、盤の大きさを画面の高さに合わせる（boardFit.ts）。
-// 研究手順だけを復習する（2026-11-17）：上の「全部／研究手順だけ」で切り替える（#/review/<id>/study）。研究手順を 1 本選び、
-// 相手の手は研究手順どおりに指して、自分の手番で研究手順の手を答える。疑問手の決まりは当てはめず最後まで。終わったらメモを出す。
-// トップ画面の研究手順の ⋯「この研究手順を復習」からは、その 1 本だけ（#/review/<id>/study/<研究手順の id>）。
+// 研究手順だけを復習する：上の「全部／研究手順だけ」で切り替える（このツリーの開始局面を通る研究手順があるときだけ）。
+// 段階8-1 から研究手順の復習はツリーを使わない別の画面（StudyReviewScreen.tsx、#/review/<id>/study）。
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { Move } from 'tsshogi';
@@ -18,31 +17,16 @@ import { loadTree } from '../storage/trees';
 import { clearReview, loadReview, saveReview } from '../storage/review';
 import { lastPrefixMove, prefixMoveTexts } from '../tree/browse';
 import { isOpponentNode } from '../tree/generator';
-import { traceStudy } from '../tree/studies';
-import type { Study, TreeData, TreeEdge } from '../tree/types';
-import {
-  answerOf,
-  computeNeeds,
-  emptyRecord,
-  isDubiousReply,
-  pickReply,
-  pickStudy,
-  recordAnswer,
-  studyQuestions,
-  studyRecordKey,
-  summarize,
-  summarizeStudies,
-  type ReviewRecord,
-} from '../review/review';
+import { studiesThroughTree } from '../review/studyReview';
+import type { TreeData, TreeEdge } from '../tree/types';
+import { answerOf, computeNeeds, emptyRecord, isDubiousReply, pickReply, recordAnswer, summarize, type ReviewRecord } from '../review/review';
 import { boardFitProps, measureFitAbove, useBoardFit } from './boardFit';
 import { openTree } from './generation';
 import { go } from './router';
 import { settings } from './settings';
+import { ensureStudies, library } from './studies';
 
-/** 何を出すか：全部（今までの復習）・研究手順だけ（only があればその 1 本だけ） */
-type Mode = { kind: 'all' } | { kind: 'studies'; only?: string };
-
-export function ReviewScreen({ id, studies, study }: { id: string; studies?: boolean; study?: string }) {
+export function ReviewScreen({ id }: { id: string }) {
   const [tree, setTree] = useState<TreeData | null>(openTree.value?.id === id ? openTree.value : null);
   const [record, setRecord] = useState<ReviewRecord | null>(null);
   const [error, setError] = useState('');
@@ -64,8 +48,7 @@ export function ReviewScreen({ id, studies, study }: { id: string; studies?: boo
 
   if (error) return <p class="status-ng">{error}</p>;
   if (!tree || !record) return <p class="muted">読み込み中…</p>;
-  const mode: Mode = studies ? { kind: 'studies', only: study } : { kind: 'all' };
-  return <ReviewView key={`${mode.kind}/${study ?? ''}`} tree={tree} initialRecord={record} mode={mode} />;
+  return <ReviewView tree={tree} initialRecord={record} />;
 }
 
 /** 今の手順の 1 局面（move はその局面に来た手） */
@@ -83,12 +66,13 @@ type Phase =
   | { kind: 'end'; afterDubious?: boolean }
   | { kind: 'start' };
 
-function ReviewView({ tree, initialRecord, mode }: { tree: TreeData; initialRecord: ReviewRecord; mode: Mode }) {
+function ReviewView({ tree, initialRecord }: { tree: TreeData; initialRecord: ReviewRecord }) {
   const [record, setRecord] = useState(initialRecord);
-  // 研究手順だけのとき：出す研究手順（only があればその 1 本）と、今出している研究手順
-  const allStudies = tree.studies ?? [];
-  const studyPool = mode.kind === 'studies' ? (mode.only ? allStudies.filter((s) => s.id === mode.only) : allStudies) : [];
-  const [currentStudy, setCurrentStudy] = useState<Study | null>(null);
+  // このツリーの開始局面を通る研究手順があれば「研究手順だけ」に切り替えられる
+  useEffect(() => {
+    void ensureStudies().catch(() => undefined);
+  }, []);
+  const hasStudies = studiesThroughTree(tree, library.value ?? []).length > 0;
   const [steps, setSteps] = useState<Step[]>([{ key: tree.rootKey }]);
   const [phase, setPhase] = useState<Phase>({ kind: 'start' });
   /** この手順で出した問題の数と、1 回目で正解した数 */
@@ -99,19 +83,11 @@ function ReviewView({ tree, initialRecord, mode }: { tree: TreeData; initialReco
 
   const thresholds = settings.value.thresholds;
   const needs = useMemo(() => computeNeeds(tree, record, thresholds), [tree, record, thresholds]);
-  const summary = useMemo(
-    () => (mode.kind === 'studies' ? summarizeStudies(tree, studyPool, record) : summarize(tree, record, thresholds)),
-    [tree, record, thresholds, mode.kind, studyPool.length],
-  );
+  const summary = useMemo(() => summarize(tree, record, thresholds), [tree, record, thresholds]);
   const current = steps[steps.length - 1];
   const node = tree.nodes[current.key];
-  // 正解：全部のときはツリーの先頭の手、研究手順のときは研究手順の手（その手がツリーにある間だけ）
-  const answer: TreeEdge | null =
-    mode.kind === 'studies'
-      ? currentStudy && steps.length - 1 < currentStudy.moves.length
-        ? (node.edges.find((e) => e.move === currentStudy.moves[steps.length - 1]) ?? null)
-        : null
-      : answerOf(tree, current.key);
+  // 正解：ツリーの先頭の手
+  const answer: TreeEdge | null = answerOf(tree, current.key);
   const mySideText = tree.mySide === 'black' ? '☗先手' : '☖後手';
 
   const input = useMoveInput(node.sfen, onMove, phase.kind === 'ask');
@@ -145,43 +121,11 @@ function ReviewView({ tree, initialRecord, mode }: { tree: TreeData; initialReco
   function startLine() {
     setLineScore({ asked: 0, ok: 0 });
     setLineCount((n) => n + 1);
-    if (mode.kind === 'studies') {
-      const study = pickStudy(tree, studyPool, record);
-      setCurrentStudy(study);
-      continueStudy([{ key: tree.rootKey }], study);
-      return;
-    }
     continueFrom([{ key: tree.rootKey }], needs);
-  }
-
-  /** 研究手順：相手の手は研究手順どおりに指し、次の自分の手番（問題）まで進める。たどれなくなったら終わり */
-  function continueStudy(list: Step[], study: Study | null = currentStudy) {
-    if (!study) {
-      setSteps(list);
-      setPhase({ kind: 'end' });
-      return;
-    }
-    const trace = traceStudy(tree, study.moves);
-    let next = list;
-    while (next.length - 1 < trace.reached) {
-      const i = next.length - 1;
-      if (!isOpponentNode(tree, tree.nodes[next[i].key])) {
-        setSteps(next);
-        setPhase({ kind: 'ask', firstTry: true });
-        return;
-      }
-      next = [...next, { key: trace.keys[i + 1], move: study.moves[i] }];
-    }
-    setSteps(next);
-    setPhase({ kind: 'end' });
   }
 
   /** 手順の最後の局面から、次の問題まで進める（相手の手番なら応手を選んで指す） */
   function continueFrom(list: Step[], currentNeeds = needs) {
-    if (mode.kind === 'studies') {
-      continueStudy(list);
-      return;
-    }
     const last = list[list.length - 1];
     const lastNode = tree.nodes[last.key];
     // 相手の疑問手を咎める手を答えたところで、この手順は終わり（その先は深く掘り下げない）
@@ -205,9 +149,7 @@ function ReviewView({ tree, initialRecord, mode }: { tree: TreeData; initialReco
   }
 
   function remember(ok: boolean) {
-    // 研究手順の正解がツリーの本線と違う局面は、別のキーで記録する（今の復習の記録と混ざらないように）
-    const recordKey = mode.kind === 'studies' && answer ? studyRecordKey(tree, current.key, answer.move) : current.key;
-    const updated = recordAnswer(record, recordKey, ok, Date.now());
+    const updated = recordAnswer(record, current.key, ok, Date.now());
     setRecord(updated);
     setLineScore((s) => ({ asked: s.asked + 1, ok: s.ok + (ok ? 1 : 0) }));
     saveReview(updated).catch((e: unknown) => setSaveError(`記録を保存できませんでした（${e instanceof Error ? e.message : String(e)}）`));
@@ -269,35 +211,10 @@ function ReviewView({ tree, initialRecord, mode }: { tree: TreeData; initialReco
         <h1 class="tree-title">復習：{tree.name}</h1>
       </div>
 
-      {/* 研究手順があるツリーでは「全部／研究手順だけ」を切り替えられる */}
-      {allStudies.length > 0 && (
-        <div class="review-modes" role="tablist" aria-label="出す問題">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mode.kind === 'all'}
-            class={mode.kind === 'all' ? 'home-tab on' : 'home-tab'}
-            data-testid="review-mode-all"
-            onClick={() => go(`/review/${tree.id}`)}
-          >
-            全部
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mode.kind === 'studies'}
-            class={mode.kind === 'studies' ? 'home-tab on' : 'home-tab'}
-            data-testid="review-mode-studies"
-            onClick={() => go(`/review/${tree.id}/study`)}
-          >
-            研究手順だけ
-          </button>
-        </div>
-      )}
+      {/* このツリーの開始局面を通る研究手順があれば「全部／研究手順だけ」を切り替えられる */}
+      {hasStudies && <ReviewModeTabs treeId={tree.id} mode="all" />}
 
       <p class="muted review-summary" data-testid="review-summary">
-        {mode.kind === 'studies' &&
-          (mode.only ? `研究「${studyPool[0]?.name ?? '（見つかりません）'}」だけ・` : `研究手順 ${studyPool.length} 本・`)}
         問題 {summary.total}（まだ {summary.unseen}・前回まちがい {summary.wrong}・覚えた {summary.learned}）
       </p>
 
@@ -328,11 +245,8 @@ function ReviewView({ tree, initialRecord, mode }: { tree: TreeData; initialReco
                 <p class="status-ng" data-testid="review-wrong">
                   {moveText(node.sfen, phase.tried, current.move)} ではありません。
                 </p>
-                {mode.kind === 'all' && node.edges.some((e) => e.move === phase.tried) && (
+                {node.edges.some((e) => e.move === phase.tried) && (
                   <p class="muted">その手は、調べ直す前の読み筋で出た手です（調べ直すと別の手が最善でした）。</p>
-                )}
-                {mode.kind === 'studies' && node.edges.some((e) => e.move === phase.tried) && (
-                  <p class="muted">その手もツリーにありますが、この研究手順では別の手を指しています。</p>
                 )}
                 <div class="btn-row">
                   <button type="button" class="btn btn-primary" data-testid="review-retry" onClick={() => setPhase({ kind: 'ask', firstTry: false })}>
@@ -357,17 +271,7 @@ function ReviewView({ tree, initialRecord, mode }: { tree: TreeData; initialReco
                 )}
               </>
             )}
-            {phase.kind === 'end' && mode.kind === 'studies' && (
-              <StudyEnd
-                tree={tree}
-                study={currentStudy}
-                score={lineScore}
-                hasQuestions={summary.total > 0}
-                single={studyPool.length <= 1}
-                onNext={startLine}
-              />
-            )}
-            {phase.kind === 'end' && mode.kind === 'all' && (
+            {phase.kind === 'end' && (
               <>
                 <p data-testid="review-end">
                   {lineScore.asked > 0
@@ -427,50 +331,30 @@ function answeredScore(tree: TreeData, steps: Step[]) {
   return (from.edges.find((e) => e.move === move) ?? from.edges[0]).score;
 }
 
-/** 研究手順を 1 本出し終わったとき：結果・メモ・（たどれなければ）その知らせ・次へ */
-function StudyEnd({
-  tree,
-  study,
-  score,
-  hasQuestions,
-  single,
-  onNext,
-}: {
-  tree: TreeData;
-  study: Study | null;
-  score: { asked: number; ok: number };
-  hasQuestions: boolean;
-  single: boolean;
-  onNext: () => void;
-}) {
-  if (!study || !hasQuestions) {
-    return (
-      <p data-testid="review-end">
-        研究手順に問題がありません（自分の手番の局面を通る研究手順がありません）。閲覧画面で、自分の手を指した後の局面まで進めて保存してください。
-      </p>
-    );
-  }
-  const trace = traceStudy(tree, study.moves);
-  const questions = studyQuestions(tree, study).length;
+/** 「全部／研究手順だけ」の切り替え（ツリーの復習画面と、そのツリーの研究手順だけの復習画面で共通） */
+export function ReviewModeTabs({ treeId, mode }: { treeId: string; mode: 'all' | 'studies' }) {
   return (
-    <>
-      <p data-testid="review-end">
-        研究「{study.name}」を{trace.complete ? '最後まで' : 'たどれるところまで'}答えました（{score.asked} 問中 {score.ok} 問、1 回目で正解）。
-      </p>
-      {!trace.complete && (
-        <p class="muted" data-testid="review-study-broken">
-          この研究手順は途中までしかたどれません（{study.moves.length} 手のうち {trace.reached} 手目まで）。
-        </p>
-      )}
-      {questions === 0 && <p class="muted">この研究手順には、自分の手番の局面がありません。</p>}
-      {study.note && (
-        <p class="study-note review-study-note" data-testid="review-study-note">
-          {study.note}
-        </p>
-      )}
-      <button type="button" class="btn btn-primary" data-testid="review-next" onClick={onNext}>
-        {single ? 'もう一度' : '次の研究手順へ'}
+    <div class="review-modes" role="tablist" aria-label="出す問題">
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === 'all'}
+        class={mode === 'all' ? 'home-tab on' : 'home-tab'}
+        data-testid="review-mode-all"
+        onClick={() => go(`/review/${treeId}`)}
+      >
+        全部
       </button>
-    </>
+      <button
+        type="button"
+        role="tab"
+        aria-selected={mode === 'studies'}
+        class={mode === 'studies' ? 'home-tab on' : 'home-tab'}
+        data-testid="review-mode-studies"
+        onClick={() => go(`/review/${treeId}/study`)}
+      >
+        研究手順だけ
+      </button>
+    </div>
   );
 }

@@ -9,9 +9,10 @@ export const TREE_APP = 'joban-tree';
  * 形式の版。1：段階1〜。2：段階4-3 A〜（局面に「除外した手」excluded を足した）。
  * 3：段階4-3 B〜（自分の手に userChosen・loss を足した）。4：段階6-3〜（ツリーに source を足した）。
  * 5：段階7-1〜（ツリーに templateId を足した）。6：段階7-2〜（ツリーに studies＝研究手順を足した）。
- * 1〜5 の形はそのまま 6 として読める
+ * 7：段階8-1〜（研究手順をツリーの外の置き場所に移した。ツリーには研究手順を持たない）。
+ * 1〜6 の形もそのまま読める（形式 6 までのツリーの研究手順は、取り込むときに独立した研究手順へ移す）
  */
-export const TREE_FORMAT_VERSION = 6;
+export const TREE_FORMAT_VERSION = 7;
 
 /** 生成の条件（プリセットから決まる） */
 export interface GenerationSettings {
@@ -95,13 +96,33 @@ export interface TreeSource {
   finishedAt: number;
 }
 
-/** 研究手順（形式 6〜。ツリーの中の手順に付けた名前とメモ。src/tree/studies.ts） */
+/**
+ * 研究手順（段階8-1〜。ツリーから独立したデータ。IndexedDB の studies に保存する。src/tree/studies.ts）。
+ * 手順は**平手の初期局面からの**指し手（USI）の並び。同じ手順（moves がまったく同じ）は 1 つだけにする
+ */
 export interface Study {
   id: string;
   name: string;
   /** メモ（複数行） */
   note: string;
-  /** ツリーの開始局面からの指し手（USI）の並び */
+  /** 平手の初期局面からの指し手（USI）の並び（1 手以上） */
+  moves: string[];
+  /** 研究する側 */
+  mySide: Side;
+  /** 登録したときに分かった戦型（同梱・自分で登録した戦型の id）。無ければ表示のたびに手順から推定する */
+  templateId?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/**
+ * 形式 6（段階7-2）のツリーの中の研究手順。手順は「ツリーの開始局面からの」指し手。
+ * 読むとき（端末の保存場所を新しい版にするとき・JSON を取り込むとき）に独立した研究手順（Study）へ移す
+ */
+export interface TreeStudy {
+  id: string;
+  name: string;
+  note: string;
   moves: string[];
   createdAt: number;
   updatedAt: number;
@@ -135,6 +156,9 @@ export interface TreeData {
    * 無いとき（形式 4 までのツリー・どの戦型にも当てはまらなかったツリー）は、開始局面までの手順から推定する（src/tree/organize.ts）
    */
   templateId?: string;
-  /** 研究手順（形式 6〜）。ツリーを書き出すと一緒に届く */
-  studies?: Study[];
+  /**
+   * 形式 6 の研究手順（段階7-2）。形式 7 からは持たない（独立した研究手順に移す）。
+   * 平手から始まらないツリーの研究手順は、平手からの手順に直せないので、消さずにここに残す
+   */
+  studies?: TreeStudy[];
 }

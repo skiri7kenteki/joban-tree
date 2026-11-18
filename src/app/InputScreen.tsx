@@ -9,6 +9,9 @@
 // 段階5の手直し：戦型の出発点かその先にいるときは、盤の上の案内の行を「戦型：○○」にする（スマホ縦でスクロールしなくても見える）。
 // 段階6-3：同梱ツリー（用意済みのツリー）がある局面・側なら、作るボタンの上に「用意済みのツリーを開く」を大きく出す。
 // 開くとツリー一覧にコピーする（2 回目からはそのコピーを開く。新しい版が出たら知らせて、新しいコピーを作る）。
+// 段階8-1：研究手順の登録（エンジンを使わない）。#/new/study では作るボタンの代わりに「研究手順として保存」、
+// ふだんの新しいツリーの画面でも「この手順を研究手順として保存」。研究手順の画面の「この局面からツリーを作る」から来たら、手順を読み込んでおく。
+// 用意済みのツリーの新しい版をコピーするときの「研究手順を引き継ぎますか？」はやめた（研究手順はツリーの外にあり、手順が同じなら★が付く）。
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { Position, type Move } from 'tsshogi';
@@ -16,11 +19,10 @@ import { Board } from '../components/Board';
 import { PromotionBox, useMoveInput } from '../components/useMoveInput';
 import { parseKifu, type LinePosition } from '../shogi/kifu';
 import { STARTPOS_SFEN, moveText, otherSide, sfenKey, sideToMove, type Side } from '../shogi/position';
-import { listTrees, loadTree, saveTree, newTreeId, type TreeSummary } from '../storage/trees';
-import { bundledStatus, type BundledTreeFile, type BundledTreeMeta } from '../tree/bundled';
-import { carryStudies } from '../tree/studies';
+import { listTrees, saveTree, newTreeId, type TreeSummary } from '../storage/trees';
+import { bundledStatus, type BundledTreeMeta } from '../tree/bundled';
+import { defaultStudyName, newStudyId, studyMovesText } from '../tree/studies';
 import type { Study } from '../tree/types';
-import { Dialog } from '../components/Dialog';
 import { bundledFor } from '../tree/bundledCatalog';
 import { createTree } from '../tree/generator';
 import { closestTemplate, templateLine, templateRelation, type OpeningTemplate } from '../tree/templates';
@@ -31,27 +33,45 @@ import { go } from './router';
 import { generationSettingsFor, presetLabel } from './settings';
 import { RegisterTemplateDialog, TemplatePicker, allTemplates } from './TemplateDialogs';
 import { boardFitProps, measureFitAbove, useBoardFit } from './boardFit';
-import { copyBundledToList, fetchBundledFile } from './bundledTrees';
+import { copyBundledToList } from './bundledTrees';
+import { takeInputHandoff } from './handoff';
+import { StudyEditDialog } from './StudyDialogs';
+import { findSame, saveStudies, updateStudyFields } from './studies';
 
 const SIDE_TEXT: Record<Side, string> = { black: '☗先手', white: '☖後手' };
 
-export function InputScreen() {
+/** 研究手順の画面から来たときの、最初の手順・局面・側・戦型 */
+function initialInput(): { line: LinePosition[]; index: number; side: Side | null; template: OpeningTemplate | null } {
+  const h = takeInputHandoff();
+  const r = h ? templateLine(h.moves) : null;
+  if (!h || !r?.ok) return { line: [{ sfen: STARTPOS_SFEN }], index: 0, side: null, template: null };
+  const template = h.templateId ? (allTemplates().find((t) => t.id === h.templateId) ?? null) : null;
+  return { line: r.line, index: Math.min(h.index, r.line.length - 1), side: h.mySide, template };
+}
+
+/** forStudy：研究手順を登録する画面（#/new/study）。作るボタンの代わりに「研究手順として保存」 */
+export function InputScreen({ forStudy = false }: { forStudy?: boolean }) {
+  const [initial] = useState(initialInput);
   const [kifu, setKifu] = useState('');
   const [message, setMessage] = useState('');
-  const [line, setLine] = useState<LinePosition[]>([{ sfen: STARTPOS_SFEN }]);
-  const [index, setIndex] = useState(0);
-  const [sideChoice, setSideChoice] = useState<Side | null>(null);
+  const [line, setLine] = useState<LinePosition[]>(initial.line);
+  const [index, setIndex] = useState(initial.index);
+  const [sideChoice, setSideChoice] = useState<Side | null>(initial.side);
   const [busy, setBusy] = useState(false);
   /** 棋譜の貼り付け欄を開いているか */
   const [pasteOpen, setPasteOpen] = useState(false);
   /** 「戦型から選ぶ」の窓を開いているか */
   const [pickerOpen, setPickerOpen] = useState(false);
   /** 選んだ戦型（棋譜を読み込む・初期局面に戻すと外れる） */
-  const [template, setTemplate] = useState<OpeningTemplate | null>(null);
+  const [template, setTemplate] = useState<OpeningTemplate | null>(initial.template);
   /** 「この局面を戦型として登録」の窓を開いているか */
   const [registerOpen, setRegisterOpen] = useState(false);
   /** 登録についての一言（登録できない理由・登録した） */
   const [registerNote, setRegisterNote] = useState('');
+  /** 研究手順として保存する窓（同じ手順の研究手順があれば existing） */
+  const [studyDialog, setStudyDialog] = useState<{ existing: Study | null } | null>(null);
+  /** 研究手順についての一言（保存した・保存できない理由）と、保存した研究手順（「開く」） */
+  const [studyNote, setStudyNote] = useState<{ text: string; saved?: Study } | null>(null);
 
   const current = line[index];
   const turn = sideToMove(current.sfen);
@@ -64,13 +84,14 @@ export function InputScreen() {
   // 戦型の出発点なら戦型の名前、その先なら「戦型の名前 → ○○まで」
   const templateName = onTemplate ? (relation === 'at' ? onTemplate.name : `${onTemplate.name} → ${where}`) : null;
   const movesHere = line.slice(1, index + 1).map((p) => p.usi!);
-  // この局面・この側から始まる同梱ツリー（用意済みのツリー）
-  const bundled = bundledFor(sfenKey(current.sfen), mySide);
+  // この局面・この側から始まる同梱ツリー（用意済みのツリー）。研究手順の登録では出さない
+  const bundled = forStudy ? null : bundledFor(sfenKey(current.sfen), mySide);
 
   function moveTo(i: number) {
     setIndex(Math.max(0, Math.min(line.length - 1, i)));
     input.clear();
     setRegisterNote('');
+    setStudyNote(null);
     // 戦型を選んだときは、その側のまま（手順を前後しても変えない）
     if (!template) setSideChoice(null);
   }
@@ -112,6 +133,7 @@ export function InputScreen() {
     setLine([...line.slice(0, index + 1), next]);
     setIndex(index + 1);
     input.clear();
+    setStudyNote(null);
     if (!template) setSideChoice(null);
   }
 
@@ -120,8 +142,6 @@ export function InputScreen() {
   /** 端末にあるツリーの一覧（同梱ツリーのコピーがあるかを見るため。同梱ツリーがある局面でだけ読む） */
   const [savedTrees, setSavedTrees] = useState<TreeSummary[] | null>(null);
   const [bundledBusy, setBundledBusy] = useState(false);
-  /** 新しい版をコピーするときに、前の版のコピーの研究手順を引き継ぐかを聞いているところ（段階7-2） */
-  const [carry, setCarry] = useState<{ meta: BundledTreeMeta; file: BundledTreeFile; oldName: string; carried: Study[]; lost: Study[] } | null>(null);
   useEffect(() => {
     if (!bundled) return;
     let alive = true;
@@ -143,32 +163,15 @@ export function InputScreen() {
     }
     setBundledBusy(true);
     try {
-      // 新しい版：前の版のコピーに研究手順があれば、引き継ぐかを聞く（たどれるものだけ引き継げる）
-      if (status.kind === 'outdated') {
-        const old = await loadTree(status.treeId);
-        if (old?.studies && old.studies.length > 0) {
-          const file = await fetchBundledFile(meta);
-          setCarry({ meta, file, oldName: old.name, ...carryStudies(old.studies, file.tree) });
-          setBundledBusy(false);
-          return;
-        }
-      }
-      await finishBundledCopy(meta);
+      const tree = await copyBundledToList(meta);
+      openTree.value = tree;
+      go(`/tree/${tree.id}`);
     } catch (e) {
       bundledFailed(e);
     }
   }
 
-  /** コピーを作って開く（引き継ぐ研究手順があれば一緒に） */
-  async function finishBundledCopy(meta: BundledTreeMeta, file?: BundledTreeFile, studies?: Study[]) {
-    setBundledBusy(true);
-    const tree = await copyBundledToList(meta, { file, studies });
-    openTree.value = tree;
-    go(`/tree/${tree.id}`);
-  }
-
   function bundledFailed(e: unknown) {
-    setCarry(null);
     setMessage(
       `用意済みのツリーを読み込めませんでした（${e instanceof Error ? e.message : String(e)}）。通信できるところで、もう一度押してください（一度開けば、通信なしでも開けます）。`,
     );
@@ -191,6 +194,51 @@ export function InputScreen() {
     }
     setRegisterNote('');
     setRegisterOpen(true);
+  }
+
+  /** 「研究手順として保存」：平手からの手順だけ。同じ手順の研究手順があれば、それを直す窓 */
+  async function openStudySave() {
+    if (line[0].sfen !== STARTPOS_SFEN) {
+      setStudyNote({ text: '平手の初期局面から始まる手順だけ、研究手順にできます（駒落ちや、SFEN で途中の局面から始めた手順は登録できません）。' });
+      return;
+    }
+    if (index === 0) {
+      setStudyNote({ text: '1 手以上進めた局面を選んでください（初期局面そのものは保存できません）。' });
+      return;
+    }
+    setStudyNote(null);
+    try {
+      setStudyDialog({ existing: await findSame(movesHere) });
+    } catch (e) {
+      setStudyNote({ text: `研究手順を読めませんでした（${e instanceof Error ? e.message : String(e)}）` });
+    }
+  }
+
+  async function saveStudy(f: { name: string; note: string; mySide: Side }, existing: Study | null) {
+    setStudyDialog(null);
+    try {
+      if (existing) {
+        const saved = await updateStudyFields(existing, f);
+        setStudyNote({ text: `研究手順を直しました：「${saved.name}」`, saved });
+        return;
+      }
+      const now = Date.now();
+      const templateId = onTemplate?.id ?? closestTemplate(allTemplates(), movesHere)?.id;
+      const study: Study = {
+        id: newStudyId(),
+        name: f.name.trim(),
+        note: f.note.trimEnd(),
+        moves: movesHere,
+        mySide: f.mySide,
+        ...(templateId ? { templateId } : {}),
+        createdAt: now,
+        updatedAt: now,
+      };
+      await saveStudies([study]);
+      setStudyNote({ text: `研究手順として保存しました：「${study.name}」`, saved: study });
+    } catch (e) {
+      setStudyNote({ text: `保存できませんでした（${e instanceof Error ? e.message : String(e)}）` });
+    }
   }
 
   /** 戦型を選ぶ：手順を読み込み、出発点の局面にする */
@@ -245,7 +293,7 @@ export function InputScreen() {
         <button type="button" class="btn btn-ghost" onClick={() => go('/')}>
           ‹ 一覧
         </button>
-        <h1>新しいツリー</h1>
+        <h1>{forStudy ? '研究手順を登録' : '新しいツリー'}</h1>
       </div>
 
       {/* スマホ縦は上から「貼り付け・盤・操作」、iPad 横は左に盤、右に貼り付けと操作（盤が作るボタンに隠れないように） */}
@@ -367,18 +415,30 @@ export function InputScreen() {
                 </button>
               ))}
             </div>
-            <p class="muted">
-              {mySide === turn
-                ? 'この局面は自分の手番です。まず自分の最善手を調べてから、相手の応手を広げます。'
-                : 'この局面は相手の手番です。相手の応手と、それへの自分の対応を広げます。'}
-            </p>
-            {isGenerating() && <p class="muted">ほかのツリーを生成中です。終わるか止めてから作ってください。</p>}
-            {pcEngine.value && (
+            {forStudy ? (
+              <p class="muted">研究手順の登録にエンジンは使いません。復習では「自分」の手番で研究手順の手を答えます。</p>
+            ) : (
+              <p class="muted">
+                {mySide === turn
+                  ? 'この局面は自分の手番です。まず自分の最善手を調べてから、相手の応手を広げます。'
+                  : 'この局面は相手の手番です。相手の応手と、それへの自分の対応を広げます。'}
+              </p>
+            )}
+            {!forStudy && isGenerating() && <p class="muted">ほかのツリーを生成中です。終わるか止めてから作ってください。</p>}
+            {!forStudy && pcEngine.value && (
               <p class="notice" data-testid="pc-engine-note">
                 PC のエンジンで作ります（{effectivePcThreads(pcEngine.value)} スレッド）。できたツリーは「JSON で渡す」で iPad やスマホに渡せます。
               </p>
             )}
           </div>
+          {!forStudy && (
+            <>
+              <button type="button" class="btn btn-wide" data-testid="input-study-save" onClick={() => void openStudySave()}>
+                この手順を研究手順として保存
+              </button>
+              {studyNote && <StudyNoteLine note={studyNote} />}
+            </>
+          )}
           <button type="button" class="btn btn-wide" data-testid="register-template" onClick={openRegister}>
             この局面を戦型として登録
           </button>
@@ -389,7 +449,34 @@ export function InputScreen() {
           )}
         </div>
 
+        {/* 研究手順の登録：作るボタンの代わりに「研究手順として保存」（画面の下に固定） */}
+        {forStudy && (
+          // バーの高さを変えない（盤・手順の操作が隠れないように）：一言は説明の行に、「開く」は保存ボタンの横に
+          <div class="start-bar" ref={barRef} data-testid="start-bar">
+            {studyNote ? (
+              <p class={studyNote.saved ? 'start-bar-caption muted' : 'muted'} role="status" data-testid="study-note-line">
+                {studyNote.text}
+              </p>
+            ) : (
+              <p class="start-bar-caption muted">
+                {index === 0 ? '初期局面' : `${index}手目 ${current.text ?? ''}`}までを保存（自分は{SIDE_TEXT[mySide]}）
+              </p>
+            )}
+            <div class="preset-buttons">
+              {studyNote?.saved && (
+                <button type="button" class="btn" data-testid="study-saved-open" onClick={() => go(`/study/${studyNote.saved!.id}`)}>
+                  開く
+                </button>
+              )}
+              <button type="button" class="btn btn-primary" data-testid="study-save-open" onClick={() => void openStudySave()}>
+                研究手順として保存
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* 作るボタン：画面の下に固定（ホーム画面アプリでは、下の端のバーを避ける） */}
+        {!forStudy && (
         <div class="start-bar" ref={barRef} data-testid="start-bar">
           {bundled && (
             <BundledOffer
@@ -421,51 +508,18 @@ export function InputScreen() {
             ))}
           </div>
         </div>
+        )}
       </div>
 
-      {carry && (
-        <Dialog title="研究手順を引き継ぎますか？" onClose={() => setCarry(null)} testId="carry-dialog">
-          <p data-testid="carry-summary">
-            前の版のコピー「{carry.oldName}」に研究手順が {carry.carried.length + carry.lost.length} 件あります。
-            新しい版でも手順がたどれる <strong>{carry.carried.length} 件</strong>を引き継げます。
-          </p>
-          {carry.lost.length > 0 && (
-            <p class="muted" data-testid="carry-lost">
-              新しい版ではたどれないもの（{carry.lost.length} 件）：{carry.lost.map((s) => `「${s.name}」`).join('')}（前の版のコピーには残ります）
-            </p>
-          )}
-          <div class="dialog-actions dialog-actions-column">
-            {carry.carried.length > 0 && (
-              <button
-                type="button"
-                class="btn btn-primary"
-                data-testid="carry-yes"
-                onClick={() => {
-                  const c = carry;
-                  setCarry(null);
-                  void finishBundledCopy(c.meta, c.file, c.carried).catch(bundledFailed);
-                }}
-              >
-                引き継いで開く
-              </button>
-            )}
-            <button
-              type="button"
-              class="btn"
-              data-testid="carry-no"
-              onClick={() => {
-                const c = carry;
-                setCarry(null);
-                void finishBundledCopy(c.meta, c.file).catch(bundledFailed);
-              }}
-            >
-              引き継がずに開く
-            </button>
-            <button type="button" class="btn btn-ghost" onClick={() => setCarry(null)}>
-              やめる
-            </button>
-          </div>
-        </Dialog>
+      {studyDialog && (
+        <StudyEditDialog
+          study={studyDialog.existing}
+          defaultName={defaultStudyName({ moves: movesHere, ...(onTemplate ? { templateId: onTemplate.id } : {}) }, allTemplates())}
+          movesText={studyMovesText({ moves: movesHere, ...(onTemplate ? { templateId: onTemplate.id } : {}) }, allTemplates())}
+          side={mySide}
+          onSave={(f) => void saveStudy(f, studyDialog.existing)}
+          onClose={() => setStudyDialog(null)}
+        />
       )}
 
       {pickerOpen && <TemplatePicker onPick={chooseTemplate} onClose={() => setPickerOpen(false)} />}
@@ -489,6 +543,20 @@ export function InputScreen() {
         />
       )}
     </>
+  );
+}
+
+/** 研究手順を保存した・保存できなかったときの一言（保存したら「開く」） */
+function StudyNoteLine({ note }: { note: { text: string; saved?: Study } }) {
+  return (
+    <p class="muted study-note-line" role="status" data-testid="study-note-line">
+      {note.text}
+      {note.saved && (
+        <button type="button" class="btn btn-ghost" data-testid="study-saved-open" onClick={() => go(`/study/${note.saved!.id}`)}>
+          開く
+        </button>
+      )}
+    </p>
   );
 }
 

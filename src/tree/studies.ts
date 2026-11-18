@@ -1,17 +1,121 @@
-// 研究手順（段階7-2）：ツリーの中の気になる手順に、名前とメモを付けてしおりのように保存する。
-// ツリーの中に保存する（TreeData.studies、形式 6）ので、ツリーを JSON で渡すと研究手順とメモも一緒に届く。
-// 手順は「ツリーの開始局面からの指し手（USI）の並び」。ツリーにある手（edges）だけでたどる。
-// 後で手を除外した・消したなどでたどれなくなっても、研究手順は消さない（「途中までしかたどれません」と出す）。
+// 研究手順：気になる手順に名前とメモを付けて保存する（しおり）。
+// 段階7-2 ではツリーの中に保存していたが、段階8-1（持ち主の判断 2026-11-18）から**ツリーとは独立したデータ**にした。
+//   - 手順は「平手の初期局面からの指し手（USI）の並び」。駒落ち・途中の局面から始まる手順は対象外
+//   - 登録にエンジンは使わない（盤で指す・棋譜を貼る・ツリーの中から）
+//   - ツリーとは「平手からの手順がまったく同じか」だけでつなぐ（★・終わりの局面の名前・「ツリーで見る」）。
+//     手順前後で同じ局面に合流した場合は対象外
+//   - 同じ手順の研究手順は 1 つだけ（保存を押すと、すでにあればそれを直す画面）
+// 形式 6 までのツリーの中の研究手順は、migrateTrees で独立した研究手順へ移す（端末の保存場所を新しい版にするとき・JSON を取り込むとき）。
 
-import { applyUsiMove, moveText } from '../shogi/position';
-import { lastPrefixMove } from './browse';
-import type { Study, TreeData } from './types';
+import { STARTPOS_SFEN, applyUsiMove, moveText, type Side } from '../shogi/position';
+import { closestTemplate, type OpeningTemplate } from './templates';
+import type { Study, TreeData, TreeStudy } from './types';
 
 export type { Study } from './types';
 
 /** 新しい研究手順の id */
 export function newStudyId(): string {
   return `s-${crypto.randomUUID()}`;
+}
+
+/** 手順がまったく同じか */
+export const sameMoves = (a: readonly string[], b: readonly string[]): boolean => a.length === b.length && a.every((m, i) => m === b[i]);
+
+/** moves が head で始まるか（head と同じ長さも含む） */
+export const startsWith = (moves: readonly string[], head: readonly string[]): boolean =>
+  moves.length >= head.length && head.every((m, i) => moves[i] === m);
+
+/** 同じ手順の研究手順（あれば） */
+export function findSameStudy<S extends Pick<Study, 'moves'>>(list: readonly S[], moves: readonly string[]): S | null {
+  return list.find((s) => sameMoves(s.moves, moves)) ?? null;
+}
+
+/** 名前とメモを確かめる。問題が無ければ null */
+export function checkStudyFields(f: { name: string; note: string }): string | null {
+  if (f.name.trim() === '') return '名前を入れてください。';
+  if (f.name.trim().length > 100) return '名前は 100 文字までです。';
+  if (f.note.length > 3000) return 'メモは 3000 文字までです。';
+  return null;
+}
+
+/** メモの最初の 1 行（一覧用） */
+export function firstLine(note: string): string {
+  return note.split(/\r?\n/).find((l) => l.trim() !== '')?.trim() ?? '';
+}
+
+// ---------------------------------------------------------------------------
+// 手順の文字・戦型・名前の初期値
+
+/** 平手からの手順を 1 手ずつ日本語にする（例：["▲７六歩", "△３四歩"]）。指せない手があれば、そこまで */
+export function moveTexts(moves: readonly string[]): string[] {
+  const texts: string[] = [];
+  let sfen = STARTPOS_SFEN;
+  let prev: string | undefined;
+  for (const move of moves) {
+    const next = applyUsiMove(sfen, move);
+    if (!next) break;
+    texts.push(moveText(sfen, move, prev));
+    sfen = next.sfen;
+    prev = move;
+  }
+  return texts;
+}
+
+/** 研究手順の戦型：記録した戦型が今もあればそれ、無ければ手順がいちばん長く一致する戦型（7-1 と同じ決まり） */
+export function studyTemplate(study: Pick<Study, 'moves' | 'templateId'>, templates: readonly OpeningTemplate[]): OpeningTemplate | null {
+  if (study.templateId) {
+    const t = templates.find((x) => x.id === study.templateId);
+    if (t && startsWith(study.moves, t.moves)) return t;
+  }
+  return closestTemplate(templates, study.moves);
+}
+
+/** 戦型の出発点が何手目か（手順がどの戦型にも当てはまらなければ 0＝初期局面） */
+export function studyStartIndex(study: Pick<Study, 'moves' | 'templateId'>, templates: readonly OpeningTemplate[]): number {
+  return studyTemplate(study, templates)?.moves.length ?? 0;
+}
+
+/**
+ * 名前の初期値：研究の分かれ目がわかるように、戦型の出発点（分からなければ初期局面）より後の手順から作る。
+ *   - 4 手までなら全部（「▲３六飛 △８四飛 ▲２六飛 △２二銀」）
+ *   - 5 手以上なら最初の手と最後の手（「▲３六飛 … △２二銀」）。最初の手（いちばん大事な分かれ目）は必ず入れる
+ *   - branchAt（変化付き KIF の取り込み、段階8-2）：本譜から分かれた手（0 始まり）。最初と最後の間なら手数付きで入れる
+ *     （「▲３六飛 … 20手目 △８四飛 … ▲３四飛」）
+ *   - 出発点そのもので終わるなら、戦型の名前（無ければ「平手の初期局面」）
+ */
+export function defaultStudyName(
+  study: Pick<Study, 'moves' | 'templateId'>,
+  templates: readonly OpeningTemplate[],
+  branchAt?: number,
+): string {
+  const template = studyTemplate(study, templates);
+  const start = template?.moves.length ?? 0;
+  const texts = moveTexts(study.moves);
+  const rest = texts.slice(start);
+  if (rest.length === 0) return template?.name ?? '平手の初期局面';
+  if (rest.length <= 4) return rest.join(' ');
+  const last = texts.length - 1;
+  const parts = [texts[start]];
+  if (branchAt !== undefined && branchAt > start && branchAt < last) parts.push(`${branchAt + 1}手目 ${texts[branchAt]}`);
+  parts.push(texts[last]);
+  return parts.join(' … ');
+}
+
+/** 手順の文（保存の窓に出す）：戦型が分かれば「戦型名 → その後の手順」、無ければ初手から */
+export function studyMovesText(study: Pick<Study, 'moves' | 'templateId'>, templates: readonly OpeningTemplate[]): string {
+  const template = studyTemplate(study, templates);
+  const texts = moveTexts(study.moves);
+  if (!template) return texts.join(' ');
+  const rest = texts.slice(template.moves.length);
+  return rest.length > 0 ? `${template.name} → ${rest.join(' ')}` : template.name;
+}
+
+// ---------------------------------------------------------------------------
+// ツリーとのつながり（平手からの手順がまったく同じときだけ）
+
+/** ツリーの開始局面までの、平手からの手順（平手の初期局面から始まらないツリーは null） */
+export function treeBaseMoves(tree: Pick<TreeData, 'prefix'>): string[] | null {
+  return tree.prefix.initialSfen === STARTPOS_SFEN ? tree.prefix.moves : null;
 }
 
 /** 開始局面からのキーの並び（閲覧画面の path）を、指し手の並びにする */
@@ -34,7 +138,7 @@ export interface StudyTrace {
   complete: boolean;
 }
 
-/** 研究手順をツリーの手（除外した手は使わない）でたどる */
+/** ツリーの開始局面からの手順を、ツリーの手（除外した手は使わない）でたどる */
 export function traceStudy(tree: TreeData, moves: readonly string[]): StudyTrace {
   const keys = [tree.rootKey];
   for (const move of moves) {
@@ -46,104 +150,126 @@ export function traceStudy(tree: TreeData, moves: readonly string[]): StudyTrace
   return { keys, reached: keys.length - 1, complete: keys.length - 1 === moves.length };
 }
 
-const sameMoves = (a: readonly string[], b: readonly string[]) => a.length === b.length && a.every((m, i) => m === b[i]);
-
-/** 同じ手順の研究手順（あれば） */
-export function findSameStudy(tree: TreeData, moves: readonly string[]): Study | null {
-  return (tree.studies ?? []).find((s) => sameMoves(s.moves, moves)) ?? null;
-}
-
-/** 名前とメモを確かめる。問題が無ければ null */
-export function checkStudyFields(f: { name: string; note: string }): string | null {
-  if (f.name.trim() === '') return '名前を入れてください。';
-  if (f.name.trim().length > 100) return '名前は 100 文字までです。';
-  if (f.note.length > 3000) return 'メモは 3000 文字までです。';
-  return null;
+/**
+ * 平手からの手順（の最初の ply 手）が、ツリーの中に最後まであれば、閲覧画面の path（開始局面からのキーの並び）。
+ * ツリーの開始局面を通らない・途中でたどれなければ null（「ツリーで見る」の対象にしない）
+ */
+export function pathInTree(tree: TreeData, moves: readonly string[]): string[] | null {
+  const base = treeBaseMoves(tree);
+  if (!base || !startsWith(moves, base)) return null;
+  const trace = traceStudy(tree, moves.slice(base.length));
+  return trace.complete ? trace.keys : null;
 }
 
 /**
- * 研究手順を足す。同じ手順がすでにあれば、足さずにそれを返す（created: false）。
- * 手順はツリーにある手だけ（最後までたどれないものは足さない。null）
+ * 平手から今の局面までの手順が、研究手順の途中なら、その研究手順の次の手（★を付ける手）。
+ * どこで作った研究手順か（ツリーの中・独立して登録）は関係ない。合流（別の手順から同じ局面に来た）では付けない
  */
-export function addStudy(
-  tree: TreeData,
-  f: { name: string; note: string; moves: readonly string[] },
-  now: number,
-  id: string = newStudyId(),
-): { study: Study; created: boolean } | null {
-  const same = findSameStudy(tree, f.moves);
-  if (same) return { study: same, created: false };
-  if (f.moves.length === 0 || !traceStudy(tree, f.moves).complete) return null;
-  const study: Study = { id, name: f.name.trim(), note: f.note.trimEnd(), moves: [...f.moves], createdAt: now, updatedAt: now };
-  tree.studies = [...(tree.studies ?? []), study];
-  return { study, created: true };
-}
-
-/** 名前とメモを直す */
-export function updateStudy(tree: TreeData, id: string, f: { name: string; note: string }, now: number): boolean {
-  const study = tree.studies?.find((s) => s.id === id);
-  if (!study) return false;
-  study.name = f.name.trim();
-  study.note = f.note.trimEnd();
-  study.updatedAt = now;
-  return true;
-}
-
-/** 消す（画面で確認を出してから呼ぶ） */
-export function removeStudy(tree: TreeData, id: string): boolean {
-  const before = tree.studies?.length ?? 0;
-  tree.studies = (tree.studies ?? []).filter((s) => s.id !== id);
-  return tree.studies.length < before;
-}
-
-/** 名前の初期値：最後の 3 手（例：「▲３六飛 △８四飛 ▲２六飛」）。手が無ければツリーの名前 */
-export function defaultStudyName(tree: TreeData, moves: readonly string[], count = 3): string {
-  if (moves.length === 0) return tree.name;
-  const texts: string[] = [];
-  let sfen = tree.nodes[tree.rootKey].sfen;
-  let prev = lastPrefixMove(tree);
-  for (const move of moves) {
-    texts.push(moveText(sfen, move, prev));
-    const next = applyUsiMove(sfen, move);
-    if (!next) break;
-    sfen = next.sfen;
-    prev = move;
-  }
-  return texts.slice(-count).join(' ');
-}
-
-/**
- * 今たどってきた手順（開始局面から）が、研究手順の途中なら、その研究手順の次の手（★を付ける手）。
- * 合流（別の手順から同じ局面に来た）では付けない（持ち主の判断 2026-11-17）
- */
-export function studyNextMoves(tree: TreeData, pathMoves: readonly string[]): Set<string> {
+export function studyNextMoves(studies: readonly Pick<Study, 'moves'>[], movesHere: readonly string[]): Set<string> {
   const out = new Set<string>();
-  for (const s of tree.studies ?? []) {
-    if (s.moves.length > pathMoves.length && pathMoves.every((m, i) => s.moves[i] === m)) out.add(s.moves[pathMoves.length]);
+  for (const s of studies) {
+    if (s.moves.length > movesHere.length && startsWith(s.moves, movesHere)) out.add(s.moves[movesHere.length]);
   }
   return out;
 }
 
 /** 今の局面で終わる研究手順（同じ手順は 1 つだけなので、あれば 1 つ） */
-export function studyEndingAt(tree: TreeData, pathMoves: readonly string[]): Study | null {
-  return findSameStudy(tree, pathMoves);
+export function studyEndingAt<S extends Pick<Study, 'moves'>>(studies: readonly S[], movesHere: readonly string[]): S | null {
+  return findSameStudy(studies, movesHere);
 }
 
-/** メモの最初の 1 行（一覧用） */
-export function firstLine(note: string): string {
-  return note.split(/\r?\n/).find((l) => l.trim() !== '')?.trim() ?? '';
+// ---------------------------------------------------------------------------
+// 形式 6 までのツリーの中の研究手順 → 独立した研究手順（移し替え）
+
+/** ツリーの中の研究手順を、平手からの手順の研究手順にする（ツリーは書き換えない）。平手から始まらないツリーは null */
+export function liftTreeStudies(tree: TreeData): Study[] | null {
+  const base = treeBaseMoves(tree);
+  if (!base) return null;
+  return (tree.studies ?? [])
+    .map(
+      (s: TreeStudy): Study => ({
+        id: s.id,
+        name: s.name,
+        note: s.note,
+        moves: [...base, ...s.moves],
+        mySide: tree.mySide,
+        ...(tree.templateId ? { templateId: tree.templateId } : {}),
+        createdAt: s.createdAt,
+        updatedAt: s.updatedAt,
+      }),
+    )
+    .filter((s) => s.moves.length > 0);
+}
+
+/** メモをつなぐときの区切り */
+export const NOTE_JOIN = '\n――\n';
+
+/**
+ * 同じ手順の研究手順を 1 本にまとめる（持ち主の判断 2026-11-18）：
+ * 名前・id・自分の側・戦型は直した日時が新しい方、メモは違えば両方つなぐ（消えるものが無いように）、作った日時はいちばん古いもの
+ */
+export function mergeSameMoves(list: readonly Study[]): Study[] {
+  const out: Study[] = [];
+  const sorted = [...list].sort((a, b) => b.updatedAt - a.updatedAt);
+  for (const s of sorted) {
+    const base = findSameStudy(out, s.moves);
+    if (!base) {
+      out.push({ ...s, moves: [...s.moves] });
+      continue;
+    }
+    base.createdAt = Math.min(base.createdAt, s.createdAt);
+    const note = s.note.trim();
+    if (note !== '' && !base.note.split(NOTE_JOIN).some((part) => part.trim() === note)) {
+      base.note = base.note.trim() === '' ? s.note : `${base.note}${NOTE_JOIN}${s.note}`;
+    }
+  }
+  return out;
+}
+
+export interface TreeMigration {
+  /** 独立した研究手順（同じ手順はまとめた） */
+  studies: Study[];
+  /** 研究手順を外したツリー（書き戻す。形式は 7 にする） */
+  changed: TreeData[];
+  /** 平手から始まらないツリーに残した研究手順の数（消さない） */
+  leftover: number;
 }
 
 /**
- * 用意済みのツリーの新しい版に、前の版のコピーの研究手順を引き継ぐ見通し（段階7-2）。
- * 新しい版のツリーで最後までたどれるものだけ引き継げる。たどれないものは数と名前を知らせる（前の版のコピーには残る）
+ * ツリーの中の研究手順を、独立した研究手順に移す見通しを作る（ツリーは複製して書き換えるので、元のデータは変えない）。
+ * 端末の保存場所を版 4 にするときに 1 回だけ使う（src/storage/db.ts）。JSON を取り込むときも同じ
  */
-export function carryStudies(from: readonly Study[], to: TreeData): { carried: Study[]; lost: Study[] } {
-  const carried: Study[] = [];
-  const lost: Study[] = [];
-  for (const s of from) {
-    if (traceStudy(to, s.moves).complete) carried.push({ ...s, moves: [...s.moves] });
-    else lost.push(s);
+export function migrateTrees(trees: readonly TreeData[]): TreeMigration {
+  const lifted: Study[] = [];
+  const changed: TreeData[] = [];
+  let leftover = 0;
+  for (const tree of trees) {
+    if (!tree.studies || tree.studies.length === 0) continue;
+    const studies = liftTreeStudies(tree);
+    if (!studies) {
+      leftover += tree.studies.length;
+      continue;
+    }
+    lifted.push(...studies);
+    const { studies: _removed, ...rest } = tree;
+    changed.push({ ...rest, version: Math.max(tree.version, 7) });
   }
-  return { carried, lost };
+  return { studies: mergeSameMoves(lifted), changed, leftover };
+}
+
+/**
+ * 取り込んだ研究手順のうち、まだ無い手順のものだけ（同じ手順がすでにあれば足さない。ツリーの JSON の取り込み用）。
+ * 取り込むものどうしで同じ手順なら、まとめてから比べる
+ */
+export function missingStudies(existing: readonly Pick<Study, 'moves'>[], incoming: readonly Study[]): { added: Study[]; skipped: number } {
+  const merged = mergeSameMoves(incoming);
+  const added = merged.filter((s) => !findSameStudy(existing, s.moves));
+  return { added, skipped: incoming.length - added.length };
+}
+
+/** 自分の側の初期値（棋譜から登録するとき）：戦型が分かればその側、無ければ最後の手を指した側 */
+export function guessSide(moves: readonly string[], templates: readonly OpeningTemplate[]): Side {
+  const t = closestTemplate(templates, moves);
+  if (t) return t.mySide;
+  return moves.length % 2 === 1 ? 'black' : 'white';
 }

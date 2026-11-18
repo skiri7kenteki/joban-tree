@@ -1172,3 +1172,88 @@
   border-left: 3px solid var(--color-accent);
   background: var(--color-bg);
 }
+
+/* ---- 段階8-1：ツリーから独立した研究手順 ---- */
+/* トップ画面の研究手順のタブの上の「＋ 研究手順を登録」「書き出し」 */
+.study-tools {
+  margin-bottom: var(--space-2);
+}
+
+/* グループの見出しの右の ⋯（研究手順のグループ：このグループを復習・書き出す） */
+.tree-group-row {
+  display: flex;
+  align-items: center;
+}
+
+.tree-group-row .tree-group-head {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.tree-group-menu {
+  flex: 0 0 auto;
+  min-width: var(--touch-min);
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+}
+
+/* 研究手順の画面：名前と、戦型・手数 */
+.study-head {
+  margin: 0 0 var(--space-1);
+}
+
+.study-title {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.study-meta {
+  margin: 0;
+  font-size: var(--font-size-small);
+}
+
+/* 研究手順の画面の手順（全部の手。今の局面より先は薄く） */
+.study-crumbs {
+  margin: var(--space-1) 0;
+}
+
+.crumb.crumb-ahead {
+  color: var(--color-text-muted);
+}
+
+/* 研究手順の書き出し：選ぶ一覧 */
+.study-pick-list {
+  max-height: 50vh;
+  overflow-y: auto;
+  margin: var(--space-2) 0;
+}
+
+.study-pick-group {
+  margin: var(--space-2) 0 var(--space-1);
+  font-size: var(--font-size-small);
+  color: var(--color-text-muted);
+}
+
+.study-pick-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--touch-min);
+  overflow-wrap: anywhere;
+}
+
+.study-pick-item input {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+}
+
+/* 研究手順を保存した・保存できなかったときの一言（保存したら「開く」） */
+.study-note-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  margin: var(--space-1) 0;
+}

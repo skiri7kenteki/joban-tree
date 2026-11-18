@@ -10,8 +10,7 @@
 
 import { isOpponentNode } from '../tree/generator';
 import { DEFAULT_THRESHOLDS, labelOf, type LabelThresholds } from '../tree/labels';
-import { traceStudy } from '../tree/studies';
-import type { Study, TreeData, TreeEdge } from '../tree/types';
+import type { TreeData, TreeEdge } from '../tree/types';
 
 /** 1 つの問題（自分の手番の局面）の記録 */
 export interface NodeRecord {
@@ -59,7 +58,7 @@ export function replyKey(from: string, move: string): string {
 export const LEARNED_STREAK = 2;
 
 /** 1 つの問題の「出したさ」：まだ出していない 1、前回間違えた 2、正解が続くほど小さく */
-function ownNeed(rec: NodeRecord | undefined): number {
+export function questionNeed(rec: NodeRecord | undefined): number {
   if (!rec) return 1;
   if (!rec.lastOk) return 2;
   return 0.5 ** (rec.streak + 1);
@@ -76,7 +75,7 @@ export function computeNeeds(tree: TreeData, record: ReviewRecord, thresholds: L
   const questionOnly = (key: string): number => {
     const node = tree.nodes[key];
     if (!node || isOpponentNode(tree, node) || !node.edges[0]) return 0;
-    return ownNeed(record.nodes[key]);
+    return questionNeed(record.nodes[key]);
   };
   const visiting = new Set<string>();
   const visit = (key: string): number => {
@@ -95,7 +94,7 @@ export function computeNeeds(tree: TreeData, record: ReviewRecord, thresholds: L
       }
     } else {
       const answer = node.edges[0];
-      if (answer) need = ownNeed(record.nodes[key]) + visit(answer.to);
+      if (answer) need = questionNeed(record.nodes[key]) + visit(answer.to);
     }
     visiting.delete(key);
     memo.set(key, need);
@@ -181,83 +180,6 @@ export function summarize(tree: TreeData, record: ReviewRecord, thresholds: Labe
     if (questionOnly || expanded.has(key)) continue;
     expanded.add(key);
     stack.push({ key: answer.to, questionOnly: false });
-  }
-  return summary;
-}
-
-// ---------------------------------------------------------------------------
-// 研究手順だけを復習する（持ち主の判断 2026-11-17「全ておすすめの通りで」）
-//   - 範囲は研究手順の手順の上だけ（開始局面から研究の終わりまでの、自分の手番の局面）。相手の手は研究手順どおりに指す
-//   - 正解は研究手順として保存した手。疑問手の決まり（咎める 1 手で終わり）は当てはめず、最後まで出す
-//   - 研究手順が複数あれば、今の復習と同じ「出したさ」で 1 本を選び、通して出す
-//   - 記録は今の復習と共通（同じ局面・同じ正解なら共有）。正解がツリーの本線と違う局面だけ、別のキーで記録する
-//   - 途中までしかたどれない研究手順は、たどれるところまで出す
-
-/** 研究手順の 1 問 */
-export interface StudyQuestion {
-  /** 問題の局面のキー */
-  key: string;
-  /** 開始局面から何手目の手を答えるか（0 から） */
-  index: number;
-  /** 正解（研究手順の手） */
-  move: string;
-  /** 記録のキー（studyRecordKey） */
-  recordKey: string;
-}
-
-/**
- * 記録のキー：正解がツリーの本線（先頭の手）と同じなら局面のキー（今の復習と共有）、
- * 違えば「局面のキー>手」（本線を答える今の復習の記録と混ざらないように）
- */
-export function studyRecordKey(tree: TreeData, key: string, move: string): string {
-  return answerOf(tree, key)?.move === move ? key : replyKey(key, move);
-}
-
-/** 研究手順の問題（たどれるところまで。自分の手番の局面だけ） */
-export function studyQuestions(tree: TreeData, study: Pick<Study, 'moves'>): StudyQuestion[] {
-  const trace = traceStudy(tree, study.moves);
-  const out: StudyQuestion[] = [];
-  for (let i = 0; i < trace.reached; i++) {
-    const key = trace.keys[i];
-    const node = tree.nodes[key];
-    if (!node || isOpponentNode(tree, node)) continue;
-    out.push({ key, index: i, move: study.moves[i], recordKey: studyRecordKey(tree, key, study.moves[i]) });
-  }
-  return out;
-}
-
-/** その研究手順の「出したさ」（問題ごとの出したさの合計。問題が無ければ 0） */
-export function studyNeed(tree: TreeData, study: Pick<Study, 'moves'>, record: ReviewRecord): number {
-  return studyQuestions(tree, study).reduce((sum, q) => sum + ownNeed(record.nodes[q.recordKey]), 0);
-}
-
-/** 研究手順を 1 本選ぶ（問題のあるものだけ。出したさに比例した確率で）。無ければ null */
-export function pickStudy<S extends Pick<Study, 'moves'>>(tree: TreeData, studies: readonly S[], record: ReviewRecord, rand: () => number = Math.random): S | null {
-  const weighted = studies.map((s) => ({ s, w: studyNeed(tree, s, record) })).filter((x) => x.w > 0);
-  if (weighted.length === 0) return null;
-  const total = weighted.reduce((sum, x) => sum + x.w, 0);
-  let r = rand() * total;
-  for (const x of weighted) {
-    r -= x.w;
-    if (r < 0) return x.s;
-  }
-  return weighted[weighted.length - 1].s;
-}
-
-/** 研究手順の問題の、記録のまとめ（同じ局面・同じ正解は 1 問と数える） */
-export function summarizeStudies(tree: TreeData, studies: readonly Pick<Study, 'moves'>[], record: ReviewRecord): ReviewSummary {
-  const summary: ReviewSummary = { total: 0, unseen: 0, wrong: 0, learned: 0 };
-  const counted = new Set<string>();
-  for (const s of studies) {
-    for (const q of studyQuestions(tree, s)) {
-      if (counted.has(q.recordKey)) continue;
-      counted.add(q.recordKey);
-      summary.total++;
-      const rec = record.nodes[q.recordKey];
-      if (!rec) summary.unseen++;
-      else if (!rec.lastOk) summary.wrong++;
-      else if (rec.streak >= LEARNED_STREAK) summary.learned++;
-    }
   }
   return summary;
 }

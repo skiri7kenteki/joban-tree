@@ -1,7 +1,7 @@
 // ツリーを端末の中（IndexedDB）に保存する。データは端末の外へは送らない。
 
 import { prefixSummary } from '../tree/browse';
-import { traceStudy } from '../tree/studies';
+import { startsWith, treeBaseMoves } from '../tree/studies';
 import type { TreeData } from '../tree/types';
 import { REVIEW, TREES, done, finished, openDb } from './db';
 
@@ -20,18 +20,6 @@ export interface TreeSummary {
   /** どの戦型から作ったか・開始局面までの手順（トップ画面のグループ分け。段階7-1） */
   templateId?: string;
   prefix: TreeData['prefix'];
-  /** 研究手順（段階7-2。一覧に出す分と、最後までたどれるか） */
-  studies: StudySummary[];
-}
-
-export interface StudySummary {
-  id: string;
-  name: string;
-  note: string;
-  updatedAt: number;
-  /** 手順の手の数・たどれた手の数 */
-  total: number;
-  reached: number;
 }
 
 /** ツリーを保存する（同じ id なら上書き） */
@@ -62,11 +50,22 @@ export async function listTrees(): Promise<TreeSummary[]> {
       source: t.source,
       templateId: t.templateId,
       prefix: t.prefix,
-      studies: (t.studies ?? []).map((s) => {
-        const trace = traceStudy(t, s.moves);
-        return { id: s.id, name: s.name, note: s.note, updatedAt: s.updatedAt, total: s.moves.length, reached: trace.reached };
-      }),
     }))
+    .sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+/**
+ * 平手からの手順 moves の途中を開始局面にするツリー（研究手順の「ツリーで見る」の候補。段階8-1）。
+ * 開始局面までの手順が moves の先頭と同じものだけ読む（ツリーの中で最後までたどれるかは、画面で確かめる）
+ */
+export async function loadTreesOnLine(moves: readonly string[]): Promise<TreeData[]> {
+  const db = await openDb();
+  const trees = (await done(db.transaction(TREES).objectStore(TREES).getAll())) as TreeData[];
+  return trees
+    .filter((t) => {
+      const base = treeBaseMoves(t);
+      return base !== null && startsWith(moves, base);
+    })
     .sort((a, b) => b.updatedAt - a.updatedAt);
 }
 

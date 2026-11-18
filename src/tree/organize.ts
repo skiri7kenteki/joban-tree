@@ -100,38 +100,50 @@ export function matchesQuery(texts: readonly string[], query: string): boolean {
   return texts.some((t) => normalizeForSearch(t).includes(q));
 }
 
-/** 名前で絞り込む（空なら全部）。研究手順（段階7-2）があれば、その名前とメモにも当てる */
-export function filterByName<T extends Pick<OrganizeItem, 'name'> & { studies?: readonly { name: string; note: string }[] }>(items: readonly T[], query: string): T[] {
-  return items.filter((t) => matchesQuery([t.name, ...(t.studies ?? []).flatMap((s) => [s.name, s.note])], query));
+/** 名前で絞り込む（空なら全部）。段階8-1〜 ツリーの名前だけに当てる（研究手順はツリーの外に移したので） */
+export function filterByName<T extends Pick<OrganizeItem, 'name'>>(items: readonly T[], query: string): T[] {
+  return items.filter((t) => matchesQuery([t.name], query));
 }
 
-/** 研究手順の一覧の 1 行（どのツリーのものか付き） */
-export interface StudyListItem<S> {
-  study: S;
-  treeId: string;
-  treeName: string;
+/** グループ分けに使う、研究手順の形 */
+export interface StudyItem {
+  id: string;
+  name: string;
+  note: string;
+  moves: readonly string[];
+  mySide: Side;
+  templateId?: string;
+  updatedAt: number;
 }
+
+/** 研究手順のグループの key（ツリーのグループと開閉の記録を分ける） */
+export const STUDY_GROUP_PREFIX = 'study:';
 
 /**
- * 研究手順の一覧（段階7-2）：ツリーと同じグループ（戦型 × 自分の側）でまとめ、グループの中は直した日の新しい順。
- * 絞り込みは、研究手順の名前・メモと、属するツリーの名前に当てる
+ * 研究手順の一覧（段階8-1〜 ツリーから独立した研究手順）：ツリーと同じ決まり（戦型のグループ × 自分の側）でまとめる。
+ * 戦型は、記録した戦型が今もあればそれ、無ければ手順がいちばん長く一致する戦型。グループの中は直した日の新しい順。
+ * 絞り込みは名前とメモに当てる
  */
-export function groupStudies<T extends OrganizeItem & { studies: readonly { name: string; note: string; updatedAt: number }[] }>(
-  trees: readonly T[],
-  templates: readonly OpeningTemplate[],
-  query: string,
-): TreeGroup<StudyListItem<T['studies'][number]>>[] {
-  return groupTrees(trees, templates)
-    .map((g) => ({
-      key: `study:${g.key}`,
-      label: g.label,
-      items: g.items
-        .flatMap((t) => t.studies.map((study) => ({ study, treeId: t.id, treeName: t.name })))
-        .filter((x) => matchesQuery([x.study.name, x.study.note, x.treeName], query))
-        .sort((a, b) => b.study.updatedAt - a.study.updatedAt),
-    }))
-    .filter((g) => g.items.length > 0);
+export function groupStudies<S extends StudyItem>(studies: readonly S[], templates: readonly OpeningTemplate[], query: string): TreeGroup<S>[] {
+  const items = studies
+    .filter((s) => matchesQuery([s.name, s.note], query))
+    .map((s) => ({
+      study: s,
+      id: s.id,
+      name: s.name,
+      updatedAt: s.updatedAt,
+      mySide: s.mySide,
+      templateId: s.templateId && templates.some((t) => t.id === s.templateId && startsWithMoves(s.moves, t.moves)) ? s.templateId : undefined,
+      prefix: { initialSfen: STARTPOS_SFEN, moves: [...s.moves] },
+    }));
+  return groupTrees(items, templates).map((g) => ({
+    key: `${STUDY_GROUP_PREFIX}${g.key}`,
+    label: g.label,
+    items: g.items.sort((a, b) => b.updatedAt - a.updatedAt).map((x) => x.study),
+  }));
 }
+
+const startsWithMoves = (moves: readonly string[], head: readonly string[]) => moves.length >= head.length && head.every((m, i) => moves[i] === m);
 
 /** 最近開いた記録（端末にだけ保存する。src/app/recent.ts） */
 export interface RecentEntry {

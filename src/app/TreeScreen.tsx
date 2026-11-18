@@ -10,6 +10,8 @@
 // v0.12.3：候補手が 4 つ以上なら 4 行目も見せる（盤を画面幅の 85% まで縮めて収める、収まらなければ半分のぞかせる）。見出しに件数。
 // 段階7-2：研究手順。「この手順を研究として保存」、研究手順の上の候補手に★、終わりの局面では候補手の見出しの行に「★ 名前」（押すとメモ・直す・消す）。
 //          #/tree/<id>/study/<研究手順の id> で開くと、その局面をパンくずリストごと開く。
+// 段階8-1：研究手順はツリーの外（端末の研究手順の置き場所）にある。平手からの手順（ツリーの開始局面までの手順＋たどった手）が
+//          研究手順の途中と同じなら★、同じ手順で終わる研究手順があれば「★ 名前」。保存は平手からの手順にして独立した研究手順へ。
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { Board } from '../components/Board';
@@ -26,10 +28,10 @@ import { countRemoved, deleteMove, makeMainMove } from '../tree/edit';
 import { LABEL_TEXT, labelOf } from '../tree/labels';
 import type { PresetId } from '../tree/presets';
 import { closestTemplate, templateLine } from '../tree/templates';
-import { addStudy, defaultStudyName, movesOfPath, removeStudy, studyEndingAt, studyNextMoves, traceStudy, updateStudy } from '../tree/studies';
+import { defaultStudyName, movesOfPath, newStudyId, startsWith, studyEndingAt, studyMovesText, studyNextMoves, traceStudy, treeBaseMoves } from '../tree/studies';
 import { boardFitProps, measureBoardFit, useBoardFit } from './boardFit';
 import { availablePresets } from './engineService';
-import type { TreeData, TreeEdge } from '../tree/types';
+import type { Study, TreeData, TreeEdge } from '../tree/types';
 import {
   generation,
   isGenerating,
@@ -48,11 +50,17 @@ import { generationSettingsFor, presetLabel, settings } from './settings';
 import { OUTCOME_TEXT, copyText, shareFile } from './share';
 import { RegisterTemplateDialog, allTemplates } from './TemplateDialogs';
 import { StudyEditDialog, StudyViewDialog } from './StudyDialogs';
+import { ensureStudies, library, removeStudy, saveStudies, updateStudyFields } from './studies';
 
 
-export function TreeScreen({ id, studyId }: { id: string; studyId?: string }) {
+export function TreeScreen({ id, studyId, ply }: { id: string; studyId?: string; ply?: number }) {
   const [error, setError] = useState('');
   const tree = openTree.value?.id === id ? openTree.value : null;
+  // 研究手順（★・終わりの局面の名前・研究手順から開く局面）を読む
+  const studies = library.value;
+  useEffect(() => {
+    ensureStudies().catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
+  }, []);
 
   // 最近開いたツリーとして、端末に記録する（段階7-1）
   useEffect(() => {
@@ -70,26 +78,29 @@ export function TreeScreen({ id, studyId }: { id: string; studyId?: string }) {
   }, [id, tree]);
 
   if (error) return <p class="status-ng">{error}</p>;
-  if (!tree) return <p class="muted">読み込み中…</p>;
-  return <TreeView key={`${tree.id}/${studyId ?? ''}`} tree={tree} studyId={studyId} />;
+  if (!tree || !studies) return <p class="muted">読み込み中…</p>;
+  return <TreeView key={`${tree.id}/${studyId ?? ''}/${ply ?? ''}`} tree={tree} studies={studies} studyId={studyId} ply={ply} />;
 }
 
-/** 研究手順から開くときの、最初の局面（たどれるところまで）と一言 */
-function initialPath(tree: TreeData, studyId?: string): { path: string[]; note: string } {
-  const study = studyId ? tree.studies?.find((s) => s.id === studyId) : undefined;
+/** 研究手順から開くときの、最初の局面（研究手順の終わり、または平手から ply 手目。たどれるところまで）と一言 */
+function initialPath(tree: TreeData, studies: readonly Study[], studyId?: string, ply?: number): { path: string[]; note: string } {
   if (!studyId) return { path: [tree.rootKey], note: '' };
+  const study = studies.find((s) => s.id === studyId);
   if (!study) return { path: [tree.rootKey], note: 'この研究手順は見つかりませんでした（消されたかもしれません）。' };
-  const trace = traceStudy(tree, study.moves);
+  const moves = study.moves.slice(0, ply ?? study.moves.length);
+  const base = treeBaseMoves(tree);
+  if (!base || !startsWith(moves, base)) return { path: [tree.rootKey], note: `研究手順「${study.name}」は、このツリーの開始局面を通りません。` };
+  const trace = traceStudy(tree, moves.slice(base.length));
   return {
     path: trace.keys,
-    note: trace.complete ? '' : `研究手順「${study.name}」は途中までしかたどれません（${study.moves.length} 手のうち ${trace.reached} 手目まで）。`,
+    note: trace.complete ? '' : `研究手順「${study.name}」は、このツリーでは途中までしかたどれません（${moves.length} 手のうち ${base.length + trace.reached} 手目まで）。`,
   };
 }
 
-function TreeView({ tree, studyId }: { tree: TreeData; studyId?: string }) {
+function TreeView({ tree, studies, studyId, ply }: { tree: TreeData; studies: readonly Study[]; studyId?: string; ply?: number }) {
   // 生成が進むたびに描き直す
   void treeVersion.value;
-  const [initial] = useState(() => initialPath(tree, studyId));
+  const [initial] = useState(() => initialPath(tree, studies, studyId, ply));
   /** 開始局面から今の局面までの、局面のキーの並び */
   const [path, setPath] = useState<string[]>(initial.path);
   /** 戻ったときに覚えておく「進む」先（スワイプで進む用） */
@@ -124,10 +135,12 @@ function TreeView({ tree, studyId }: { tree: TreeData; studyId?: string }) {
   // 平手の初期局面から今の局面までの手順（開始局面までの手順＋そこからたどった手）
   const movesHere = [...tree.prefix.moves, ...path.slice(1).map((k, i) => edgeBetween(tree, path[i], k)?.move ?? '')];
   const busy = isGenerating();
-  // 研究手順（段階7-2）：開始局面からたどってきた手・★を付ける手・この局面で終わる研究手順
-  const pathMoves = movesOfPath(tree, path);
-  const starMoves = studyNextMoves(tree, pathMoves);
-  const studyHere = studyEndingAt(tree, pathMoves);
+  // 研究手順（段階8-1）：平手から今の局面までの手順（平手から始まらないツリーは null）・★を付ける手・この局面で終わる研究手順
+  const base = treeBaseMoves(tree);
+  const fullMoves = base ? [...base, ...movesOfPath(tree, path)] : null;
+  const starMoves = fullMoves ? studyNextMoves(studies, fullMoves) : new Set<string>();
+  const studyHere = fullMoves ? studyEndingAt(studies, fullMoves) : null;
+  const templates = allTemplates();
   // 「この手を検証」は、まだ調べていない自分の手番の局面だけ
   const canVerify = !opp && !node.searched && !node.terminal;
   // 「別の手を調べる」：盤のタップで自分の手を選ぶ（入力画面・復習と同じ仕組み）
@@ -231,30 +244,47 @@ function TreeView({ tree, studyId }: { tree: TreeData; studyId?: string }) {
     setNote('');
     await saveEdited(tree);
   }
-  /** 「この手順を研究として保存」：同じ手順がもうあれば、それを直す画面 */
+  /** 「この手順を研究として保存」：平手からの手順にして保存する。同じ手順がもうあれば、それを直す画面 */
   function openStudy() {
+    if (!fullMoves) {
+      setNote('平手の初期局面から始まるツリーだけ、研究手順を保存できます（SFEN で途中の局面から始めたツリーは保存できません）。');
+      return;
+    }
     setNote('');
     setDialog('study-edit');
   }
-  async function saveStudy(f: { name: string; note: string }) {
+  async function saveStudy(f: { name: string; note: string; mySide: Study['mySide'] }) {
     setDialog(null);
-    const now = Date.now();
-    if (studyHere) {
-      updateStudy(tree, studyHere.id, f, now);
-      setNote(`研究手順「${f.name.trim()}」を直しました`);
-    } else {
-      const r = addStudy(tree, { ...f, moves: pathMoves }, now);
-      if (!r) return;
-      setNote(`研究手順「${r.study.name}」を保存しました。トップ画面の「研究手順」から開けます。`);
+    if (!fullMoves) return;
+    try {
+      if (studyHere) {
+        await updateStudyFields(studyHere, f);
+        setNote(`研究手順「${f.name.trim()}」を直しました`);
+      } else {
+        const now = Date.now();
+        const template = closestTemplate(templates, fullMoves);
+        const study: Study = {
+          id: newStudyId(),
+          name: f.name.trim(),
+          note: f.note.trimEnd(),
+          moves: fullMoves,
+          mySide: f.mySide,
+          ...(template ? { templateId: template.id } : {}),
+          createdAt: now,
+          updatedAt: now,
+        };
+        await saveStudies([study]);
+        setNote(`研究手順「${study.name}」を保存しました。トップ画面の「研究手順」から開けます。`);
+      }
+    } catch (e) {
+      setNote(`保存できませんでした（${e instanceof Error ? e.message : String(e)}）`);
     }
-    await saveEdited(tree);
   }
   async function deleteStudy() {
     if (!studyHere) return;
     setDialog(null);
-    removeStudy(tree, studyHere.id);
+    await removeStudy(studyHere.id);
     setNote(`研究手順「${studyHere.name}」を消しました`);
-    await saveEdited(tree);
   }
 
   /** 「戦型として登録」：平手の初期局面から始まるツリーだけ */
@@ -488,7 +518,7 @@ function TreeView({ tree, studyId }: { tree: TreeData; studyId?: string }) {
                 別の手を調べる
               </button>
             )}
-            <button type="button" class="btn" data-testid="study-open" onClick={openStudy} disabled={path.length <= 1}>
+            <button type="button" class="btn" data-testid="study-open" onClick={openStudy} disabled={fullMoves?.length === 0}>
               {studyHere ? '研究手順を直す' : 'この手順を研究として保存'}
             </button>
             <button type="button" class="btn" data-testid="copy-kif" onClick={() => void copyKif()}>
@@ -603,18 +633,25 @@ function TreeView({ tree, studyId }: { tree: TreeData; studyId?: string }) {
         </Dialog>
       )}
 
-      {dialog === 'study-edit' && (
+      {dialog === 'study-edit' && fullMoves && (
         <StudyEditDialog
           study={studyHere}
-          defaultName={defaultStudyName(tree, pathMoves)}
-          movesText={defaultStudyName(tree, pathMoves, Infinity)}
+          defaultName={defaultStudyName({ moves: fullMoves }, templates)}
+          movesText={studyMovesText({ moves: fullMoves }, templates)}
+          side={tree.mySide}
           onSave={(f) => void saveStudy(f)}
           onClose={() => setDialog(null)}
         />
       )}
 
       {dialog === 'study-view' && studyHere && (
-        <StudyViewDialog study={studyHere} onEdit={() => setDialog('study-edit')} onDelete={() => void deleteStudy()} onClose={() => setDialog(null)} />
+        <StudyViewDialog
+          study={studyHere}
+          onOpen={() => go(`/study/${studyHere.id}`)}
+          onEdit={() => setDialog('study-edit')}
+          onDelete={() => void deleteStudy()}
+          onClose={() => setDialog(null)}
+        />
       )}
 
       {dialog === 'register' && (
