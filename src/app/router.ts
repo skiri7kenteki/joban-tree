@@ -5,6 +5,7 @@
 //   #/tree/<id>  … ツリーの閲覧
 //   #/tree/<id>/study/<研究手順の id>[/<手数>] … ツリーの閲覧（研究手順の終わり、または平手から「手数」手目の局面を、パンくずリストごと開く）
 //   #/study/<研究手順の id> … 研究手順を開く（軽い見返しの画面。段階8-1）
+//   #/study/<研究手順の id>/edit … 研究手順の手順を編集する（段階9-1）
 //   #/study-import … 変化付き KIF から研究手順をまとめて取り込む（段階8-2）
 //   #/settings   … 設定
 //   #/review/<id> … 復習モード
@@ -20,7 +21,7 @@ export type Route =
   | { name: 'new'; study?: boolean }
   | { name: 'settings' }
   | { name: 'tree'; id: string; study?: string; ply?: number }
-  | { name: 'study'; id: string }
+  | { name: 'study'; id: string; edit?: boolean }
   | { name: 'study-import' }
   | { name: 'review'; id: string; studies?: boolean }
   | { name: 'study-review'; study?: string; group?: string };
@@ -36,8 +37,8 @@ function parse(hash: string): Route {
     if (!tree[2]) return { name: 'tree', id: tree[1] };
     return tree[3] ? { name: 'tree', id: tree[1], study: tree[2], ply: Number(tree[3]) } : { name: 'tree', id: tree[1], study: tree[2] };
   }
-  const study = /^\/study\/([\w-]+)$/.exec(path);
-  if (study) return { name: 'study', id: study[1] };
+  const study = /^\/study\/([\w-]+)(\/edit)?$/.exec(path);
+  if (study) return study[2] ? { name: 'study', id: study[1], edit: true } : { name: 'study', id: study[1] };
   const one = /^\/study-review\/([\w-]+)$/.exec(path);
   if (one && one[1] !== 'group') return { name: 'study-review', study: one[1] };
   const group = /^\/study-review\/group\/([^/]+)$/.exec(path);

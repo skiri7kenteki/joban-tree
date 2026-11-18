@@ -64,6 +64,21 @@ describe('JSON', () => {
     expect(plan.fresh[1].id).toBe('c');
   });
 
+  it('同じ手順の研究手順が 2 本あるとき（両方残した後）：どちらかとまったく同じなら、並びに関係なく飛ばす。違えば同じ id のものと比べる', () => {
+    const a = study('s-1', ['7g7f'], { name: '研究1' });
+    const copy = study('s-0', ['7g7f'], { name: '研究1（仲間）' });
+    for (const existing of [
+      [a, copy],
+      [copy, a],
+    ]) {
+      const plan = planStudyImport([study('s-1', ['7g7f'], { name: '研究1' })], existing);
+      expect(plan.same).toBe(1);
+      expect(plan.conflicts).toEqual([]);
+      const other = planStudyImport([study('s-1', ['7g7f'], { name: '研究1（また別）' })], existing);
+      expect(other.conflicts.map((c) => c.existing.id)).toEqual(['s-1']);
+    }
+  });
+
   it('置き換える（今の id と作った日時はそのまま）・両方残す（新しい id）・取り込まない', () => {
     const existing = [study('b', ['2g2f'], { createdAt: 100 })];
     const plan = planStudyImport([study('x', ['2g2f'], { name: '新しい名前', createdAt: 5 }), study('c', ['6g6f'])], existing);

@@ -1222,6 +1222,38 @@
   color: var(--color-text-muted);
 }
 
+/* 研究手順の手順を編集中（段階9-1）：見出しを色付きの帯に */
+.study-editing-header {
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+  border-radius: var(--radius-card);
+  padding: var(--space-1);
+}
+
+.study-editing-header h1 {
+  text-align: center;
+  font-size: var(--font-size-heading);
+}
+
+.study-editing-header .btn-ghost {
+  color: var(--color-accent-text);
+}
+
+.study-editing-header .btn-primary {
+  background: var(--color-surface);
+  color: var(--color-accent);
+  border-color: var(--color-surface);
+}
+
+.study-edit-tools {
+  margin: var(--space-1) 0;
+}
+
+.study-edit-hint {
+  margin: var(--space-1) 0;
+  font-size: var(--font-size-small);
+}
+
 /* 研究手順の書き出し：選ぶ一覧 */
 .study-pick-list {
   max-height: 50vh;

@@ -7,7 +7,7 @@
 
 import { Position, Record, RecordMetadataKey, exportKIF } from 'tsshogi';
 import { STARTPOS_SFEN } from '../shogi/position';
-import { findSameStudy, newStudyId } from './studies';
+import { newStudyId, sameMoves } from './studies';
 import { templateLine } from './templates';
 import { TREE_APP, type Study } from './types';
 
@@ -102,14 +102,16 @@ export function planStudyImport(incoming: readonly Study[], existing: readonly S
   const plan: StudyImportPlan = { fresh: [], same: 0, conflicts: [] };
   const ids = new Set(existing.map((s) => s.id));
   for (const s of incoming) {
-    const ex = findSameStudy(existing, s.moves);
-    if (!ex) {
+    // 同じ手順の研究手順は「両方残す」で 2 本以上あることがある：どれかとまったく同じなら飛ばす。
+    // 違えば、同じ id のもの（無ければ最初のもの）と比べて聞く（以前は最初の 1 本としか比べず、並び次第で「まったく同じ」を見落とした）
+    const matches = existing.filter((e) => sameMoves(e.moves, s.moves));
+    if (matches.length === 0) {
       // 手順の違う研究手順と id だけ重なった（または取り込むものどうしで重なった）ら、新しい id にする
       const study = ids.has(s.id) ? { ...s, id: newStudyId() } : s;
       ids.add(study.id);
       plan.fresh.push(study);
-    } else if (ex.name === s.name && ex.note === s.note && ex.mySide === s.mySide) plan.same++;
-    else plan.conflicts.push({ incoming: s, existing: ex });
+    } else if (matches.some((ex) => ex.name === s.name && ex.note === s.note && ex.mySide === s.mySide)) plan.same++;
+    else plan.conflicts.push({ incoming: s, existing: matches.find((ex) => ex.id === s.id) ?? matches[0] });
   }
   return plan;
 }
