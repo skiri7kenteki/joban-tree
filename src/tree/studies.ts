@@ -61,34 +61,60 @@ export function moveTexts(moves: readonly string[]): string[] {
   return texts;
 }
 
-/** 研究手順の戦型：記録した戦型が今もあればそれ、無ければ手順がいちばん長く一致する戦型（7-1 と同じ決まり） */
-export function studyTemplate(study: Pick<Study, 'moves' | 'templateId'>, templates: readonly OpeningTemplate[]): OpeningTemplate | null {
+/**
+ * 研究手順の戦型：記録した戦型が今もあればそれ、無ければ手順がいちばん長く一致する戦型（7-1 と同じ決まり）。
+ * 段階10 の直し（持ち主の判断 2026-11-19）：自分の側（mySide）を渡すと、**自分の側が同じ戦型**を先に見る
+ * （記録した戦型の側が違えば使わない。自分の側が同じ戦型が 1 つも当てはまらなければ、側を問わずいちばん長いもの）。
+ * 研究手順だけの復習の出題は、この戦型の出発点の後から
+ */
+export function studyTemplate(study: Pick<Study, 'moves' | 'templateId'> & { mySide?: Side }, templates: readonly OpeningTemplate[]): OpeningTemplate | null {
+  const side = study.mySide;
   if (study.templateId) {
     const t = templates.find((x) => x.id === study.templateId);
-    if (t && startsWith(study.moves, t.moves)) return t;
+    if (t && startsWith(study.moves, t.moves) && (!side || t.mySide === side)) return t;
+  }
+  if (side) {
+    const same = closestTemplate(
+      templates.filter((t) => t.mySide === side),
+      study.moves,
+    );
+    if (same) return same;
   }
   return closestTemplate(templates, study.moves);
 }
 
 /** 戦型の出発点が何手目か（手順がどの戦型にも当てはまらなければ 0＝初期局面） */
-export function studyStartIndex(study: Pick<Study, 'moves' | 'templateId'>, templates: readonly OpeningTemplate[]): number {
+export function studyStartIndex(study: Pick<Study, 'moves' | 'templateId'> & { mySide?: Side }, templates: readonly OpeningTemplate[]): number {
   return studyTemplate(study, templates)?.moves.length ?? 0;
 }
 
+/** いちばん浅い（手数が短い）戦型 */
+function shallowest(list: readonly OpeningTemplate[]): OpeningTemplate | null {
+  return list.reduce<OpeningTemplate | null>((best, t) => (!best || t.moves.length < best.moves.length ? t : best), null);
+}
+
 /**
- * 名前の初期値：研究の分かれ目がわかるように、戦型の出発点（分からなければ初期局面）より後の手順から作る。
+ * 研究手順の出発点の戦型（段階10 の直し）：手順が通る、**自分の側が同じ戦型のうち、いちばん浅いもの**。
+ * 自分の側が同じ戦型が 1 つも通らなければ、側を問わずいちばん浅いもの。どれも通らなければ null（平手の初期局面）。
+ * shorter：手順より短い戦型だけ（名前を付けるとき。出発点の後が 0 手の名前＝戦型の名前だけ、にしないため）。
+ * 横歩取りの例：後手番は 16 手目 △3三角、先手番は 15 手目 ▲3四飛（基本図）
+ */
+export function startTemplate(moves: readonly string[], side: Side, templates: readonly OpeningTemplate[], shorter = false): OpeningTemplate | null {
+  const passing = templates.filter((t) => startsWith(moves, t.moves) && (!shorter || t.moves.length < moves.length));
+  return shallowest(passing.filter((t) => t.mySide === side)) ?? shallowest(passing);
+}
+
+/**
+ * 名前の初期値：研究の分かれ目がわかるように、出発点の戦型（`startTemplate`。分からなければ初期局面）より後の手順から作る。
+ * 段階10 の直し：出発点は、その研究手順が通る自分の側が同じ、いちばん浅い戦型（手順より短いもの。戦型の名前だけの名前にしない）
  *   - 4 手までなら全部（「▲３六飛 △８四飛 ▲２六飛 △２二銀」）
  *   - 5 手以上なら最初の手と最後の手（「▲３六飛 … △２二銀」）。最初の手（いちばん大事な分かれ目）は必ず入れる
  *   - branchAt（変化付き KIF の取り込み、段階8-2）：本譜から分かれた手（0 始まり）。最初と最後の間なら手数付きで入れる
  *     （「▲３六飛 … 20手目 △８四飛 … ▲３四飛」）
  *   - 出発点そのもので終わるなら、戦型の名前（無ければ「平手の初期局面」）
  */
-export function defaultStudyName(
-  study: Pick<Study, 'moves' | 'templateId'>,
-  templates: readonly OpeningTemplate[],
-  branchAt?: number,
-): string {
-  return nameFromTexts(moveTexts(study.moves), studyTemplate(study, templates), branchAt);
+export function defaultStudyName(study: Pick<Study, 'moves' | 'mySide'>, templates: readonly OpeningTemplate[], branchAt?: number): string {
+  return nameFromTexts(moveTexts(study.moves), startTemplate(study.moves, study.mySide, templates, true), branchAt);
 }
 
 /** 名前の初期値を、手の文字（平手から 1 手ずつ）と戦型から作る（defaultStudyName の中身。文字を作り直さずに済むように分けた） */
@@ -104,9 +130,9 @@ export function nameFromTexts(texts: readonly string[], template: Pick<OpeningTe
   return parts.join(' … ');
 }
 
-/** 手順の文（保存の窓に出す）：戦型が分かれば「戦型名 → その後の手順」、無ければ初手から */
-export function studyMovesText(study: Pick<Study, 'moves' | 'templateId'>, templates: readonly OpeningTemplate[]): string {
-  const template = studyTemplate(study, templates);
+/** 手順の文（保存の窓に出す）：出発点の戦型（名前と同じ決まり）が分かれば「戦型名 → その後の手順」、無ければ初手から */
+export function studyMovesText(study: Pick<Study, 'moves' | 'mySide'>, templates: readonly OpeningTemplate[]): string {
+  const template = startTemplate(study.moves, study.mySide, templates, true);
   const texts = moveTexts(study.moves);
   if (!template) return texts.join(' ');
   const rest = texts.slice(template.moves.length);

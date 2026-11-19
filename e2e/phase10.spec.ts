@@ -72,15 +72,16 @@ test.describe('10-1 定跡帳で直接指して研究を足す', () => {
 
     await play(page, '86', '84'); // △8四飛
     await expect(page.getByTestId('book-toast')).toContainText('△８四飛 を足しました');
-    await expect(page.getByTestId('study-title')).toHaveText('△８四飛');
+    // 名前は、先手番の戦型のうちいちばん浅い基本図（15 手）の後から（段階10 の直し）
+    await expect(page.getByTestId('study-title')).toHaveText('△３三角 ▲３六飛 △８四飛');
     await play(page, '36', '26'); // ▲2六飛
-    await expect(page.getByTestId('study-title')).toHaveText('△８四飛 ▲２六飛');
+    await expect(page.getByTestId('study-title')).toHaveText('△３三角 ▲３六飛 △８四飛 ▲２六飛');
     await expect(page.getByTestId('study-position')).toContainText('19手目');
     await expect(page).toHaveURL(/#\/book\/[^/]+\/s-[\w-]+\/19$/);
 
     await backHome(page);
     await expect(page.getByTestId('study-item')).toHaveCount(1);
-    await expect(page.getByTestId('study-item')).toContainText('△８四飛 ▲２六飛');
+    await expect(page.getByTestId('study-item')).toContainText('△３三角 ▲３六飛 △８四飛 ▲２六飛');
     await expect(page.getByTestId('study-item')).toContainText('19 手');
     await expect(page.getByTestId('tree-group-head')).toHaveText([/横歩取り（先手番）\s*1/]);
   });
@@ -123,7 +124,7 @@ test.describe('10-1 定跡帳で直接指して研究を足す', () => {
     // 別の手（△5二玉）→ 新しい研究手順
     await play(page, '51', '52');
     await expect(page.getByTestId('book-toast')).toContainText('△５二玉 を足しました');
-    await expect(page.getByTestId('study-title')).toHaveText('△５二玉');
+    await expect(page.getByTestId('study-title')).toHaveText('△３三角 ▲３六飛 △５二玉');
     await page.getByTestId('study-prev').click();
     await expect(page.getByTestId('study-book-head')).toHaveText('この局面からの研究（2 本）');
     await expect(page.getByTestId('study-book-branch')).toHaveCount(2);
@@ -285,4 +286,77 @@ test.describe('10-2 使わなくなった画面と道筋の整理', () => {
     await expect(page.getByTestId('book-title')).toHaveText('定跡帳平手から（先手番）');
     await expect(page.getByTestId('study-position')).toHaveText('2手目 △３四歩');
   });
+});
+
+test.describe('定跡帳の出発点がずれる不具合の直し', () => {
+  /** 戦型から選んで定跡帳を開く */
+  async function openFromTemplate(page: Page, name: string, side: 'black' | 'white') {
+    await page.getByTestId('tab-studies').click();
+    await page.getByTestId('study-register').click();
+    await page.getByTestId('study-register-template').click();
+    await page.getByTestId('template-group').filter({ hasText: '横歩取り' }).click();
+    await page.getByTestId('template-item').filter({ hasText: name }).click();
+    await page.getByTestId(`new-study-side-${side}`).click();
+    await page.getByTestId('new-study-open').click();
+  }
+
+  test('「△3三角（後手番）」から ▲3六飛 を指しても出発点は 16 手目のまま。戻って ▲5八玉 を足すと 2 行', async ({ page }) => {
+    await openHome(page);
+    await openFromTemplate(page, '△3三角（後手番）', 'white');
+    await expect(page.getByTestId('book-title')).toHaveText('定跡帳横歩取り（後手番）');
+    await expect(page.getByTestId('study-position')).toContainText('16手目');
+    await play(page, '34', '36'); // ▲3六飛
+    await expect(page.getByTestId('study-title')).toHaveText('▲３六飛');
+    await expect(page.getByTestId('book-start-crumb')).toContainText('△3三角（後手番）');
+    await expect(page.getByTestId('study-prev')).toBeEnabled();
+    await page.getByTestId('study-prev').click();
+    await expect(page.getByTestId('study-position')).toContainText('16手目');
+    await play(page, '59', '58'); // ▲5八玉（青野流）
+    await expect(page.getByTestId('study-title')).toHaveText('▲５八玉');
+    await page.getByTestId('study-prev').click();
+    const rows = page.getByTestId('study-book-branch');
+    await expect(rows).toHaveCount(2);
+    await expect(rows.filter({ hasText: '▲３六飛' })).toHaveCount(1);
+    await expect(rows.filter({ hasText: '▲５八玉' })).toHaveCount(1);
+    // 一覧から開き直しても、16 手目に戻れる
+    await page.getByRole('button', { name: '‹ 一覧' }).click();
+    await page.getByTestId('tab-studies').click();
+    await page.getByTestId('study-item').filter({ hasText: '▲３六飛' }).click();
+    await expect(page.getByTestId('study-position')).toContainText('17手目');
+    await page.getByTestId('study-prev').click();
+    await expect(page.getByTestId('study-position')).toContainText('16手目');
+    await expect(page.getByTestId('study-prev')).toBeDisabled();
+  });
+
+  test('先手番の基本図から △3三角 ▲3六飛 と指しても出発点は 15 手目のまま。戻って別の手を足せる', async ({ page }) => {
+    await openHome(page);
+    await openFromTemplate(page, '基本図', 'black');
+    await expect(page.getByTestId('book-title')).toHaveText('定跡帳横歩取り（先手番）');
+    await expect(page.getByTestId('study-position')).toContainText('15手目');
+    await play(page, '22', '33'); // △3三角
+    await play(page, '34', '36'); // ▲3六飛
+    await expect(page.getByTestId('study-title')).toHaveText('△３三角 ▲３六飛');
+    await expect(page.getByTestId('book-start-crumb')).toContainText('基本図');
+    await page.getByTestId('book-start-crumb').click();
+    await expect(page.getByTestId('study-position')).toContainText('15手目');
+    await play(page, '51', '52'); // △5二玉
+    await expect(page.getByTestId('study-title')).toHaveText('△５二玉');
+    await page.getByTestId('study-prev').click();
+    await expect(page.getByTestId('study-book-branch')).toHaveCount(2);
+  });
+});
+
+test('前の版でずれた研究手順（後手番に先手番の戦型・戦型の名前だけの名前）は直る。自分で付けた名前は変えない', async ({ page }) => {
+  await openHome(page);
+  await importStudies(page, [
+    study('s-old', '横歩取り △3三角型（▲3六飛まで）', [...KAKU33], { mySide: 'white', templateId: 'yokofu-33kaku', updatedAt: 2 }),
+    study('s-mine', '自分の名前', [...KAKU33, '8f8d'], { mySide: 'white', templateId: 'yokofu-33kaku', updatedAt: 1 }),
+  ]);
+  await expect(page.getByTestId('study-item').filter({ hasText: '▲３六飛' })).toHaveCount(1);
+  await expect(page.getByTestId('study-item').filter({ hasText: '自分の名前' })).toHaveCount(1);
+  await page.getByTestId('study-item').filter({ hasText: '▲３六飛' }).click();
+  await expect(page.getByTestId('book-title')).toHaveText('定跡帳横歩取り（後手番）');
+  await expect(page.getByTestId('book-start-crumb')).toContainText('△3三角（後手番）');
+  await page.getByTestId('study-prev').click();
+  await expect(page.getByTestId('study-position')).toContainText('16手目');
 });

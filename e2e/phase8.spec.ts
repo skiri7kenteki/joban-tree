@@ -166,27 +166,29 @@ test.describe('8-1 登録（エンジンを使わない）', () => {
       await page.getByTestId('kif-paste-input').fill(kif);
       await page.getByTestId('kif-paste-read').click();
     };
-    // 同梱の戦型「横歩取り △3三角型（▲3六飛まで）」がいちばん長く一致するので、その後の手順から。側は後手に切り替える
+    // 出発点の戦型は、自分の側が同じ戦型のうちいちばん浅いもの（段階10 の直し）：先手番なら基本図、後手番なら △3三角（後手番）
     await paste(KIF('平手', [...yokofu, '８四飛(86)']));
-    await expect(page.getByTestId('kif-paste-moves')).toHaveText('18 手：横歩取り △3三角型（▲3六飛まで） → △８四飛');
+    await expect(page.getByTestId('kif-paste-side-black')).toHaveAttribute('aria-checked', 'true');
+    await expect(page.getByTestId('kif-paste-moves')).toHaveText('18 手：横歩取り 基本図（▲3四飛まで） → △３三角 ▲３六飛 △８四飛');
     await page.getByTestId('kif-paste-side-white').click();
+    await expect(page.getByTestId('kif-paste-moves')).toHaveText('18 手：横歩取り △3三角（後手番） → ▲３六飛 △８四飛');
     await page.getByTestId('kif-paste-add').click();
     await expect(page.getByTestId('book-title')).toHaveText('定跡帳横歩取り（後手番）');
-    await expect(page.getByTestId('study-title')).toHaveText('△８四飛');
+    await expect(page.getByTestId('study-title')).toHaveText('▲３六飛 △８四飛');
 
     // 同じ手順：足さずに知らせ、定跡帳で開ける
     await page.getByRole('button', { name: '‹ 一覧' }).click();
     await page.getByTestId('tab-studies').click();
     await paste(KIF('平手', [...yokofu, '８四飛(86)']));
     await page.getByTestId('kif-paste-add').click();
-    await expect(page.getByTestId('kif-paste-exists')).toContainText('研究手順「△８四飛」としてすでにあります');
+    await expect(page.getByTestId('kif-paste-exists')).toContainText('研究手順「▲３六飛 △８四飛」としてすでにあります');
     await page.getByTestId('kif-paste-open-existing').click();
-    await expect(page.getByTestId('study-title')).toHaveText('△８四飛');
+    await expect(page.getByTestId('study-title')).toHaveText('▲３六飛 △８四飛');
 
-    // 戦型の出発点そのもの・香落ちは足さない
+    // 戦型の出発点そのもの（先手番の基本図ちょうど）・香落ちは足さない
     await page.getByRole('button', { name: '‹ 一覧' }).click();
     await page.getByTestId('tab-studies').click();
-    await paste(KIF('平手', yokofu));
+    await paste(KIF('平手', yokofu.slice(0, 15)));
     await expect(page.getByTestId('kif-paste-message')).toContainText('戦型の出発点そのものは研究手順にできません');
     await page.getByTestId('kif-paste-input').fill(KIF('香落ち', ['３四歩(33)', '７六歩(77)']));
     await page.getByTestId('kif-paste-read').click();

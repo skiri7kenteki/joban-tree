@@ -14,7 +14,8 @@
 import { Move, type ImmutableNode } from 'tsshogi';
 import { toRecord } from '../shogi/kifu';
 import { STARTPOS_SFEN, type Side } from '../shogi/position';
-import { guessSide, nameFromTexts, newStudyId, studyTemplate } from './studies';
+import { guessSide, nameFromTexts, newStudyId, startTemplate } from './studies';
+import { templateIdFor } from './bookEdit';
 import type { OpeningTemplate } from './templates';
 import { KIF_NAME_MARK } from './studyFile';
 import type { Study } from './types';
@@ -104,6 +105,10 @@ export interface KifCandidate {
   note: string;
   /** 分かれ目（その変化が分かれた手、0 始まり。本譜なら無い） */
   branchAt?: number;
+  /** 手の文字（平手から 1 手ずつ。名前を自分の側で付け直すため） */
+  texts: string[];
+  /** 「★名前」から読み戻した名前か（自分で付けた名前なので、自分の側を切り替えても変えない） */
+  named: boolean;
   /** メモを 3000 文字で切った */
   noteCut: boolean;
   /** 同じ手順の研究手順がすでにある（初期値は取り込まない） */
@@ -119,6 +124,7 @@ export function candidateOf(
   index: number,
   templates: readonly OpeningTemplate[],
   existing: ReadonlyMap<string, Study>,
+  side: Side = 'black',
 ): KifCandidate {
   const moves = path.map((n) => (n.move as Move).usi);
   const texts = path.map(textOf);
@@ -152,8 +158,18 @@ export function candidateOf(
   const noteCut = note.length > NOTE_MAX;
   if (noteCut) note = `${note.slice(0, NOTE_MAX - CUT_MARK.length)}${CUT_MARK}`;
 
-  const name = (named ?? nameFromTexts(texts, studyTemplate({ moves }, templates), branchAt)).slice(0, NAME_MAX);
-  return { index, moves, name, note, branchAt, noteCut, existing: existing.get(moves.join(' ')) ?? null };
+  const base = { moves, texts, branchAt, named: named !== null, name: named ?? '' };
+  const name = candidateName(base, side, templates);
+  return { index, moves, name, note, branchAt, texts, named: named !== null, noteCut, existing: existing.get(moves.join(' ')) ?? null };
+}
+
+/**
+ * 候補の名前：「★名前」から読み戻したものはそのまま。それ以外は名前の初期値（段階10 の直し：自分の側が同じ、いちばん浅い戦型の後から。
+ * 自分の側で出発点が変わるので、側を切り替えたら付け直す）
+ */
+export function candidateName(c: Pick<KifCandidate, 'moves' | 'texts' | 'branchAt' | 'named' | 'name'>, side: Side, templates: readonly OpeningTemplate[]): string {
+  if (c.named) return c.name;
+  return nameFromTexts(c.texts, startTemplate(c.moves, side, templates, true), c.branchAt).slice(0, NAME_MAX);
 }
 
 /**
@@ -167,9 +183,15 @@ export async function buildCandidates(
   chunk = 50,
 ): Promise<KifCandidate[]> {
   const byMoves = new Map(existing.map((s) => [s.moves.join(' '), s]));
+  // 名前の初期値は自分の側の初期値で付ける（画面で側を切り替えたら candidateName で付け直す）
+  const side = kifSide(
+    read,
+    templates,
+    read.ends.map((path) => path.map((n) => (n.move as Move).usi)),
+  );
   const out: KifCandidate[] = [];
   for (let i = 0; i < read.ends.length; i++) {
-    out.push(candidateOf(read.ends[i], read.root, i, templates, byMoves));
+    out.push(candidateOf(read.ends[i], read.root, i, templates, byMoves, side));
     if ((i + 1) % chunk === 0) {
       onProgress?.(i + 1, read.ends.length);
       await new Promise((resolve) => setTimeout(resolve, 0));
@@ -198,15 +220,15 @@ export function candidatesToStudies(
   newId: () => string = newStudyId,
 ): Study[] {
   return list.map((c, i) => {
-    const t = studyTemplate({ moves: c.moves }, templates);
+    const templateId = templateIdFor(c.moves, templates, mySide);
     const at = now + (list.length - i);
     return {
       id: newId(),
-      name: c.name,
+      name: candidateName(c, mySide, templates),
       note: c.note,
       moves: [...c.moves],
       mySide,
-      ...(t ? { templateId: t.id } : {}),
+      ...(templateId ? { templateId } : {}),
       createdAt: at,
       updatedAt: at,
     };

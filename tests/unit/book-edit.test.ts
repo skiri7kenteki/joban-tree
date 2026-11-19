@@ -12,13 +12,16 @@ import {
   playInBook,
   settleView,
   checkNewMoves,
+  fixStudies,
+  defaultNameMatch,
   studyFromMoves,
   templateIdFor,
   type BookCtx,
 } from '../../src/tree/bookEdit';
-import { kifSide } from '../../src/tree/kifImport';
+import { candidateName, kifSide } from '../../src/tree/kifImport';
 import { bookKeyOfGroup, bookLabel, bookPool, fitsBook, groupStudies, hirateBookKey, studyGroupKey } from '../../src/tree/organize';
-import { defaultStudyName } from '../../src/tree/studies';
+import { defaultStudyName, moveTexts, nameFromTexts } from '../../src/tree/studies';
+import { bookStart } from '../../src/tree/studyBook';
 import type { OpeningTemplate } from '../../src/tree/templates';
 import type { Study } from '../../src/tree/types';
 
@@ -39,8 +42,8 @@ const TEMPLATES = [KAKU, NAKA];
 const K = KAKU.moves;
 
 const study = (id: string, moves: string[], opts: Partial<Study> = {}): Study => {
-  const shape = { moves, templateId: KAKU.id };
-  return { id, name: defaultStudyName(shape, TEMPLATES), note: '', ...shape, mySide: 'white', createdAt: 1, updatedAt: 1, ...opts };
+  const shape = { moves, templateId: KAKU.id, mySide: 'white' as const };
+  return { id, name: defaultStudyName(shape, TEMPLATES), note: '', ...shape, createdAt: 1, updatedAt: 1, ...opts };
 };
 
 let seq = 0;
@@ -258,34 +261,107 @@ describe('変化付き KIF の取り込み：自分の側の初期値（段階10
 
 describe('1 本の手順を定跡帳に足す（棋譜を貼る・ツリーから。段階10-2）', () => {
   it('手が 0 本・戦型の出発点そのもので終わる手順は足さない。1 手でも先なら足せる', () => {
-    expect(checkNewMoves([], TEMPLATES)).toBe('empty');
-    expect(checkNewMoves(K, TEMPLATES)).toBe('start');
-    expect(checkNewMoves(['5g5f'], TEMPLATES)).toBe('start'); // 中飛車の出発点
-    expect(checkNewMoves([...K, '3d3f'], TEMPLATES)).toBeNull();
-    expect(checkNewMoves(['7g7f'], TEMPLATES)).toBeNull(); // どの戦型にも当てはまらない 1 手
+    expect(checkNewMoves([], TEMPLATES, 'white')).toBe('empty');
+    expect(checkNewMoves(K, TEMPLATES, 'white')).toBe('start');
+    expect(checkNewMoves(['5g5f'], TEMPLATES, 'black')).toBe('start'); // 中飛車の出発点
+    expect(checkNewMoves([...K, '3d3f'], TEMPLATES, 'white')).toBeNull();
+    expect(checkNewMoves(['7g7f'], TEMPLATES, 'white')).toBeNull(); // どの戦型にも当てはまらない 1 手
   });
 
   it('作る研究手順：名前は初期値（戦型の出発点の後の手順から）、メモは空、戦型はいちばん長く一致するもの、自分の側は選んだもの', () => {
-    const s = studyFromMoves([...K, '3d3f', '8f8d'], 'black', TEMPLATES, 50, 'x');
+    const s = studyFromMoves([...K, '3d3f', '8f8d'], 'white', TEMPLATES, 50, 'x');
     expect(s).toEqual({
       id: 'x',
       name: '▲３六飛 △８四飛',
       note: '',
       moves: [...K, '3d3f', '8f8d'],
       templateId: KAKU.id,
-      mySide: 'black',
+      mySide: 'white',
       createdAt: 50,
       updatedAt: 50,
     });
+    // 先手番の研究には後手番向けの戦型を付けない（名前は側を問わず短い戦型の後から）
+    const b = studyFromMoves([...K, '3d3f', '8f8d'], 'black', TEMPLATES, 50, 'z');
+    expect('templateId' in b).toBe(false);
+    expect(b.name).toBe('▲３六飛 △８四飛');
     expect('templateId' in studyFromMoves(['7g7f', '3c3d'], 'white', TEMPLATES, 1, 'y')).toBe(false);
   });
 
   it('戦型は手順から付け直す（延ばした・縮めたときも。外れたら付けない）', () => {
-    expect(templateIdFor(['5g5f', '3c3d'], TEMPLATES)).toBe(NAKA.id);
-    expect(templateIdFor(['7g7f'], TEMPLATES)).toBeUndefined();
+    expect(templateIdFor(['5g5f', '3c3d'], TEMPLATES, 'black')).toBe(NAKA.id);
+    expect(templateIdFor(['5g5f', '3c3d'], TEMPLATES, 'white')).toBeUndefined();
+    expect(templateIdFor(['7g7f'], TEMPLATES, 'black')).toBeUndefined();
     const plan = cutBranch([A], [...K, '3d3f'], '8f8d', 'A', ctx({ start: 0 }));
     expect(plan?.kept?.templateId).toBe(KAKU.id);
     // 平手からの定跡帳（出発点 0）でも、戦型の出発点で終わる研究手順は残さない
     expect(cutBranch([A], K, '3d3f', 'A', ctx({ start: 0 }))?.kept).toBeNull();
+  });
+});
+
+describe('定跡帳の出発点がずれる不具合の直し（段階10 の直し。自分の側が同じ戦型）', () => {
+  // 同梱の戦型と同じ形：基本図（15 手・先手番）、△3三角（16 手・後手番）、△3三角型（▲3六飛まで。17 手・先手番）
+  const KIHON = tpl('yokofu-kihon', '横歩取り', YOKOFU, 'black', '横歩取り 基本図（▲3四飛まで）');
+  const KAKU_G = tpl('yokofu-33kaku-gote', '横歩取り', [...YOKOFU, '2b3c'], 'white', '横歩取り △3三角（後手番）');
+  const KAKU36 = tpl('yokofu-33kaku', '横歩取り', [...YOKOFU, '2b3c', '3d3f'], 'black', '横歩取り △3三角型（▲3六飛まで）');
+  const T = [KIHON, KAKU_G, KAKU36];
+  const c = (side: 'black' | 'white', start: number): BookCtx => ({ templates: T, side, start, now: 10, newId: () => `m${++seq}`, fits: () => true });
+
+  it('後手番：△3三角 から ▲3六飛 を指しても、戦型は後手番の △3三角 のまま。名前は「▲３六飛」。出発点は 16 手目のまま', () => {
+    const r = playInBook([], [], KAKU_G.moves, '3d3f', null, c('white', 16));
+    if (r.kind !== 'create') throw new Error(r.kind);
+    expect(r.study.templateId).toBe(KAKU_G.id);
+    expect(r.study.name).toBe('▲３六飛');
+    expect(bookStart([r.study], T, 'white')).toBe(16);
+    // 延ばしても出発点は 16 手目、名前は 16 手目の後から
+    const r2 = playInBook([r.study], [r.study], r.study.moves, '8f8d', r.study.id, c('white', 16));
+    if (r2.kind !== 'extend') throw new Error(r2.kind);
+    expect(r2.study.name).toBe('▲３六飛 △８四飛');
+    expect(bookStart([r2.study], T, 'white')).toBe(16);
+    // 16 手目に戻って ▲5八玉（青野流）を足せる → 「この局面からの研究」に 2 本
+    const r3 = playInBook([r2.study], [r2.study], KAKU_G.moves, '5i5h', r2.study.id, c('white', 16));
+    expect(r3.kind).toBe('create');
+  });
+
+  it('先手番：基本図から △3三角 ▲3六飛 と指しても、出発点は 15 手目のまま。16 手目に △8八角成 を足せる', () => {
+    const r = playInBook([], [], KIHON.moves, '2b3c', null, c('black', 15));
+    if (r.kind !== 'create') throw new Error(r.kind);
+    expect(r.study.templateId).toBe(KIHON.id);
+    expect(r.study.name).toBe('△３三角');
+    const r2 = playInBook([r.study], [r.study], r.study.moves, '3d3f', r.study.id, c('black', 15));
+    if (r2.kind !== 'extend') throw new Error(r2.kind);
+    expect(r2.study.templateId).toBe(KAKU36.id); // 先手番の戦型なので付け直す
+    expect(r2.study.name).toBe('△３三角 ▲３六飛');
+    expect(bookStart([r2.study], T, 'black')).toBe(15);
+    expect(playInBook([r2.study], [r2.study], KIHON.moves, '2b8h+', r2.study.id, c('black', 15)).kind).toBe('create');
+  });
+
+  it('ずれた研究手順を直す：側の違う戦型を付け直し、初期値のままの名前を付け直す（分かれ目は残す）。自分で付けた名前・直した日時は変えない', () => {
+    const moves = [...KAKU36.moves, '8f8d', '3f2f', '3a2b', '5i5h', '5a4b'];
+    // 前の決まりで付いた名前：△3三角型（▲3六飛まで）の後から（分かれ目 19 手目）。戦型も先手番のもの
+    const legacy = nameFromTexts(moveTexts(moves), KAKU36, 18);
+    const a: Study = { id: 'a', name: legacy, note: 'メモ', moves, templateId: KAKU36.id, mySide: 'white', createdAt: 1, updatedAt: 5 };
+    // 戦型の名前だけになった研究手順
+    const b: Study = { id: 'b', name: KAKU36.name, note: '', moves: KAKU36.moves, templateId: KAKU36.id, mySide: 'white', createdAt: 1, updatedAt: 6 };
+    // 自分で付けた名前
+    const u: Study = { ...b, id: 'u', name: '本線' };
+    // もう正しいもの
+    const ok: Study = { id: 'ok', name: '▲３六飛', note: '', moves: KAKU36.moves, templateId: KAKU_G.id, mySide: 'white', createdAt: 1, updatedAt: 7 };
+    expect(defaultNameMatch(a, T)).toEqual({ branchAt: 18 });
+    const fixed = fixStudies([a, b, u, ok], T);
+    expect(fixed.map((s) => [s.id, s.name, s.templateId, s.updatedAt, s.note])).toEqual([
+      ['a', '▲３六飛 … 19手目 ▲２六飛 … △４二玉', KAKU_G.id, 5, 'メモ'],
+      ['b', '▲３六飛', KAKU_G.id, 6, ''],
+      ['u', '本線', KAKU_G.id, 6, ''],
+    ]);
+    // 何度直しても同じ（直したものをもう一度直しても変わらない）
+    expect(fixStudies(fixed, T)).toEqual([]);
+  });
+
+  it('変化付き KIF の取り込み：名前の初期値は選んだ自分の側で付ける（★名前から読み戻したものは変えない）', () => {
+    const moves = [...KAKU36.moves, '8f8d'];
+    const cand = { moves, texts: moveTexts(moves), branchAt: undefined, named: false, name: '' };
+    expect(candidateName(cand, 'white', T)).toBe('▲３六飛 △８四飛');
+    expect(candidateName(cand, 'black', T)).toBe('△３三角 ▲３六飛 △８四飛');
+    expect(candidateName({ ...cand, named: true, name: '本線' }, 'black', T)).toBe('本線');
   });
 });

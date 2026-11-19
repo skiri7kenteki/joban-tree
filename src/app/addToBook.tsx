@@ -25,10 +25,10 @@ export function studyBookUrl(study: Pick<Study, 'id' | 'moves' | 'mySide' | 'tem
   return bookPath(key, study.id, Math.min(study.moves.length, ply ?? study.moves.length));
 }
 
-/** 足せない手順の理由（足せれば null） */
-export function addProblem(moves: readonly string[] | null): string | null {
+/** 足せない手順の理由（足せれば null）。出発点の戦型は自分の側で変わるので side を渡す（段階10 の直し） */
+export function addProblem(moves: readonly string[] | null, side: Side): string | null {
   if (!moves) return '平手の初期局面から始まる手順だけ、研究手順にできます（駒落ちや、SFEN で途中の局面から始めた手順は足せません）。';
-  const problem = checkNewMoves(moves, allTemplates());
+  const problem = checkNewMoves(moves, allTemplates(), side);
   if (problem === 'empty') return '1 手以上進めた局面を選んでください（初期局面そのものは研究手順にできません）。';
   if (problem === 'start') return '戦型の出発点そのものは研究手順にできません。1 手以上進めた局面で足してください。';
   return null;
@@ -84,6 +84,11 @@ export function AddToBookDialog({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   async function add() {
+    const problem = addProblem(moves, side);
+    if (problem) {
+      setError(problem);
+      return;
+    }
     setBusy(true);
     try {
       onDone(await addMovesToBook(moves, side));
@@ -95,7 +100,7 @@ export function AddToBookDialog({
   return (
     <Dialog title="定跡帳に足す" onClose={onClose} testId="add-book-dialog">
       <p class="study-moves muted" data-testid="add-book-moves">
-        {studyMovesText({ moves: [...moves] }, allTemplates())}
+        {studyMovesText({ moves: [...moves], mySide: side }, allTemplates())}
       </p>
       <SidePicker side={side} onChange={setSide} testPrefix="add-book" />
       <p class="muted">名前は自動で付けます。名前とメモは、定跡帳の「★」の行から直せます。</p>
@@ -137,17 +142,24 @@ export function KifPasteDialog({ onClose }: { onClose: () => void }) {
       return;
     }
     const list = r.line.slice(1).map((p) => p.usi ?? '');
-    const problem = addProblem(r.line[0].sfen === STARTPOS_SFEN ? list : null);
+    const guessed = guessSide(list, allTemplates());
+    const problem = addProblem(r.line[0].sfen === STARTPOS_SFEN ? list : null, guessed);
     if (problem) {
       setMessage(problem);
       return;
     }
     setMoves(list);
-    setSide(guessSide(list, allTemplates()));
+    setSide(guessed);
   }
 
   async function add() {
     if (!moves) return;
+    const problem = addProblem(moves, side);
+    if (problem) {
+      setMessage(problem);
+      return;
+    }
+    setMessage('');
     setBusy(true);
     try {
       const r = await addMovesToBook(moves, side);
@@ -192,7 +204,7 @@ export function KifPasteDialog({ onClose }: { onClose: () => void }) {
       ) : (
         <>
           <p class="study-moves muted" data-testid="kif-paste-moves">
-            {moves.length} 手：{studyMovesText({ moves }, allTemplates())}
+            {moves.length} 手：{studyMovesText({ moves, mySide: side }, allTemplates())}
           </p>
           <SidePicker side={side} onChange={setSide} testPrefix="kif-paste" />
           <p class="muted">名前は自動で付けます。名前とメモは、定跡帳の「★」の行から直せます。</p>

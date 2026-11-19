@@ -7,7 +7,7 @@
 
 import { useRef, useState } from 'preact/hooks';
 import type { Side } from '../shogi/position';
-import { buildCandidates, candidatesToStudies, decodeKifFile, kifSide, readKif, type KifCandidate } from '../tree/kifImport';
+import { buildCandidates, candidateName, candidatesToStudies, decodeKifFile, kifSide, readKif, type KifCandidate } from '../tree/kifImport';
 import { setHomeTab } from './recent';
 import { back, go } from './router';
 import { ensureStudies, homeNotice, saveStudies } from './studies';
@@ -185,7 +185,7 @@ export function StudyKifImportScreen() {
                 <label class="study-pick-item kif-bulk-row" data-testid="kif-bulk-row">
                   <input type="checkbox" checked={checked.has(c.index)} data-testid="kif-bulk-check" onChange={() => toggle(c.index)} />
                   <span class="kif-bulk-text">
-                    <span class="kif-bulk-name">{c.name}</span>
+                    <span class="kif-bulk-name">{candidateName(c, side, allTemplates())}</span>
                     <span class="muted kif-bulk-meta">
                       {c.moves.length} 手{c.note ? '・メモあり' : ''}
                       {c.noteCut ? '（長いので途中まで）' : ''}

@@ -51,11 +51,15 @@ test.describe('9-2 研究手順どうしをつないで見る', () => {
     await page.getByTestId('study-group-menu-open').first().click();
     await page.getByTestId('study-group-book').click();
     await expect(page.getByTestId('book-title')).toHaveText('定跡帳横歩取り（先手番）');
-    // 出発点は 3 本が全部通る戦型の出発点（△3三角型）。それより前には戻れない。いちばん最近直した研究A を見ている
-    await expect(page.getByTestId('study-position')).toContainText('17手目');
-    await expect(page.getByTestId('book-start-crumb')).toContainText('△3三角型');
+    // 出発点は 3 本が全部通る、先手番の戦型のうちいちばん浅いもの（基本図。段階10 の直し）。それより前には戻れない。いちばん最近直した研究A を見ている
+    await expect(page.getByTestId('study-position')).toContainText('15手目');
+    await expect(page.getByTestId('book-start-crumb')).toContainText('基本図');
     await expect(page.getByTestId('study-prev')).toBeDisabled();
     await expect(page.getByTestId('study-title')).toHaveText('研究A');
+    // 17 手目（▲3六飛 の後）へ
+    await page.getByTestId('study-next').click();
+    await page.getByTestId('study-next').click();
+    await expect(page.getByTestId('study-position')).toContainText('17手目');
     await expect(page.getByTestId('study-meta')).toContainText('Aのメモ');
     await expect(page.getByTestId('study-book-head')).toHaveText('この局面からの研究（3 本）');
     const rows = page.getByTestId('study-book-branch');
@@ -81,8 +85,11 @@ test.describe('9-2 研究手順どうしをつないで見る', () => {
     await expect(page.getByTestId('study-title')).toHaveText('研究B');
     await expect(page.getByTestId('study-position')).toContainText('20手目');
 
-    // 出発点へ戻る：今いちばん最近直したのは研究B。研究C へ切り替えて、その終わり
+    // 出発点（15 手目）へ戻って 17 手目へ：今いちばん最近直したのは研究B。研究C へ切り替えて、その終わり
     await page.getByTestId('book-start-crumb').click();
+    await expect(page.getByTestId('study-position')).toContainText('15手目');
+    await page.getByTestId('study-next').click();
+    await page.getByTestId('study-next').click();
     await expect(page.getByTestId('study-position')).toContainText('17手目');
     await rows.filter({ hasText: '研究C' }).click();
     await expect(page.getByTestId('study-title')).toHaveText('研究C');

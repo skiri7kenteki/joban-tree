@@ -255,7 +255,7 @@ function TreeView({ tree, studies, studyId, ply }: { tree: TreeData; studies: re
       go(studyBookUrl(studyHere));
       return;
     }
-    const problem = addProblem(fullMoves);
+    const problem = addProblem(fullMoves, tree.mySide);
     if (problem) {
       setNote(problem);
       return;

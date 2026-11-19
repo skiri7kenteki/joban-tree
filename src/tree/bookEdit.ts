@@ -17,31 +17,37 @@
 //     here が定跡帳の出発点・戦型の出発点・初期局面なら、残すと 0 手の研究手順になるので残さない
 // 取り消し：変更（BookChange）と、変更する前の一覧から、元に戻す変更を作る（inverseChange）
 
-import { nameFromTexts, moveTexts, startsWith, studyStartIndex, studyTemplate, findSameStudy, defaultStudyName } from './studies';
+import { nameFromTexts, moveTexts, startsWith, startTemplate, studyTemplate, findSameStudy, defaultStudyName } from './studies';
 import { closestTemplate, type OpeningTemplate } from './templates';
 import type { Study } from './types';
 import type { Side } from '../shogi/position';
 
-/** 手順から付け直す戦型（いちばん長く一致する戦型。無ければ付けない） */
-export function templateIdFor(moves: readonly string[], templates: readonly OpeningTemplate[]): string | undefined {
-  return closestTemplate(templates, moves)?.id;
+/**
+ * 手順から付け直す戦型：**自分の側が同じ戦型**のうち、いちばん長く一致するもの。無ければ付けない
+ * （段階10 の直し。後手番の研究に先手番向けの戦型を付けない。付けなくても、一覧のグループは手順から決まる）
+ */
+export function templateIdFor(moves: readonly string[], templates: readonly OpeningTemplate[], side: Side): string | undefined {
+  return closestTemplate(
+    templates.filter((t) => t.mySide === side),
+    moves,
+  )?.id;
 }
 
 /**
  * 1 本の手順をそのまま研究手順にして定跡帳に足せるか（棋譜を貼る・ツリーや新しいツリーの画面から。段階10-2）：
- * 手が 0 本（'empty'）、戦型の出発点そのもので終わる（'start'）なら足さない
+ * 手が 0 本（'empty'）、出発点の戦型（自分の側が同じ、いちばん浅いもの。`startTemplate`）そのもので終わる（'start'）なら足さない
  */
-export function checkNewMoves(moves: readonly string[], templates: readonly OpeningTemplate[]): 'empty' | 'start' | null {
+export function checkNewMoves(moves: readonly string[], templates: readonly OpeningTemplate[], side: Side): 'empty' | 'start' | null {
   if (moves.length === 0) return 'empty';
-  if (studyStartIndex({ moves: [...moves] }, templates) >= moves.length) return 'start';
+  if (startTemplate(moves, side, templates)?.moves.length === moves.length) return 'start';
   return null;
 }
 
-/** 1 本の手順から作る研究手順（名前は初期値、メモは空、戦型はいちばん長く一致するもの） */
+/** 1 本の手順から作る研究手順（名前は初期値、メモは空、戦型は自分の側が同じ戦型のうちいちばん長く一致するもの） */
 export function studyFromMoves(moves: readonly string[], side: Side, templates: readonly OpeningTemplate[], now: number, id: string): Study {
-  const templateId = templateIdFor(moves, templates);
-  const shape = { moves: [...moves], ...(templateId ? { templateId } : {}) };
-  return { id, name: defaultStudyName(shape, templates), note: '', ...shape, mySide: side, createdAt: now, updatedAt: now };
+  const templateId = templateIdFor(moves, templates, side);
+  const shape = { moves: [...moves], ...(templateId ? { templateId } : {}), mySide: side };
+  return { id, name: defaultStudyName(shape, templates), note: '', ...shape, createdAt: now, updatedAt: now };
 }
 
 /** 研究手順の一覧への変更（put：保存する、remove：消す） */
@@ -86,23 +92,70 @@ export function branchPoint(study: Pick<Study, 'id' | 'moves' | 'createdAt'>, po
   return at >= 0 ? at : undefined;
 }
 
-/** 名前が、その手順の初期値（分かれ目の手数付きの形も含む）のままか */
-export function isDefaultName(study: Pick<Study, 'name' | 'moves' | 'templateId'>, templates: readonly OpeningTemplate[]): boolean {
+/**
+ * 名前が、その手順の初期値（分かれ目の手数付きの形も含む）のままなら、その分かれ目（無ければ undefined）。初期値でなければ null。
+ * 今の決まり（出発点の戦型の後から）のほかに、段階10 の直しより前の決まり（側を問わず、記録した戦型・いちばん長く一致する戦型の後から。
+ * 後が 0 手なら戦型の名前）も初期値として見る（ずれた名前を直すため）
+ */
+export function defaultNameMatch(study: Pick<Study, 'name' | 'moves' | 'templateId' | 'mySide'>, templates: readonly OpeningTemplate[]): { branchAt?: number } | null {
   const texts = moveTexts(study.moves);
-  const template = studyTemplate(study, templates);
-  if (nameFromTexts(texts, template) === study.name) return true;
-  for (let b = 0; b < study.moves.length; b++) if (nameFromTexts(texts, template, b) === study.name) return true;
-  return false;
+  const legacy = { moves: study.moves, ...(study.templateId ? { templateId: study.templateId } : {}) };
+  const candidates = [
+    startTemplate(study.moves, study.mySide, templates, true),
+    studyTemplate(legacy, templates),
+    closestTemplate(templates, study.moves),
+    studyTemplate(study, templates),
+    null,
+  ];
+  const seen = new Set<string>();
+  for (const t of candidates) {
+    const key = t?.id ?? '';
+    if (seen.has(key)) continue;
+    seen.add(key);
+    if (nameFromTexts(texts, t) === study.name) return {};
+    for (let b = 0; b < study.moves.length; b++) if (nameFromTexts(texts, t, b) === study.name) return { branchAt: b };
+  }
+  return null;
 }
 
-/** 名前の初期値（分かれ目は pool の中の、先に作った研究手順から決める） */
-export function autoName(study: Pick<Study, 'id' | 'moves' | 'templateId' | 'createdAt'>, pool: readonly Study[], templates: readonly OpeningTemplate[]): string {
-  return nameFromTexts(moveTexts(study.moves), studyTemplate(study, templates), branchPoint(study, pool));
+/** 名前が、その手順の初期値のままか */
+export function isDefaultName(study: Pick<Study, 'name' | 'moves' | 'templateId' | 'mySide'>, templates: readonly OpeningTemplate[]): boolean {
+  return defaultNameMatch(study, templates) !== null;
+}
+
+/** 名前の初期値（出発点は `startTemplate`。分かれ目は pool の中の、先に作った研究手順から決める） */
+export function autoName(study: Pick<Study, 'id' | 'moves' | 'mySide' | 'createdAt'>, pool: readonly Study[], templates: readonly OpeningTemplate[]): string {
+  return nameFromTexts(moveTexts(study.moves), startTemplate(study.moves, study.mySide, templates, true), branchPoint(study, pool));
+}
+
+/**
+ * ずれてしまった研究手順を直す（段階10 の直し。アプリを開いたときに毎回確かめる。直すものが無ければ何もしない）：
+ *   - 記録した戦型の自分の側が研究手順と違う・手順が通らない → 自分の側が同じ戦型で付け直す（記録した戦型が見つからないときは触らない）
+ *   - 名前が初期値のまま（前の決まりの初期値も含む）→ 今の決まりで付け直す（分かれ目の手数付きなら、その分かれ目を残す）。自分で付けた名前は変えない
+ *   - 直した日時は変えない（「いちばん最近直した研究手順」の並びを変えないため）
+ * 直した研究手順だけを返す
+ */
+export function fixStudies(list: readonly Study[], templates: readonly OpeningTemplate[]): Study[] {
+  const out: Study[] = [];
+  for (const s of list) {
+    let templateId = s.templateId;
+    if (templateId) {
+      const t = templates.find((x) => x.id === templateId);
+      if (t && (t.mySide !== s.mySide || !startsWith(s.moves, t.moves))) templateId = templateIdFor(s.moves, templates, s.mySide);
+    }
+    const match = defaultNameMatch(s, templates);
+    const name = match ? nameFromTexts(moveTexts(s.moves), startTemplate(s.moves, s.mySide, templates, true), match.branchAt) : s.name;
+    if (name === s.name && templateId === s.templateId) continue;
+    const { templateId: _old, ...rest } = s;
+    void _old;
+    out.push({ ...rest, name, ...(templateId ? { templateId } : {}) });
+  }
+  return out;
 }
 
 /** 手順を変えた研究手順（戦型は付け直す。名前は初期値のままなら付け直す。メモ・側・作った日時はそのまま） */
 export function reshaped(original: Study, moves: readonly string[], pool: readonly Study[], ctx: Pick<BookCtx, 'templates' | 'now'>): Study {
-  const templateId = templateIdFor(moves, ctx.templates);
+  const templateId = templateIdFor(moves, ctx.templates, original.mySide);
   const { templateId: _old, ...rest } = original;
   void _old;
   const next: Study = { ...rest, moves: [...moves], ...(templateId ? { templateId } : {}), updatedAt: ctx.now };
@@ -111,9 +164,9 @@ export function reshaped(original: Study, moves: readonly string[], pool: readon
 
 /** 新しい研究手順（名前は自動、メモは空、側は定跡帳の側） */
 export function createdStudy(moves: readonly string[], pool: readonly Study[], ctx: BookCtx): Study {
-  const templateId = templateIdFor(moves, ctx.templates);
-  const shape = { id: ctx.newId(), moves: [...moves], ...(templateId ? { templateId } : {}), createdAt: ctx.now };
-  return { ...shape, name: autoName(shape, pool, ctx.templates), note: '', mySide: ctx.side, updatedAt: ctx.now };
+  const templateId = templateIdFor(moves, ctx.templates, ctx.side);
+  const shape = { id: ctx.newId(), moves: [...moves], ...(templateId ? { templateId } : {}), mySide: ctx.side, createdAt: ctx.now };
+  return { ...shape, name: autoName(shape, pool, ctx.templates), note: '', updatedAt: ctx.now };
 }
 
 export type PlayResult =
@@ -154,25 +207,25 @@ export interface CutPlan extends BookChange {
 }
 
 /** removed を消す。here を通る研究手順が無くなるなら 1 本を here で終わる形にして残す */
-function removeKeepingHere(pool: readonly Study[], here: readonly string[], removed: readonly Study[], currentId: string | null, ctx: Pick<BookCtx, 'templates' | 'now' | 'start'>): CutPlan {
+function removeKeepingHere(pool: readonly Study[], here: readonly string[], removed: readonly Study[], currentId: string | null, ctx: Pick<BookCtx, 'templates' | 'now' | 'start' | 'side'>): CutPlan {
   const ids = new Set(removed.map((s) => s.id));
   const rest = pool.filter((s) => !ids.has(s.id));
   const covered = rest.some((s) => startsWith(s.moves, here));
   // 出発点（定跡帳の出発点・戦型の出発点・初期局面）で終わる研究手順は残さない
-  if (covered || here.length <= ctx.start || checkNewMoves(here, ctx.templates) !== null) return { put: [], remove: [...removed], kept: null };
+  if (covered || here.length <= ctx.start || checkNewMoves(here, ctx.templates, ctx.side) !== null) return { put: [], remove: [...removed], kept: null };
   const keep = removed.find((s) => s.id === currentId) ?? [...removed].sort(byLatest)[0];
   const kept = reshaped(keep, here, rest, ctx);
   return { put: [kept], remove: removed.filter((s) => s.id !== keep.id), kept };
 }
 
 /** この手から先を消す（here＋move を通る研究手順をまとめて）。消すものが無ければ null */
-export function cutBranch(pool: readonly Study[], here: readonly string[], move: string, currentId: string | null, ctx: Pick<BookCtx, 'templates' | 'now' | 'start'>): CutPlan | null {
+export function cutBranch(pool: readonly Study[], here: readonly string[], move: string, currentId: string | null, ctx: Pick<BookCtx, 'templates' | 'now' | 'start' | 'side'>): CutPlan | null {
   const removed = pool.filter((s) => startsWith(s.moves, [...here, move]));
   return removed.length > 0 ? removeKeepingHere(pool, here, removed, currentId, ctx) : null;
 }
 
 /** ここで終わりにする（here より先へ進む研究手順をまとめて）。消すものが無ければ null */
-export function endHere(pool: readonly Study[], here: readonly string[], currentId: string | null, ctx: Pick<BookCtx, 'templates' | 'now' | 'start'>): CutPlan | null {
+export function endHere(pool: readonly Study[], here: readonly string[], currentId: string | null, ctx: Pick<BookCtx, 'templates' | 'now' | 'start' | 'side'>): CutPlan | null {
   const removed = pool.filter((s) => s.moves.length > here.length && startsWith(s.moves, here));
   return removed.length > 0 ? removeKeepingHere(pool, here, removed, currentId, ctx) : null;
 }

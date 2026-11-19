@@ -195,7 +195,7 @@ export function InputScreen() {
 
   /** 「この手順を定跡帳に足す」：平手からの手順で、1 手以上（戦型の出発点そのものは足さない） */
   function openAddToBook() {
-    const problem = addProblem(line[0].sfen === STARTPOS_SFEN ? movesHere : null);
+    const problem = addProblem(line[0].sfen === STARTPOS_SFEN ? movesHere : null, mySide);
     if (problem) {
       setStudyNote({ text: problem });
       return;

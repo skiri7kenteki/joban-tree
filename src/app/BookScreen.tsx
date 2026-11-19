@@ -109,10 +109,10 @@ export function BookScreen({ bookKey, id, ply, template }: { bookKey: string; id
   return <BookViewScreen bookKey={bookKey} side={side} pool={pool} templates={templates} id={id} ply={ply} tpl={tpl} />;
 }
 
-/** 定跡帳の出発点：平手からの定跡帳は初期局面。戦型のグループは、研究手順（と今の手順）が全部通る、いちばん深い戦型の出発点 */
+/** 定跡帳の出発点：平手からの定跡帳は初期局面。戦型のグループは、研究手順（と今の手順）が全部通る、自分の側が同じ、いちばん浅い戦型の出発点（段階10 の直し） */
 function startOf(key: string, pool: readonly Study[], line: readonly string[], templates: readonly OpeningTemplate[]): number {
   if (isHirateBook(key)) return 0;
-  return bookStart([...pool, { moves: [...line] }], templates);
+  return bookStart([...pool, { moves: [...line] }], templates, bookSide(key) ?? 'black');
 }
 
 const byLatest = (a: Study, b: Study) => b.updatedAt - a.updatedAt;
@@ -176,7 +176,9 @@ function BookViewScreen({
   const sfen = positions[index] ?? STARTPOS_SFEN;
   const prevMove = index > 0 ? line[index - 1] : undefined;
   const label = bookLabel(bookKey);
-  const startTemplate = start > 0 ? templates.find((t) => t.moves.length === start && startsWith(line, t.moves)) : undefined;
+  // 出発点の名前：自分の側が同じ戦型を先に
+  const startCandidates = start > 0 ? templates.filter((t) => t.moves.length === start && startsWith(line, t.moves)) : [];
+  const startTemplate = startCandidates.find((t) => t.mySide === side) ?? startCandidates[0];
   const startName = startTemplate ? listName(startTemplate) : '初期局面';
   /** 研究の木が通っている、今の手順のいちばん深い局面（それより先は木の外。パンくずを薄く） */
   const covered = coveredDepth(pool, line);
@@ -372,7 +374,7 @@ function BookViewScreen({
   const cutPlan = dialog?.kind === 'cut' ? cutBranch(pool, here, dialog.move, current?.id ?? null, ctx()) : null;
   // ここで終わりにする：出発点（と初期局面）では使えない
   const endPlan = useMemo(
-    () => (index > start && index > 0 ? endHere(pool, here, current?.id ?? null, { templates, start, now: 0 }) : null),
+    () => (index > start && index > 0 ? endHere(pool, here, current?.id ?? null, { templates, start, side, now: 0 }) : null),
     [pool, index, line, current?.id, start],
   );
 
@@ -410,7 +412,7 @@ function BookViewScreen({
   }
 
   function makeTree() {
-    const t = studyTemplate({ moves: here }, templates);
+    const t = studyTemplate({ moves: here, mySide: side }, templates);
     inputHandoff.value = { moves: [...line], index, mySide: side, ...(t ? { templateId: t.id } : {}) };
     go('/new');
   }

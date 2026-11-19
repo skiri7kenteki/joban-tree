@@ -16,6 +16,7 @@ import { BookScreen } from './app/BookScreen';
 import { RegisterRedirect, StudyRedirect } from './app/LegacyRedirect';
 import { StudyReviewScreen } from './app/StudyReviewScreen';
 import { StudyKifImportScreen } from './app/StudyKifImportScreen';
+import { fixStudiesOnStart } from './app/studyFix';
 
 function App() {
   const [isolation, setIsolation] = useState<IsolationState | 'checking'>('checking');
@@ -67,5 +68,8 @@ function isolationMessage(state: IsolationState | 'checking'): string | null {
       return 'エンジン（将棋 AI）を動かす準備ができませんでした。アプリを開き直してください。';
   }
 }
+
+// ずれてしまった研究手順（戦型の側・名前）を直す（段階10 の直し。直すものが無ければ何もしない）
+fixStudiesOnStart();
 
 render(<App />, document.getElementById('root')!);

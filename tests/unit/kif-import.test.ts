@@ -151,7 +151,7 @@ describe('このアプリで書き出した KIF を読み戻す', () => {
 
 describe('取り込む研究手順', () => {
   it('選んだ側・戦型・日時（KIF の順に一覧の上から並ぶ）', async () => {
-    const tpl: OpeningTemplate = { id: 'tpl', name: 't', group: 'g', mySide: 'white', moves: ['7g7f', '3c3d'], note: '', reviewed: true };
+    const tpl: OpeningTemplate = { id: 'tpl', name: 't', group: 'g', mySide: 'black', moves: ['7g7f', '3c3d'], note: '', reviewed: true };
     const c = await candidates(ONE_VAR, [], [tpl]);
     let n = 0;
     const studies = candidatesToStudies(c, 'black', [tpl], 1000, () => `id-${n++}`);
@@ -159,6 +159,8 @@ describe('取り込む研究手順', () => {
       ['id-0', 'black', 'tpl', 1002],
       ['id-1', 'black', 'tpl', 1001],
     ]);
+    // 段階10 の直し：自分の側が違う戦型は付けない
+    expect(candidatesToStudies(c, 'white', [tpl], 1000).map((s) => s.templateId)).toEqual([undefined, undefined]);
   });
 
   it('多いとき：少しずつ作り、進み具合を知らせる。上限を超えたら読まない', async () => {

@@ -61,18 +61,31 @@ describe('つないだツリーの組み立て', () => {
   });
 });
 
-describe('定跡帳の出発点', () => {
-  const t1 = { moves: ['7g7f', '3c3d'] };
-  const t2 = { moves: ['7g7f', '3c3d', '2g2f'] };
-  const t3 = { moves: ['2g2f'] };
-  it('研究手順が全部通る戦型の出発点のうち、いちばん深いもの。無ければ 0', () => {
-    const s1 = study('1', ['7g7f', '3c3d', '2g2f', '8c8d']);
-    const s2 = study('2', ['7g7f', '3c3d', '2g2f']);
-    expect(bookStart([s1, s2], [t1, t2, t3])).toBe(3);
-    const s3 = study('3', ['7g7f', '3c3d', '6g6f']);
-    expect(bookStart([s1, s2, s3], [t1, t2, t3])).toBe(2);
-    expect(bookStart([study('4', ['5g5f'])], [t1, t2, t3])).toBe(0);
-    expect(bookStart([], [t1])).toBe(0);
+describe('定跡帳の出発点（段階10 の直し：研究を足しても奥へずれない）', () => {
+  // 横歩取りと同じ形：基本図（15 手・先手番）→ △3三角（16 手・後手番）→ ▲3六飛 まで（17 手・先手番）、△8八角成（16 手目から・後手番の相横歩取り）
+  const YOKOFU = '7g7f 3c3d 2g2f 8c8d 2f2e 8d8e 6i7h 4a3b 2e2d 2c2d 2h2d 8e8f 8g8f 8b8f 2d3d'.split(' ');
+  const kihon = { moves: YOKOFU, mySide: 'black' as const };
+  const kakuGote = { moves: [...YOKOFU, '2b3c'], mySide: 'white' as const };
+  const kaku36 = { moves: [...YOKOFU, '2b3c', '3d3f'], mySide: 'black' as const };
+  const aiyokofu = { moves: [...YOKOFU, '2b8h+', '7i8h', '8f7f'], mySide: 'white' as const };
+  const TPL = [kihon, kakuGote, kaku36, aiyokofu];
+
+  it('後手番：研究手順が 1 本でも、全部が通る後手番の戦型のうちいちばん浅いもの（16 手目 △3三角）。先手番向けの ▲3六飛 まで（17 手）にずれない', () => {
+    const s = study('1', [...kaku36.moves]);
+    expect(bookStart([s], TPL, 'white')).toBe(16);
+    expect(bookStart([s, study('2', [...kaku36.moves, '8f8d', '3f2f'])], TPL, 'white')).toBe(16);
+  });
+
+  it('先手番：全部が通る先手番の戦型のうちいちばん浅いもの（15 手目 基本図）。1 本だけでも、▲3六飛 まで（17 手）にずれない', () => {
+    expect(bookStart([study('1', [...kaku36.moves, '8f8d'])], TPL, 'black')).toBe(15);
+    expect(bookStart([study('1', [...kaku36.moves, '8f8d']), study('2', [...aiyokofu.moves, '7g7f'])], TPL, 'black')).toBe(15);
+  });
+
+  it('自分の側が同じ戦型で全部が通るものが無ければ、側を問わずいちばん浅いもの。それも無ければ 0', () => {
+    // 後手番で △3三角 と 相横歩取り：後手番の戦型は全部には通らない → 基本図（15 手）
+    expect(bookStart([study('1', [...kakuGote.moves, '3d3f']), study('2', [...aiyokofu.moves])], TPL, 'white')).toBe(15);
+    expect(bookStart([study('3', ['5g5f'])], TPL, 'black')).toBe(0);
+    expect(bookStart([], TPL, 'black')).toBe(0);
   });
 });
 

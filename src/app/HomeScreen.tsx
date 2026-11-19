@@ -38,6 +38,7 @@ import { bookPath, bookTemplatePath, go, groupReviewPath } from './router';
 import { OUTCOME_TEXT, shareFile } from './share';
 import { TemplatePicker, allTemplates, myTemplates, refreshMyTemplates } from './TemplateDialogs';
 import { KifPasteDialog } from './addToBook';
+import { fixStoredStudies } from './studyFix';
 
 /** 次にトップ画面を開いたとき「研究手順を登録」の窓を開く（古い登録の画面の URL #/new/study から来たとき。段階10-2） */
 export const registerRequest = signal(false);
@@ -53,6 +54,13 @@ export function HomeScreen({ isolationMessage }: { isolationMessage: string | nu
     homeNotice.value = null;
     return notice ?? '';
   });
+  // 開いている間に届いた一言（アプリを開いたときの研究手順の直しなど。段階10 の直し）
+  const lateNotice = homeNotice.value;
+  useEffect(() => {
+    if (!lateNotice) return;
+    setMessage(lateNotice);
+    homeNotice.value = null;
+  }, [lateNotice]);
   /** 一覧を読み直す合図 */
   const [reload, setReload] = useState(0);
   /** ⋯ を押したツリー（メニューを出す） */
@@ -185,7 +193,11 @@ export function HomeScreen({ isolationMessage }: { isolationMessage: string | nu
     setStudyConflict(null);
     const { put, skipped } = resolveStudyImport(plan, choice);
     try {
-      if (put.length > 0) await saveStudies(put);
+      if (put.length > 0) {
+        await saveStudies(put);
+        // 前の版で書き出した研究手順（戦型や名前がずれたもの）も直す（段階10 の直し）
+        await fixStoredStudies().catch(() => 0);
+      }
       const parts = [`研究手順 ${put.length} 本を取り込みました`];
       if (plan.same > 0) parts.push(`まったく同じもの ${plan.same} 本は飛ばしました`);
       if (skipped > 0) parts.push(`同じ手順の ${skipped} 本は取り込みませんでした`);

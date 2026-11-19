@@ -4,7 +4,7 @@
 //   - つないだツリーは保存せず、開くたびに研究手順の一覧から組み立てる（データの形は変えない）
 //   - 次の手の並びは、その手を通る研究手順の多い順。同じなら、いちばん最近直した研究手順が新しい順。KIF の本譜・変化の並びも同じ
 //   - 違う手を押したら、その手を通る研究手順のうち、いちばん最近直したものに切り替える
-//   - 定跡帳の出発点は、そのグループの研究手順が全部通る、いちばん深い戦型の出発点（無ければ平手の初期局面）
+//   - 定跡帳の出発点は、そのグループの研究手順が全部通る、自分の側が同じ、いちばん浅い戦型の出発点（段階10 の直し。前はいちばん深いもの）（無ければ平手の初期局面）
 
 import { startsWith } from './studies';
 import type { OpeningTemplate } from './templates';
@@ -62,15 +62,20 @@ export function switchTarget<S extends BookStudy>(branch: BookBranch<S>): S {
 }
 
 /**
- * 定跡帳の出発点（平手から何手目か）：研究手順が全部通る戦型の出発点のうち、いちばん深いもの。
- * どの戦型も全部には当てはまらなければ 0（平手の初期局面）
+ * 定跡帳の出発点（平手から何手目か）。段階10 の直し（持ち主の判断 2026-11-19）：研究を足しても奥へずれないように、
+ * 研究手順（と今の手順）が全部通る、**自分の側が同じ戦型のうち、いちばん浅いもの**。
+ * 自分の側が同じ戦型で全部が通るものが無ければ、側を問わず全部が通るいちばん浅いもの。それも無ければ 0（平手の初期局面）。
+ * 横歩取りの例：後手番は 16 手目 △3三角、先手番は 15 手目 ▲3四飛（基本図）
  */
-export function bookStart(studies: readonly Pick<Study, 'moves'>[], templates: readonly Pick<OpeningTemplate, 'moves'>[]): number {
-  let start = 0;
-  for (const t of templates) {
-    if (t.moves.length > start && studies.length > 0 && studies.every((s) => startsWith(s.moves, t.moves))) start = t.moves.length;
-  }
-  return start;
+export function bookStart(
+  studies: readonly Pick<Study, 'moves'>[],
+  templates: readonly Pick<OpeningTemplate, 'moves' | 'mySide'>[],
+  side: OpeningTemplate['mySide'],
+): number {
+  if (studies.length === 0) return 0;
+  const all = templates.filter((t) => studies.every((s) => startsWith(s.moves, t.moves)));
+  const pick = (list: readonly Pick<OpeningTemplate, 'moves'>[]) => (list.length > 0 ? Math.min(...list.map((t) => t.moves.length)) : null);
+  return pick(all.filter((t) => t.mySide === side)) ?? pick(all) ?? 0;
 }
 
 /**

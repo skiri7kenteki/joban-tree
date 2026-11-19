@@ -38,7 +38,8 @@ const tpl = (id: string, group: string, moves: string[], mySide: 'black' | 'whit
   note: '',
   reviewed: true,
 });
-const KIHON = tpl('yokofu-kihon', '横歩取り', YOKOFU, 'white', '横歩取り 基本図');
+// 基本図（▲3四飛まで）は同梱の戦型と同じく先手番向け（段階10 の直し：名前・出発点は自分の側が同じ戦型を先に見る）
+const KIHON = tpl('yokofu-kihon', '横歩取り', YOKOFU, 'black', '横歩取り 基本図');
 const KAKU = tpl('yokofu-33kaku', '横歩取り', [...YOKOFU, '2b3c'], 'white', '横歩取り △3三角');
 const AONO = tpl('yokofu-aono', '横歩取り', [...YOKOFU, '2b3c', '5i5h'], 'white', '横歩取り 青野流');
 const NAKA = tpl('naka', '中飛車', ['5g5f'], 'black', '中飛車');
@@ -62,30 +63,36 @@ describe('名前の初期値（研究の分かれ目がわかるように）', (
   it('戦型の出発点より後が 4 手までなら全部', () => {
     const moves = [...KAKU.moves, ...AFTER_KAKU.slice(0, 4)];
     expect(studyStartIndex({ moves }, TEMPLATES)).toBe(16);
-    expect(defaultStudyName({ moves }, TEMPLATES)).toBe('▲３六飛 △８四飛 ▲２六飛 △２二銀');
+    expect(defaultStudyName({ moves, mySide: 'white' }, TEMPLATES)).toBe('▲３六飛 △８四飛 ▲２六飛 △２二銀');
   });
 
   it('5 手以上なら最初の手と最後の手（最初の手は必ず入れる）', () => {
     const moves = [...KAKU.moves, ...AFTER_KAKU];
-    expect(defaultStudyName({ moves }, TEMPLATES)).toBe('▲３六飛 … △４二玉');
+    expect(defaultStudyName({ moves, mySide: 'white' }, TEMPLATES)).toBe('▲３六飛 … △４二玉');
   });
 
   it('分かれ目（変化付き KIF で本譜から分かれた手）があれば、手数付きで間に入れる。最初・最後と同じなら入れない', () => {
     const moves = [...KAKU.moves, ...AFTER_KAKU];
-    expect(defaultStudyName({ moves }, TEMPLATES, 18)).toBe('▲３六飛 … 19手目 ▲２六飛 … △４二玉');
-    expect(defaultStudyName({ moves }, TEMPLATES, 16)).toBe('▲３六飛 … △４二玉');
-    expect(defaultStudyName({ moves }, TEMPLATES, 21)).toBe('▲３六飛 … △４二玉');
+    expect(defaultStudyName({ moves, mySide: 'white' }, TEMPLATES, 18)).toBe('▲３六飛 … 19手目 ▲２六飛 … △４二玉');
+    expect(defaultStudyName({ moves, mySide: 'white' }, TEMPLATES, 16)).toBe('▲３六飛 … △４二玉');
+    expect(defaultStudyName({ moves, mySide: 'white' }, TEMPLATES, 21)).toBe('▲３六飛 … △４二玉');
   });
 
-  it('出発点そのもので終わるなら戦型の名前。戦型に当てはまらなければ初期局面から', () => {
-    expect(defaultStudyName({ moves: KAKU.moves }, TEMPLATES)).toBe('横歩取り △3三角');
-    expect(defaultStudyName({ moves: ['2g2f', '3c3d'] }, TEMPLATES)).toBe('▲２六歩 △３四歩');
-    expect(defaultStudyName({ moves: ['2g2f', '3c3d', '7g7f', '4c4d', '3i3h'] }, TEMPLATES)).toBe('▲２六歩 … ▲３八銀');
+  it('出発点は自分の側が同じ、いちばん浅い戦型（手順より短いもの）。戦型の名前だけの名前にしない。戦型に当てはまらなければ初期局面から', () => {
+    // 先手番：基本図（15 手）の後から。△3三角型（16 手）や青野流（17 手）が一致しても、いちばん浅い基本図
+    expect(defaultStudyName({ moves: [...KAKU.moves, '3d3f'], mySide: 'black' }, TEMPLATES)).toBe('△３三角 ▲３六飛');
+    // 後手番：△3三角（16 手）の後から（先手番の基本図は使わない）
+    expect(defaultStudyName({ moves: [...KAKU.moves, '3d3f'], mySide: 'white' }, TEMPLATES)).toBe('▲３六飛');
+    // △3三角 ちょうどで終わる後手番の手順：自分の側の短い戦型が無いので、側を問わず短い基本図の後から（戦型の名前だけにはしない）
+    expect(defaultStudyName({ moves: KAKU.moves, mySide: 'white' }, TEMPLATES)).toBe('△３三角');
+    expect(defaultStudyName({ moves: ['2g2f', '3c3d'], mySide: 'white' }, TEMPLATES)).toBe('▲２六歩 △３四歩');
+    expect(defaultStudyName({ moves: ['2g2f', '3c3d', '7g7f', '4c4d', '3i3h'], mySide: 'white' }, TEMPLATES)).toBe('▲２六歩 … ▲３八銀');
   });
 
   it('手順の文：戦型が分かれば「戦型名 → その後」', () => {
-    expect(studyMovesText({ moves: [...KAKU.moves, '3d3f'] }, TEMPLATES)).toBe('横歩取り △3三角 → ▲３六飛');
-    expect(studyMovesText({ moves: ['2g2f'] }, TEMPLATES)).toBe('▲２六歩');
+    expect(studyMovesText({ moves: [...KAKU.moves, '3d3f'], mySide: 'white' }, TEMPLATES)).toBe('横歩取り △3三角 → ▲３六飛');
+    expect(studyMovesText({ moves: [...KAKU.moves, '3d3f'], mySide: 'black' }, TEMPLATES)).toBe('横歩取り 基本図 → △３三角 ▲３六飛');
+    expect(studyMovesText({ moves: ['2g2f'], mySide: 'white' }, TEMPLATES)).toBe('▲２六歩');
     expect(moveTexts(['7g7f', '3c3d', '8h2b+', '3a2b'])).toEqual(['▲７六歩', '△３四歩', '▲２二角成', '△同　銀']);
   });
 });
