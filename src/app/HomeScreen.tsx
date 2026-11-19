@@ -3,7 +3,7 @@
 // 段階7-2：「ツリー｜研究手順」の切り替え。
 // 段階8-1：研究手順はツリーから独立したデータ（src/tree/studies.ts）。研究手順のタブ：
 //   - 「＋ 研究手順を登録」（盤で指す・棋譜を貼る／変化付き KIF からまとめて取り込む（段階8-2）／JSON を取り込む）、「書き出し」（選んで JSON・KIF）
-//   - 研究手順も戦型のグループ × 自分の側でまとめる。グループの ⋯ から「このグループの研究手順を復習」「このグループを書き出す」
+//   - 研究手順も戦型のグループ × 自分の側でまとめる。グループの ⋯ から「定跡帳として見る」（段階9-2）「このグループの研究手順を復習」「このグループを書き出す」
 //   - 行をタップで研究手順の画面（#/study/<id>）。行の ⋯：この研究手順を復習・名前・メモを直す・書き出す・消す（確認あり）
 //   - ツリーの JSON（形式 6 まで）を取り込むと、中の研究手順も研究手順として取り込む（同じ手順がすでにあれば足さない）
 //   - 端末の保存場所を新しい版にしたときの移し替えの結果を、一度だけ知らせる
@@ -20,7 +20,7 @@ import { parseStudiesJson, planStudyImport, resolveStudyImport, type StudyConfli
 import type { Study, TreeData } from '../tree/types';
 import { generation, isGenerating, openTree, treeVersion } from './generation';
 import { collapsedGroups, forgetOpened, homeTab, recentOpened, setHomeTab, toggleGroup } from './recent';
-import { go, groupReviewPath } from './router';
+import { bookPath, go, groupReviewPath } from './router';
 import { OUTCOME_TEXT, shareFile } from './share';
 import { allTemplates, myTemplates, refreshMyTemplates } from './TemplateDialogs';
 import { StudyEditDialog, StudyExportDialog, shareStudies } from './StudyDialogs';
@@ -331,7 +331,10 @@ export function HomeScreen({ isolationMessage }: { isolationMessage: string | nu
       {menuGroup && (
         <Dialog title={menuGroup.label} onClose={() => setMenuGroup(null)} testId="study-group-menu">
           <div class="dialog-actions dialog-actions-column">
-            <button type="button" class="btn btn-primary" data-testid="study-group-review" onClick={() => go(groupReviewPath(menuGroup.key))}>
+            <button type="button" class="btn btn-primary" data-testid="study-group-book" onClick={() => go(bookPath(menuGroup.key))}>
+              定跡帳として見る
+            </button>
+            <button type="button" class="btn" data-testid="study-group-review" onClick={() => go(groupReviewPath(menuGroup.key))}>
               このグループの研究手順を復習（{menuGroup.items.length} 本）
             </button>
             <button

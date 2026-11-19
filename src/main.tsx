@@ -34,7 +34,8 @@ function App() {
         {r.name === 'home' && <HomeScreen isolationMessage={isolationMessage(isolation)} />}
         {r.name === 'new' && <InputScreen key={r.study ? 'study' : 'tree'} forStudy={r.study} />}
         {r.name === 'tree' && <TreeScreen id={r.id} studyId={r.study} ply={r.ply} />}
-        {r.name === 'study' && <StudyScreen key={r.id} id={r.id} edit={r.edit === true} />}
+        {r.name === 'study' && <StudyScreen key={r.id} id={r.id} edit={r.edit === true} ply={r.ply} />}
+        {r.name === 'book' && <StudyScreen key={`book:${r.key}`} book={r.key} id={r.study} ply={r.ply} />}
         {r.name === 'study-import' && <StudyKifImportScreen />}
         {r.name === 'settings' && <SettingsScreen />}
         {r.name === 'review' && !r.studies && <ReviewScreen key={r.id} id={r.id} />}

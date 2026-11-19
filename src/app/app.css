@@ -1254,6 +1254,95 @@
   font-size: var(--font-size-small);
 }
 
+/* 「この局面からの研究」・定跡帳（段階9-2）：次の手ごとの研究手順。名前は 1 行（入りきらなければ …）。今見ている研究手順の手に印 */
+.book-list {
+  margin: var(--space-1) 0;
+}
+
+.book-names {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.book-count {
+  flex: 0 0 auto;
+  color: var(--color-text-muted);
+}
+
+.book-current .candidate-move,
+.book-current .book-names {
+  color: var(--color-accent);
+}
+
+.book-end-label {
+  font-weight: normal;
+  color: var(--color-text-muted);
+}
+
+/* 定跡帳の見出し：小さく「定跡帳」、その下にグループ（「横歩取り（後手番）」が幅 360 でも切れないように 2 段。高さは変えない） */
+.book-title {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.book-kicker {
+  font-size: var(--font-size-small);
+  font-weight: normal;
+  color: var(--color-text-muted);
+}
+
+.book-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 研究手順の画面・定跡帳の手順の操作（‹ ›）：盤との間を詰める（一覧の 3 行目まで画面に収めるため） */
+.study-layout .move-nav {
+  margin: 0 0 var(--space-1);
+}
+
+.book-list {
+  padding-top: var(--space-1);
+}
+
+.book-list .candidates-head {
+  font-size: var(--font-size-small);
+}
+
+/* 1 行は押せる高さ（44px）。ツリーの候補手（48px）より低くして、3 行目まで画面に収める */
+.book-list .book-row {
+  min-height: var(--touch-min);
+  padding: 0;
+}
+
+/* 定跡帳：今たどっている研究手順の名前とメモの最初の 1 行を 1 行に（入りきらなければ …。名前を優先） */
+.study-title-line {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-1);
+  white-space: nowrap;
+}
+
+.study-title-line strong {
+  flex: 0 1 auto;
+  max-width: 70%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.study-meta-inline {
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: var(--font-size-small);
+}
+
 /* 研究手順の書き出し：選ぶ一覧 */
 .study-pick-list {
   max-height: 50vh;

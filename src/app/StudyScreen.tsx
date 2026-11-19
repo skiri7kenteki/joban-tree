@@ -11,9 +11,12 @@ import { Dialog } from '../components/Dialog';
 import { PromotionBox, useMoveInput } from '../components/useMoveInput';
 import { STARTPOS_SFEN, moveText } from '../shogi/position';
 import { loadTreesOnLine } from '../storage/trees';
-import { groupLabel } from '../tree/organize';
+import { fileNameOf } from '../tree/backup';
+import { groupLabel, groupStudies } from '../tree/organize';
 import { studyPositions } from '../review/studyReview';
-import { findSameStudy, moveTexts, newStudyId, pathInTree, studyMovesText, studyTemplate } from '../tree/studies';
+import { findSameStudy, firstLine, moveTexts, newStudyId, pathInTree, startsWith, studyMovesText, studyTemplate } from '../tree/studies';
+import { bookAt, bookOrder, bookStart, switchTarget, type BookBranch, type BookPosition } from '../tree/studyBook';
+import { listName } from '../tree/templates';
 import {
   branchMoves,
   branchStudy,
@@ -33,37 +36,89 @@ import { studiesToKif } from '../tree/studyFile';
 import type { Study, TreeData } from '../tree/types';
 import { boardFitProps, measureFitAbove, useBoardFit } from './boardFit';
 import { inputHandoff } from './handoff';
-import { go } from './router';
-import { OUTCOME_TEXT, copyText } from './share';
+import { bookPath, go, groupReviewPath } from './router';
+import { OUTCOME_TEXT, copyText, shareFile } from './share';
 import { StudyEditDialog, shareStudies } from './StudyDialogs';
-import { editSession, enterEdit, isNavigating, leaveEdit, navigateEdit, type EditSession } from './studyEdit';
+import { editSession, enterEdit, isNavigating, leaveEdit, navigateEdit, takeEditExit, type EditSession } from './studyEdit';
 import { ensureStudies, library, removeStudy, saveStudies, studiesNow, updateStudyFields } from './studies';
 import { allTemplates, myTemplates, refreshMyTemplates } from './TemplateDialogs';
 
-export function StudyScreen({ id, edit = false }: { id: string; edit?: boolean }) {
+/** 定跡帳として見ているとき（段階9-2）：グループの key・見出し・出発点（平手から何手目か）・出発点の名前 */
+interface BookContext {
+  key: string;
+  label: string;
+  start: number;
+  startName: string;
+}
+
+/**
+ * 研究手順の画面。book を渡すと「定跡帳として見る」（そのグループの研究手順をつないだツリー。研究手順の画面を使い回す）。
+ * id・ply：開く研究手順と局面（平手から何手目か）。定跡帳で id が無い・グループに無ければ、いちばん最近直した研究手順の出発点
+ */
+export function StudyScreen({ id, edit = false, ply, book }: { id?: string; edit?: boolean; ply?: number; book?: string }) {
   const [error, setError] = useState('');
   const studies = library.value;
   const session = editSession.value;
   void myTemplates.value;
+  // 定跡帳はグループ分けに自分で登録した戦型も使うので、読み終わるまで待つ
+  const [templatesReady, setTemplatesReady] = useState(myTemplates.value !== null);
   useEffect(() => {
     ensureStudies().catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
-    if (!myTemplates.value) void refreshMyTemplates().catch(() => undefined);
+    if (!myTemplates.value)
+      void refreshMyTemplates()
+        .catch(() => undefined)
+        .finally(() => setTemplatesReady(true));
   }, []);
 
-  const study = studies?.find((s) => s.id === id);
+  const templates = allTemplates();
+  const group = useMemo(
+    () => (book !== undefined && studies && templatesReady ? (groupStudies(studies, templates, '').find((g) => g.key === book) ?? null) : null),
+    // templates は myTemplates が変わったときだけ変わる
+    [book, studies, templatesReady, myTemplates.value],
+  );
+  const bookStudy = group ? (group.items.find((s) => s.id === id) ?? group.items[0]) : undefined;
+  const study = book !== undefined ? bookStudy : studies?.find((s) => s.id === id);
+  const bookCtx = useMemo<BookContext | null>(() => {
+    if (!group || book === undefined) return null;
+    const start = bookStart(group.items, templates);
+    const t = start > 0 ? templates.find((x) => x.moves.length === start && group.items.every((s) => startsWith(s.moves, x.moves))) : undefined;
+    return { key: book, label: group.label, start, startName: t ? listName(t) : '初期局面' };
+  }, [group, book]);
+  /** 「この局面からの研究」でつなぐ研究手順：定跡帳はそのグループ、研究手順の画面は自分の側が同じもの */
+  const pool = useMemo(
+    () => (group ? group.items : studies && study ? studies.filter((s) => s.mySide === study.mySide) : []),
+    [group, studies, study?.mySide],
+  );
   // 編集中の下書きがこの画面のものでない（戻るボタンで編集から出た）：変更が無ければ黙って捨て、あれば下で聞く
   const otherSession = session && !(edit && session.id === id) && !isNavigating() ? session : null;
+  const here = study?.id ?? id ?? '';
   const otherDirty = otherSession !== null && draftChanged(otherSession.draft, otherSession.saved);
   useEffect(() => {
     if (otherSession && !otherDirty) editSession.value = null;
   }, [otherSession, otherDirty]);
   // #/study/<id>/edit を直接開いた（再読み込みなど）：終わりの局面から編集を始める
   useEffect(() => {
-    if (edit && study && !session && !isNavigating()) editSession.value = { id, saved: [...study.moves], draft: startDraft(study.moves, study.moves.length), fromView: false };
-  }, [edit, study, session, id]);
+    if (edit && study && !session && !isNavigating())
+      editSession.value = { id: study.id, saved: [...study.moves], draft: startDraft(study.moves, study.moves.length), fromView: false };
+  }, [edit, study, session]);
 
   if (error) return <p class="status-ng">{error}</p>;
-  if (!studies) return <p class="muted">読み込み中…</p>;
+  if (!studies || (book !== undefined && !templatesReady)) return <p class="muted">読み込み中…</p>;
+  if (book !== undefined && (!study || !bookCtx)) {
+    return (
+      <>
+        <div class="screen-header">
+          <button type="button" class="btn btn-ghost" onClick={() => go('/')}>
+            ‹ 一覧
+          </button>
+          <h1>定跡帳</h1>
+        </div>
+        <p class="muted" data-testid="book-missing">
+          このグループの研究手順はありません（消されたか、戦型が変わったかもしれません）。
+        </p>
+      </>
+    );
+  }
   if (!study) {
     return (
       <>
@@ -80,9 +135,11 @@ export function StudyScreen({ id, edit = false }: { id: string; edit?: boolean }
     );
   }
   const editing = edit && session?.id === study.id ? session : null;
+  // 開く局面：定跡帳で別の研究手順に替えた（URL に無い）ときは出発点
+  const openAt = book !== undefined && id !== study.id ? undefined : ply;
   return (
     <>
-      <StudyView key={study.id} study={study} session={editing} />
+      <StudyView key={study.id} study={study} session={editing} ply={openAt} book={bookCtx} pool={pool} />
       {otherSession && otherDirty && (
         <Dialog title="編集中の変更を捨てますか？" onClose={() => go(`/study/${otherSession.id}/edit`)} testId="study-edit-leave-dialog">
           <p>研究手順「{studies.find((s) => s.id === otherSession.id)?.name ?? ''}」の手順に、まだ保存していない変更があります。</p>
@@ -91,7 +148,7 @@ export function StudyScreen({ id, edit = false }: { id: string; edit?: boolean }
               type="button"
               class="btn btn-primary"
               data-testid="study-edit-leave-back"
-              onClick={() => enterEdit({ ...otherSession, fromView: otherSession.id === id })}
+              onClick={() => enterEdit({ ...otherSession, fromView: otherSession.id === here })}
             >
               編集に戻る
             </button>
@@ -113,16 +170,40 @@ type EditDialog =
   | { kind: 'truncate' }
   | { kind: 'cancel' };
 
-function StudyView({ study, session }: { study: Study; session: EditSession | null }) {
+function StudyView({
+  study,
+  session,
+  ply,
+  book,
+  pool,
+}: {
+  study: Study;
+  session: EditSession | null;
+  /** 開く局面（平手から何手目か）。無ければ研究手順の終わり（定跡帳では出発点） */
+  ply?: number;
+  /** 定跡帳として見ているとき（段階9-2） */
+  book: BookContext | null;
+  /** 「この局面からの研究」でつなぐ研究手順 */
+  pool: readonly Study[];
+}) {
   /** 編集中は下書きの手順、ふだんは研究手順の手順 */
   const moves = session ? session.draft.moves : study.moves;
   const positions = useMemo(() => studyPositions(moves), [moves]);
   const texts = useMemo(() => moveTexts(moves), [moves]);
   const last = positions.length - 1;
-  /** 盤に出している局面（平手から何手目か）。開いたときは研究手順の終わり。編集中は下書きの index を使う */
-  const [viewIndex, setIndex] = useState(study.moves.length);
-  const index = session ? session.draft.index : Math.min(viewIndex, last);
-  const [dialog, setDialog] = useState<'menu' | 'edit' | 'trees' | null>(null);
+  /** 戻れるいちばん前の局面（定跡帳は出発点より前に戻らない） */
+  const minIndex = book && !session ? Math.min(book.start, last) : 0;
+  /**
+   * 盤に出している局面（平手から何手目か）。開いたときは研究手順の終わり（定跡帳では出発点）か、URL の手数。
+   * 定跡帳から入った編集を終えて戻ったときは、編集を終えた局面。編集中は下書きの index を使う
+   */
+  const [viewIndex, setIndex] = useState(() => {
+    const exit = book ? takeEditExit(study.id) : undefined;
+    const at = exit ?? ply ?? (book ? book.start : study.moves.length);
+    return Math.max(book ? book.start : 0, Math.min(study.moves.length, at));
+  });
+  const index = session ? session.draft.index : Math.max(minIndex, Math.min(viewIndex, last));
+  const [dialog, setDialog] = useState<'menu' | 'edit' | 'trees' | 'book-menu' | null>(null);
   const [editDialog, setEditDialog] = useState<EditDialog | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -162,19 +243,65 @@ function StudyView({ study, session }: { study: Study; session: EditSession | nu
   const movesHere = moves.slice(0, index);
   const treesHere = trees.filter((t) => pathInTree(t, movesHere) !== null);
 
-  // スマホ縦：盤・手順の操作（‹ ›）・手順の行（編集中は「1手戻す」「ここで終わりにする」の行まで）が、スクロールせずに見える盤の幅
+  // スマホ縦：盤・手順の操作（‹ ›）・手順の行（編集中は「1手戻す」「ここで終わりにする」の行まで）が、スクロールせずに見える盤の幅。
+  // 「この局面からの研究」を出すときは、その 3 行目まで（段階9-2、持ち主の判断 14。幅 360・高さ 640 が基準）
   const boardRef = useRef<HTMLDivElement>(null);
   const toolsRef = useRef<HTMLDivElement>(null);
-  const boardFit = useBoardFit(boardRef, (board) => measureFitAbove(board, toolsRef.current ?? crumbsRef.current, 0));
+  const branchesRef = useRef<HTMLDivElement>(null);
+  /** 手順の行の下から、一覧の 3 行目の下までの高さ（最後に測った値）。一覧が出ない局面でも同じだけ空けて、盤の大きさを変えない */
+  const listReserve = useRef<number | null>(null);
+  const boardFit = useBoardFit(boardRef, (board) => {
+    if (session) return measureFitAbove(board, toolsRef.current ?? crumbsRef.current, 0);
+    const crumbs = crumbsRef.current;
+    const rows = branchesRef.current?.querySelectorAll<HTMLElement>('.book-row');
+    if (crumbs && rows && rows.length > 0) {
+      const n = Math.min(3, rows.length);
+      const rowH = rows[0].getBoundingClientRect().height;
+      listReserve.current = rows[n - 1].getBoundingClientRect().bottom - crumbs.getBoundingClientRect().bottom + (3 - n) * rowH;
+    }
+    // 一覧がどこかの局面で出るなら（定跡帳・同じ側の研究手順がほかにもある）、いつも一覧の分を空ける
+    const reserve = book || pool.length >= 2 ? (listReserve.current ?? LIST_GUESS) : 0;
+    return measureFitAbove(board, crumbs, reserve);
+  });
 
   const input = useMoveInput(positions[index] ?? STARTPOS_SFEN, (move) => onPlay(move.usi), session !== null && !busy);
 
   function moveTo(i: number) {
     input.clear();
     if (session) setDraft(moveDraftTo(session.draft, i));
-    else setIndex(Math.max(0, Math.min(last, i)));
+    else setIndex(Math.max(minIndex, Math.min(last, i)));
     setNote('');
   }
+
+  // ---- この局面からの研究（段階9-2） ----
+
+  /** 今の局面での研究手順のつながり（編集中は出さない） */
+  const connections = useMemo(() => (session ? null : bookAt(pool, study.moves.slice(0, index))), [session, pool, study.moves, index]);
+  /** 一覧を出すか：定跡帳ではいつも。研究手順の画面では、この局面を通る研究手順が今の 1 本だけなら出さない */
+  const showBranches = connections !== null && (book !== null || connections.count >= 2);
+
+  /** ほかの研究手順に切り替える（同じ局面のまま、またはその手を指した局面へ）。履歴は増やさない */
+  function switchTo(target: Study, at: number) {
+    if (target.id === study.id) {
+      moveTo(at);
+      return;
+    }
+    location.replace(`#${book ? bookPath(book.key, target.id, at) : `/study/${target.id}/${at}`}`);
+  }
+
+  /** 次の手を押した：今の研究手順の次の手なら 1 手進む。違う手なら、その手を通る研究手順のうちいちばん最近直したものへ */
+  function pickBranch(branch: BookBranch<Study>) {
+    if (study.moves[index] === branch.move) moveTo(index + 1);
+    else switchTo(switchTarget(branch), index + 1);
+  }
+
+  // 定跡帳：今の研究手順と局面を URL に書いておく（戻るボタンで戻ってきたとき・編集から戻ったときに同じところを開く）。
+  // 画面は移らない（hashchange は起きない）
+  useEffect(() => {
+    if (!book || session) return;
+    const url = `#${bookPath(book.key, study.id, index)}`;
+    if (location.hash !== url) history.replaceState(history.state, '', url);
+  }, [book, session, study.id, index]);
 
   // 左右スワイプ：右へ払うと 1 手戻る、左へ払うと 1 手進む
   const touch = useRef<{ x: number; y: number } | null>(null);
@@ -213,7 +340,7 @@ function StudyView({ study, session }: { study: Study; session: EditSession | nu
 
   function startEdit() {
     setNote('');
-    enterEdit({ id: study.id, saved: [...study.moves], draft: startDraft(study.moves, index), fromView: true });
+    enterEdit({ id: study.id, saved: [...study.moves], draft: startDraft(study.moves, index), fromView: true, ...(book ? { book: book.key } : {}) });
   }
 
   /** 編集を終えて見返しの画面へ（局面はそのまま） */
@@ -298,6 +425,7 @@ function StudyView({ study, session }: { study: Study; session: EditSession | nu
           ...(existing ? {} : { branchAt: branchTo.length - 1 }),
           fromView: false,
           notice: existing ? `「${made.name}」の編集に移りました` : `別の研究手順を作りました：「${made.name}」`,
+          ...(session.book !== undefined ? { book: session.book } : {}),
         },
         `/study/${made.id}/edit`,
       );
@@ -311,7 +439,7 @@ function StudyView({ study, session }: { study: Study; session: EditSession | nu
   /** ほかの研究手順を開く（編集中の変更は捨てる） */
   function openOther(other: Study) {
     setEditDialog(null);
-    navigateEdit(null, `/study/${other.id}`);
+    navigateEdit(null, session?.book !== undefined ? bookPath(session.book, other.id, other.moves.length) : `/study/${other.id}`);
   }
 
   // ---- ふだんの操作 ----
@@ -333,6 +461,17 @@ function StudyView({ study, session }: { study: Study; session: EditSession | nu
 
   async function share(kind: 'json' | 'kif') {
     const outcome = await shareStudies([study], kind);
+    if (outcome !== 'cancelled') {
+      setDialog(null);
+      setNote(OUTCOME_TEXT[outcome]);
+    }
+  }
+
+  /** 定跡帳のグループの研究手順を、変化付きの 1 つの KIF にして渡す（並びは画面と同じ。共有の前に待たない） */
+  async function shareBook() {
+    if (!book) return;
+    const kif = studiesToKif(bookOrder(pool), `定跡帳：${book.label}`);
+    const outcome = await shareFile(fileNameOf(`定跡帳-${book.label}`, 'kifu'), kif, 'text/plain');
     if (outcome !== 'cancelled') {
       setDialog(null);
       setNote(OUTCOME_TEXT[outcome]);
@@ -365,6 +504,19 @@ function StudyView({ study, session }: { study: Study; session: EditSession | nu
             保存
           </button>
         </div>
+      ) : book ? (
+        <div class="screen-header">
+          <button type="button" class="btn btn-ghost" onClick={() => go('/')}>
+            ‹ 一覧
+          </button>
+          <h1 class="tree-title book-title" data-testid="book-title">
+            <span class="book-kicker">定跡帳</span>
+            <span class="book-label">{book.label}</span>
+          </h1>
+          <button type="button" class="btn tree-menu-btn" aria-label="定跡帳の操作" data-testid="book-menu" onClick={() => setDialog('book-menu')}>
+            ⋯
+          </button>
+        </div>
       ) : (
         <div class="screen-header">
           <button type="button" class="btn btn-ghost" onClick={() => go('/')}>
@@ -377,19 +529,35 @@ function StudyView({ study, session }: { study: Study; session: EditSession | nu
         </div>
       )}
 
-      <div class="study-head">
-        <p class="study-title">
-          <span class="study-star" aria-hidden="true">
-            ★
-          </span>
-          <strong data-testid="study-title">{study.name}</strong>
-        </p>
-        <p class="muted study-meta" data-testid="study-meta">
-          {where}・{moves.length} 手{dirty && session ? `（保存前。元は ${session.saved.length} 手）` : ''}
-        </p>
-      </div>
+      {book && !session ? (
+        // 定跡帳：今たどっている研究手順の名前とメモの最初の 1 行を 1 行に（その研究手順を通っている間はいつも見える。
+        // 一覧の 3 行目まで画面に収めるため 1 行にした。メモの全文は下のカード）
+        <div class="study-head">
+          <p class="study-title study-title-line">
+            <span class="study-star" aria-hidden="true">
+              ★
+            </span>
+            <strong data-testid="study-title">{study.name}</strong>
+            <span class="muted study-meta-inline" data-testid="study-meta">
+              {firstLine(study.note) || 'メモなし'}
+            </span>
+          </p>
+        </div>
+      ) : (
+        <div class="study-head">
+          <p class="study-title">
+            <span class="study-star" aria-hidden="true">
+              ★
+            </span>
+            <strong data-testid="study-title">{study.name}</strong>
+          </p>
+          <p class="muted study-meta" data-testid="study-meta">
+            {where}・{moves.length} 手{dirty && session ? `（保存前。元は ${session.saved.length} 手）` : ''}
+          </p>
+        </div>
+      )}
 
-      <div class="tree-layout">
+      <div class="tree-layout study-layout">
         <div
           ref={boardRef}
           {...boardFitProps(boardFit, 'tree-board')}
@@ -407,10 +575,17 @@ function StudyView({ study, session }: { study: Study; session: EditSession | nu
         <div class="tree-side">
           {session && <PromotionBox input={input} />}
           <div class="move-nav" data-testid="study-nav">
-            <button type="button" class="btn" aria-label="最初へ" onClick={() => moveTo(0)} disabled={index === 0}>
+            <button type="button" class="btn" aria-label={book ? '出発点へ' : '最初へ'} onClick={() => moveTo(0)} disabled={index <= minIndex}>
               |‹
             </button>
-            <button type="button" class="btn" aria-label="1手戻る" data-testid="study-prev" onClick={() => moveTo(index - 1)} disabled={index === 0}>
+            <button
+              type="button"
+              class="btn"
+              aria-label="1手戻る"
+              data-testid="study-prev"
+              onClick={() => moveTo(index - 1)}
+              disabled={index <= minIndex}
+            >
               ‹
             </button>
             <span class="move-nav-text num" data-testid="study-position">
@@ -425,7 +600,18 @@ function StudyView({ study, session }: { study: Study; session: EditSession | nu
           </div>
 
           <div class="crumbs study-crumbs" ref={crumbsRef} data-testid="study-crumbs">
-            {texts.map((t, i) => (
+            {minIndex > 0 && (
+              // 定跡帳：出発点より前の手は出さず、出発点（戦型の名前）を先頭に
+              <button
+                type="button"
+                class={index === minIndex ? 'crumb current' : 'crumb'}
+                data-testid="book-start-crumb"
+                onClick={() => moveTo(minIndex)}
+              >
+                {book?.startName}
+              </button>
+            )}
+            {texts.map((t, i) => i + 1 > minIndex && (
               <button
                 type="button"
                 key={`${i}-${t}`}
@@ -468,8 +654,55 @@ function StudyView({ study, session }: { study: Study; session: EditSession | nu
                 {editHint}
               </p>
             </>
+          ) : book ? (
+            <>
+              {connections && (
+                <StudyBranches
+                  listRef={branchesRef}
+                  connections={connections}
+                  study={study}
+                  sfen={positions[index] ?? STARTPOS_SFEN}
+                  prev={index > 0 ? moves[index - 1] : undefined}
+                  onBranch={pickBranch}
+                  onEnding={(s) => switchTo(s, index)}
+                />
+              )}
+              <div class="node-actions">
+                <button type="button" class="btn btn-primary" data-testid="book-review" onClick={() => go(groupReviewPath(book.key))}>
+                  まとめて復習（{pool.length} 本）
+                </button>
+                <button type="button" class="btn" data-testid="study-edit-start" onClick={startEdit}>
+                  手順を編集
+                </button>
+              </div>
+              {note && (
+                <p class="muted" role="status" data-testid="study-screen-status">
+                  {note}
+                </p>
+              )}
+              <div class="card">
+                {study.note ? (
+                  <p class="study-note" data-testid="study-screen-note">
+                    {study.note}
+                  </p>
+                ) : (
+                  <p class="muted">「{study.name}」にメモはありません。</p>
+                )}
+              </div>
+            </>
           ) : (
             <>
+              {showBranches && connections && (
+                <StudyBranches
+                  listRef={branchesRef}
+                  connections={connections}
+                  study={study}
+                  sfen={positions[index] ?? STARTPOS_SFEN}
+                  prev={index > 0 ? moves[index - 1] : undefined}
+                  onBranch={pickBranch}
+                  onEnding={(s) => switchTo(s, index)}
+                />
+              )}
               <div class="card">
                 {study.note ? (
                   <p class="study-note" data-testid="study-screen-note">
@@ -660,6 +893,17 @@ function StudyView({ study, session }: { study: Study; session: EditSession | nu
         />
       )}
 
+      {dialog === 'book-menu' && book && (
+        <Dialog title={`定跡帳：${book.label}`} onClose={() => setDialog(null)} testId="book-menu-dialog">
+          <div class="dialog-actions dialog-actions-column">
+            <button type="button" class="btn" data-testid="book-share-kif" onClick={() => void shareBook()}>
+              KIF で書き出す（変化付き・{pool.length} 本）
+            </button>
+          </div>
+          <p class="muted">分かれ目が変化として並ぶ 1 つの KIF です（研究手順の多い手が本譜）。ShogiHome などで開けます。</p>
+        </Dialog>
+      )}
+
       {dialog === 'trees' && (
         <Dialog title="どのツリーで見ますか？" onClose={() => setDialog(null)} testId="study-trees-dialog">
           <div class="dialog-actions dialog-actions-column">
@@ -672,5 +916,88 @@ function StudyView({ study, session }: { study: Study; session: EditSession | nu
         </Dialog>
       )}
     </>
+  );
+}
+
+/** 一覧の 3 行目までの高さの見込み（まだ測っていないとき。見出し＋3 行） */
+const LIST_GUESS = 190;
+
+/**
+ * 「この局面からの研究」（段階9-2）：次の手ごとに、その手を通る研究手順の名前と数。今見ている研究手順の手に印。
+ * その局面で終わる研究手順は「ここで終わる研究」として下に。押すと、その手の局面へ進む（違う研究手順なら切り替える）
+ */
+function StudyBranches({
+  connections,
+  study,
+  sfen,
+  prev,
+  onBranch,
+  onEnding,
+  listRef,
+}: {
+  connections: BookPosition<Study>;
+  study: Study;
+  /** 今の局面（手の文字を作るため） */
+  sfen: string;
+  /** 今の局面の直前の手（「同」を付けるため） */
+  prev: string | undefined;
+  onBranch: (branch: BookBranch<Study>) => void;
+  onEnding: (s: Study) => void;
+  listRef: { current: HTMLDivElement | null };
+}) {
+  const { branches, ending, count } = connections;
+  /** 名前の並び：今見ている研究手順を先に */
+  const names = (list: readonly Study[]) =>
+    [...list.filter((s) => s.id === study.id), ...list.filter((s) => s.id !== study.id)].map((s) => s.name).join('・');
+  return (
+    <div class="card candidates book-list" ref={listRef} data-testid="study-book-list">
+      <div class="candidates-head">
+        <strong data-testid="study-book-head">この局面からの研究（{count} 本）</strong>
+      </div>
+      <ul class="candidate-list">
+        {branches.map((b) => {
+          const current = b.studies.some((s) => s.id === study.id);
+          return (
+            <li key={b.move}>
+              <button
+                type="button"
+                class={current ? 'candidate book-row book-current' : 'candidate book-row'}
+                data-testid="study-book-branch"
+                data-current={current ? 'true' : 'false'}
+                onClick={() => onBranch(b)}
+              >
+                <span class="candidate-line">
+                  <span class="candidate-move">
+                    {current ? '▶ ' : ''}
+                    {moveText(sfen, b.move, prev)}
+                  </span>
+                  <span class="book-names">{names(b.studies)}</span>
+                  {b.studies.length >= 2 && <span class="book-count num">（{b.studies.length}）</span>}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+        {ending.map((s) => {
+          const current = s.id === study.id;
+          return (
+            <li key={`end-${s.id}`}>
+              <button
+                type="button"
+                class={current ? 'candidate book-row book-current' : 'candidate book-row'}
+                data-testid="study-book-ending"
+                data-current={current ? 'true' : 'false'}
+                onClick={() => onEnding(s)}
+              >
+                <span class="candidate-line">
+                  <span class="candidate-move book-end-label">{current ? '▶ ' : ''}ここで終わる研究</span>
+                  <span class="book-names">{s.name}</span>
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </div>
   );
 }

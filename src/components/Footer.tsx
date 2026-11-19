@@ -11,7 +11,7 @@ import { Dialog } from './Dialog';
 export const APP_VERSION = import.meta.env.VITE_APP_VERSION;
 const ISSUE_NEW_URL = 'https://github.com/skiri7kenteki/joban-tree/issues/new';
 
-const SCREEN_NAME: Record<Route['name'], string> = { home: '一覧', new: '新しいツリー', tree: 'ツリー', study: '研究手順', 'study-import': 'KIF から取り込む', settings: '設定', review: '復習', 'study-review': '研究手順の復習' };
+const SCREEN_NAME: Record<Route['name'], string> = { home: '一覧', new: '新しいツリー', tree: 'ツリー', study: '研究手順', book: '定跡帳', 'study-import': 'KIF から取り込む', settings: '設定', review: '復習', 'study-review': '研究手順の復習' };
 
 /** Issue 作成画面の URL（タイトルと本文の下書き入り） */
 export function buildIssueUrl(text: string, screen: string, today: Date = new Date()): string {
