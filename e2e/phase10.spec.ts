@@ -148,6 +148,7 @@ test.describe('10-1 定跡帳で直接指して研究を足す', () => {
 
     // 2 手足して、「↶ 取り消す」で 2 回
     await play(page, '31', '22');
+    await expect(page.getByTestId('study-position')).toContainText('20手目');
     await play(page, '59', '58'); // ▲5八玉
     await expect(page.getByTestId('study-position')).toContainText('21手目');
     await page.getByTestId('book-undo').click();
