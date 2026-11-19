@@ -7,7 +7,7 @@
 // - 「この局面からの研究」の行の ⋯ で「この手から先を消す」。⋯ に、今の研究手順の操作（復習・書き出し・ここで終わりにする・消す）、
 //   この局面の操作（ツリーを作る・ツリーで見る）、定跡帳の操作（KIF で書き出す・書き込む 入／切）
 // - ★ の行を押すと、今の研究手順の名前・メモを直す
-// 研究手順の画面（StudyScreen）と編集モードは、段階10-2 で片付ける。
+// 研究手順の画面（StudyScreen）と編集モードは段階10-2 で片付けた（古い URL は src/app/LegacyRedirect.tsx でここへ移す）。
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { Board } from '../components/Board';

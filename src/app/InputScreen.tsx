@@ -9,8 +9,8 @@
 // 段階5の手直し：戦型の出発点かその先にいるときは、盤の上の案内の行を「戦型：○○」にする（スマホ縦でスクロールしなくても見える）。
 // 段階6-3：同梱ツリー（用意済みのツリー）がある局面・側なら、作るボタンの上に「用意済みのツリーを開く」を大きく出す。
 // 開くとツリー一覧にコピーする（2 回目からはそのコピーを開く。新しい版が出たら知らせて、新しいコピーを作る）。
-// 段階8-1：研究手順の登録（エンジンを使わない）。#/new/study では作るボタンの代わりに「研究手順として保存」、
-// ふだんの新しいツリーの画面でも「この手順を研究手順として保存」。研究手順の画面の「この局面からツリーを作る」から来たら、手順を読み込んでおく。
+// 段階8-1：「この手順を研究手順として保存」。研究手順の画面（段階10-1 からは定跡帳）の「この局面からツリーを作る」から来たら、手順を読み込んでおく。
+// 段階10-2：研究手順の登録の画面（#/new/study）は片付けた（定跡帳で指す・棋譜を貼って 1 本登録へ）。保存は「この手順を定跡帳に足す」（src/app/addToBook.tsx）。
 // 用意済みのツリーの新しい版をコピーするときの「研究手順を引き継ぎますか？」はやめた（研究手順はツリーの外にあり、手順が同じなら★が付く）。
 
 import { useEffect, useRef, useState } from 'preact/hooks';
@@ -21,7 +21,6 @@ import { parseKifu, type LinePosition } from '../shogi/kifu';
 import { STARTPOS_SFEN, moveText, otherSide, sfenKey, sideToMove, type Side } from '../shogi/position';
 import { listTrees, saveTree, newTreeId, type TreeSummary } from '../storage/trees';
 import { bundledStatus, type BundledTreeMeta } from '../tree/bundled';
-import { defaultStudyName, newStudyId, studyMovesText } from '../tree/studies';
 import type { Study } from '../tree/types';
 import { bundledFor } from '../tree/bundledCatalog';
 import { createTree } from '../tree/generator';
@@ -35,8 +34,7 @@ import { RegisterTemplateDialog, TemplatePicker, allTemplates } from './Template
 import { boardFitProps, measureFitAbove, useBoardFit } from './boardFit';
 import { copyBundledToList } from './bundledTrees';
 import { takeInputHandoff } from './handoff';
-import { StudyEditDialog } from './StudyDialogs';
-import { findSame, saveStudies, updateStudyFields } from './studies';
+import { AddToBookDialog, addProblem, studyBookUrl } from './addToBook';
 
 const SIDE_TEXT: Record<Side, string> = { black: '☗先手', white: '☖後手' };
 
@@ -49,8 +47,7 @@ function initialInput(): { line: LinePosition[]; index: number; side: Side | nul
   return { line: r.line, index: Math.min(h.index, r.line.length - 1), side: h.mySide, template };
 }
 
-/** forStudy：研究手順を登録する画面（#/new/study）。作るボタンの代わりに「研究手順として保存」 */
-export function InputScreen({ forStudy = false }: { forStudy?: boolean }) {
+export function InputScreen() {
   const [initial] = useState(initialInput);
   const [kifu, setKifu] = useState('');
   const [message, setMessage] = useState('');
@@ -68,9 +65,9 @@ export function InputScreen({ forStudy = false }: { forStudy?: boolean }) {
   const [registerOpen, setRegisterOpen] = useState(false);
   /** 登録についての一言（登録できない理由・登録した） */
   const [registerNote, setRegisterNote] = useState('');
-  /** 研究手順として保存する窓（同じ手順の研究手順があれば existing） */
-  const [studyDialog, setStudyDialog] = useState<{ existing: Study | null } | null>(null);
-  /** 研究手順についての一言（保存した・保存できない理由）と、保存した研究手順（「開く」） */
+  /** 「定跡帳に足す」の窓を開いているか */
+  const [addOpen, setAddOpen] = useState(false);
+  /** 研究手順についての一言（足した・足せない理由）と、足した（すでにあった）研究手順（「定跡帳で開く」） */
   const [studyNote, setStudyNote] = useState<{ text: string; saved?: Study } | null>(null);
 
   const current = line[index];
@@ -84,8 +81,8 @@ export function InputScreen({ forStudy = false }: { forStudy?: boolean }) {
   // 戦型の出発点なら戦型の名前、その先なら「戦型の名前 → ○○まで」
   const templateName = onTemplate ? (relation === 'at' ? onTemplate.name : `${onTemplate.name} → ${where}`) : null;
   const movesHere = line.slice(1, index + 1).map((p) => p.usi!);
-  // この局面・この側から始まる同梱ツリー（用意済みのツリー）。研究手順の登録では出さない
-  const bundled = forStudy ? null : bundledFor(sfenKey(current.sfen), mySide);
+  // この局面・この側から始まる同梱ツリー（用意済みのツリー）
+  const bundled = bundledFor(sfenKey(current.sfen), mySide);
 
   function moveTo(i: number) {
     setIndex(Math.max(0, Math.min(line.length - 1, i)));
@@ -196,49 +193,15 @@ export function InputScreen({ forStudy = false }: { forStudy?: boolean }) {
     setRegisterOpen(true);
   }
 
-  /** 「研究手順として保存」：平手からの手順だけ。同じ手順の研究手順があれば、それを直す窓 */
-  async function openStudySave() {
-    if (line[0].sfen !== STARTPOS_SFEN) {
-      setStudyNote({ text: '平手の初期局面から始まる手順だけ、研究手順にできます（駒落ちや、SFEN で途中の局面から始めた手順は登録できません）。' });
-      return;
-    }
-    if (index === 0) {
-      setStudyNote({ text: '1 手以上進めた局面を選んでください（初期局面そのものは保存できません）。' });
+  /** 「この手順を定跡帳に足す」：平手からの手順で、1 手以上（戦型の出発点そのものは足さない） */
+  function openAddToBook() {
+    const problem = addProblem(line[0].sfen === STARTPOS_SFEN ? movesHere : null);
+    if (problem) {
+      setStudyNote({ text: problem });
       return;
     }
     setStudyNote(null);
-    try {
-      setStudyDialog({ existing: await findSame(movesHere) });
-    } catch (e) {
-      setStudyNote({ text: `研究手順を読めませんでした（${e instanceof Error ? e.message : String(e)}）` });
-    }
-  }
-
-  async function saveStudy(f: { name: string; note: string; mySide: Side }, existing: Study | null) {
-    setStudyDialog(null);
-    try {
-      if (existing) {
-        const saved = await updateStudyFields(existing, f);
-        setStudyNote({ text: `研究手順を直しました：「${saved.name}」`, saved });
-        return;
-      }
-      const now = Date.now();
-      const templateId = onTemplate?.id ?? closestTemplate(allTemplates(), movesHere)?.id;
-      const study: Study = {
-        id: newStudyId(),
-        name: f.name.trim(),
-        note: f.note.trimEnd(),
-        moves: movesHere,
-        mySide: f.mySide,
-        ...(templateId ? { templateId } : {}),
-        createdAt: now,
-        updatedAt: now,
-      };
-      await saveStudies([study]);
-      setStudyNote({ text: `研究手順として保存しました：「${study.name}」`, saved: study });
-    } catch (e) {
-      setStudyNote({ text: `保存できませんでした（${e instanceof Error ? e.message : String(e)}）` });
-    }
+    setAddOpen(true);
   }
 
   /** 戦型を選ぶ：手順を読み込み、出発点の局面にする */
@@ -293,7 +256,7 @@ export function InputScreen({ forStudy = false }: { forStudy?: boolean }) {
         <button type="button" class="btn btn-ghost" onClick={() => go('/')}>
           ‹ 一覧
         </button>
-        <h1>{forStudy ? '研究手順を登録' : '新しいツリー'}</h1>
+        <h1>新しいツリー</h1>
       </div>
 
       {/* スマホ縦は上から「貼り付け・盤・操作」、iPad 横は左に盤、右に貼り付けと操作（盤が作るボタンに隠れないように） */}
@@ -415,30 +378,22 @@ export function InputScreen({ forStudy = false }: { forStudy?: boolean }) {
                 </button>
               ))}
             </div>
-            {forStudy ? (
-              <p class="muted">研究手順の登録にエンジンは使いません。復習では「自分」の手番で研究手順の手を答えます。</p>
-            ) : (
-              <p class="muted">
-                {mySide === turn
-                  ? 'この局面は自分の手番です。まず自分の最善手を調べてから、相手の応手を広げます。'
-                  : 'この局面は相手の手番です。相手の応手と、それへの自分の対応を広げます。'}
-              </p>
-            )}
-            {!forStudy && isGenerating() && <p class="muted">ほかのツリーを生成中です。終わるか止めてから作ってください。</p>}
-            {!forStudy && pcEngine.value && (
+            <p class="muted">
+              {mySide === turn
+                ? 'この局面は自分の手番です。まず自分の最善手を調べてから、相手の応手を広げます。'
+                : 'この局面は相手の手番です。相手の応手と、それへの自分の対応を広げます。'}
+            </p>
+            {isGenerating() && <p class="muted">ほかのツリーを生成中です。終わるか止めてから作ってください。</p>}
+            {pcEngine.value && (
               <p class="notice" data-testid="pc-engine-note">
                 PC のエンジンで作ります（{effectivePcThreads(pcEngine.value)} スレッド）。できたツリーは「JSON で渡す」で iPad やスマホに渡せます。
               </p>
             )}
           </div>
-          {!forStudy && (
-            <>
-              <button type="button" class="btn btn-wide" data-testid="input-study-save" onClick={() => void openStudySave()}>
-                この手順を研究手順として保存
-              </button>
-              {studyNote && <StudyNoteLine note={studyNote} />}
-            </>
-          )}
+          <button type="button" class="btn btn-wide" data-testid="input-study-save" onClick={openAddToBook}>
+            この手順を定跡帳に足す
+          </button>
+          {studyNote && <StudyNoteLine note={studyNote} />}
           <button type="button" class="btn btn-wide" data-testid="register-template" onClick={openRegister}>
             この局面を戦型として登録
           </button>
@@ -449,34 +404,7 @@ export function InputScreen({ forStudy = false }: { forStudy?: boolean }) {
           )}
         </div>
 
-        {/* 研究手順の登録：作るボタンの代わりに「研究手順として保存」（画面の下に固定） */}
-        {forStudy && (
-          // バーの高さを変えない（盤・手順の操作が隠れないように）：一言は説明の行に、「開く」は保存ボタンの横に
-          <div class="start-bar" ref={barRef} data-testid="start-bar">
-            {studyNote ? (
-              <p class={studyNote.saved ? 'start-bar-caption muted' : 'muted'} role="status" data-testid="study-note-line">
-                {studyNote.text}
-              </p>
-            ) : (
-              <p class="start-bar-caption muted">
-                {index === 0 ? '初期局面' : `${index}手目 ${current.text ?? ''}`}までを保存（自分は{SIDE_TEXT[mySide]}）
-              </p>
-            )}
-            <div class="preset-buttons">
-              {studyNote?.saved && (
-                <button type="button" class="btn" data-testid="study-saved-open" onClick={() => go(`/study/${studyNote.saved!.id}`)}>
-                  開く
-                </button>
-              )}
-              <button type="button" class="btn btn-primary" data-testid="study-save-open" onClick={() => void openStudySave()}>
-                研究手順として保存
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* 作るボタン：画面の下に固定（ホーム画面アプリでは、下の端のバーを避ける） */}
-        {!forStudy && (
         <div class="start-bar" ref={barRef} data-testid="start-bar">
           {bundled && (
             <BundledOffer
@@ -508,17 +436,20 @@ export function InputScreen({ forStudy = false }: { forStudy?: boolean }) {
             ))}
           </div>
         </div>
-        )}
       </div>
 
-      {studyDialog && (
-        <StudyEditDialog
-          study={studyDialog.existing}
-          defaultName={defaultStudyName({ moves: movesHere, ...(onTemplate ? { templateId: onTemplate.id } : {}) }, allTemplates())}
-          movesText={studyMovesText({ moves: movesHere, ...(onTemplate ? { templateId: onTemplate.id } : {}) }, allTemplates())}
+      {addOpen && (
+        <AddToBookDialog
+          moves={movesHere}
           side={mySide}
-          onSave={(f) => void saveStudy(f, studyDialog.existing)}
-          onClose={() => setStudyDialog(null)}
+          onDone={(r) => {
+            setAddOpen(false);
+            setStudyNote({
+              text: r.kind === 'added' ? `定跡帳に足しました：「${r.study.name}」` : `この手順は、研究手順「${r.study.name}」としてすでにあります`,
+              saved: r.study,
+            });
+          }}
+          onClose={() => setAddOpen(false)}
         />
       )}
 
@@ -546,14 +477,14 @@ export function InputScreen({ forStudy = false }: { forStudy?: boolean }) {
   );
 }
 
-/** 研究手順を保存した・保存できなかったときの一言（保存したら「開く」） */
+/** 定跡帳に足した・足せなかったときの一言（足したら「定跡帳で開く」） */
 function StudyNoteLine({ note }: { note: { text: string; saved?: Study } }) {
   return (
     <p class="muted study-note-line" role="status" data-testid="study-note-line">
       {note.text}
       {note.saved && (
-        <button type="button" class="btn btn-ghost" data-testid="study-saved-open" onClick={() => go(`/study/${note.saved!.id}`)}>
-          開く
+        <button type="button" class="btn btn-ghost" data-testid="study-saved-open" onClick={() => go(studyBookUrl(note.saved!))}>
+          定跡帳で開く
         </button>
       )}
     </p>

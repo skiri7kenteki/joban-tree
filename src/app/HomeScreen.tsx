@@ -9,6 +9,7 @@
 //   - ツリーの JSON（形式 6 まで）を取り込むと、中の研究手順も研究手順として取り込む（同じ手順がすでにあれば足さない）
 //   - 端末の保存場所を新しい版にしたときの移し替えの結果を、一度だけ知らせる
 
+import { signal } from '@preact/signals';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { Dialog } from '../components/Dialog';
 import { takeMigrationNote } from '../storage/migrate';
@@ -36,6 +37,10 @@ import { collapsedGroups, forgetOpened, homeTab, recentOpened, setHomeTab, toggl
 import { bookPath, bookTemplatePath, go, groupReviewPath } from './router';
 import { OUTCOME_TEXT, shareFile } from './share';
 import { TemplatePicker, allTemplates, myTemplates, refreshMyTemplates } from './TemplateDialogs';
+import { KifPasteDialog } from './addToBook';
+
+/** 次にトップ画面を開いたとき「研究手順を登録」の窓を開く（古い登録の画面の URL #/new/study から来たとき。段階10-2） */
+export const registerRequest = signal(false);
 import { StudyEditDialog, StudyExportDialog, shareStudies } from './StudyDialogs';
 import { ensureStudies, homeNotice, importLiftedStudies, library, removeStudy, saveStudies, updateStudyFields } from './studies';
 
@@ -56,8 +61,14 @@ export function HomeScreen({ isolationMessage }: { isolationMessage: string | nu
   const [menuStudy, setMenuStudy] = useState<Study | null>(null);
   /** ⋯ を押した研究手順のグループ */
   const [menuGroup, setMenuGroup] = useState<TreeGroup<Study> | null>(null);
-  /** 「＋ 研究手順を登録」のメニュー */
-  const [registerMenu, setRegisterMenu] = useState(false);
+  /** 「＋ 研究手順を登録」のメニュー（古い登録の画面の URL から来たときは開いておく。段階10-2） */
+  const [registerMenu, setRegisterMenu] = useState(() => {
+    const asked = registerRequest.value;
+    registerRequest.value = false;
+    return asked;
+  });
+  /** 棋譜を貼って 1 本登録の窓 */
+  const [pasting, setPasting] = useState(false);
   /** 新しい研究：戦型を選ぶ窓（picking）・自分の側を選ぶ窓（start。template が null なら平手から） */
   const [newStudy, setNewStudy] = useState<{ kind: 'picking' } | { kind: 'start'; template: OpeningTemplate | null } | null>(null);
   /** 研究手順の書き出し（initial：初めに選んでおく研究手順） */
@@ -291,7 +302,7 @@ export function HomeScreen({ isolationMessage }: { isolationMessage: string | nu
           </div>
           {studies && studyCount === 0 && (
             <p class="muted" data-testid="studies-empty">
-              研究手順はまだありません。「＋ 研究手順を登録」から、盤で指すか棋譜を貼って登録できます（エンジンは使いません）。ツリーの閲覧画面の「この手順を研究として保存」でも登録できます。
+              研究手順はまだありません。「＋ 研究手順を登録」から戦型（または平手）を選ぶと定跡帳が開き、盤で指すとその場で研究手順になります（エンジンは使いません）。棋譜を貼る・ツリーの閲覧画面の「定跡帳に足す」でも登録できます。
             </p>
           )}
           {searching && studyCount > 0 && studyGroups.length === 0 && (
@@ -353,7 +364,15 @@ export function HomeScreen({ isolationMessage }: { isolationMessage: string | nu
           </div>
           <p class="menu-section-title">棋譜・ファイルから</p>
           <div class="dialog-actions dialog-actions-column">
-            <button type="button" class="btn" data-testid="study-register-board" onClick={() => go('/new/study')}>
+            <button
+              type="button"
+              class="btn"
+              data-testid="study-register-paste"
+              onClick={() => {
+                setRegisterMenu(false);
+                setPasting(true);
+              }}
+            >
               棋譜を貼って 1 本登録
             </button>
             <button type="button" class="btn" data-testid="study-register-kif" onClick={() => go('/study-import')}>
@@ -372,6 +391,8 @@ export function HomeScreen({ isolationMessage }: { isolationMessage: string | nu
       {newStudy?.kind === 'picking' && (
         <TemplatePicker onPick={(t) => setNewStudy({ kind: 'start', template: t })} onClose={() => setNewStudy(null)} />
       )}
+
+      {pasting && <KifPasteDialog onClose={() => setPasting(false)} />}
 
       {newStudy?.kind === 'start' && <NewStudyDialog template={newStudy.template} onClose={() => setNewStudy(null)} />}
 

@@ -13,7 +13,7 @@ import { TreeScreen } from './app/TreeScreen';
 import { SettingsScreen } from './app/SettingsScreen';
 import { ReviewScreen } from './app/ReviewScreen';
 import { BookScreen } from './app/BookScreen';
-import { StudyScreen } from './app/StudyScreen';
+import { RegisterRedirect, StudyRedirect } from './app/LegacyRedirect';
 import { StudyReviewScreen } from './app/StudyReviewScreen';
 import { StudyKifImportScreen } from './app/StudyKifImportScreen';
 
@@ -33,9 +33,9 @@ function App() {
     <div class="app" data-testid="isolation" data-state={isolation}>
       <main class="main">
         {r.name === 'home' && <HomeScreen isolationMessage={isolationMessage(isolation)} />}
-        {r.name === 'new' && <InputScreen key={r.study ? 'study' : 'tree'} forStudy={r.study} />}
+        {r.name === 'new' && (r.study ? <RegisterRedirect /> : <InputScreen />)}
         {r.name === 'tree' && <TreeScreen id={r.id} studyId={r.study} ply={r.ply} />}
-        {r.name === 'study' && <StudyScreen key={r.id} id={r.id} edit={r.edit === true} ply={r.ply} />}
+        {r.name === 'study' && <StudyRedirect key={r.id} id={r.id} ply={r.ply} />}
         {r.name === 'book' && <BookScreen key={`book:${r.key}`} bookKey={r.key} id={r.study} ply={r.ply} template={r.template} />}
         {r.name === 'study-import' && <StudyKifImportScreen />}
         {r.name === 'settings' && <SettingsScreen />}

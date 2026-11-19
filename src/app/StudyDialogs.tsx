@@ -1,6 +1,6 @@
 // 研究手順の小窓。
 // - StudyEditDialog：保存する（study が無い）・直す（study がある）。名前・メモ・自分の側
-// - StudyViewDialog：ツリーの閲覧画面で、研究手順の終わりの局面の「★ 名前」を押したとき（メモ・研究手順の画面で開く・直す・消す）
+// - StudyViewDialog：ツリーの閲覧画面で、研究手順の終わりの局面の「★ 名前」を押したとき（メモ・定跡帳で開く・直す・消す）
 // - StudyExportDialog：研究手順を選んで書き出す（JSON・KIF。段階8-1）
 // - shareStudies：研究手順を JSON・KIF のファイルで共有する（共有メニューは「押した直後」でないと出ないので、中身は待たずに作る）
 
@@ -135,7 +135,7 @@ export function StudyViewDialog({
       {!confirm ? (
         <div class="dialog-actions">
           <button type="button" class="btn btn-primary" data-testid="study-view-open" onClick={onOpen}>
-            研究手順の画面で開く
+            定跡帳で開く
           </button>
           <button type="button" class="btn" data-testid="study-edit" onClick={onEdit}>
             直す

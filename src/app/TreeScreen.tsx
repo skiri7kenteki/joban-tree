@@ -12,6 +12,7 @@
 //          #/tree/<id>/study/<研究手順の id> で開くと、その局面をパンくずリストごと開く。
 // 段階8-1：研究手順はツリーの外（端末の研究手順の置き場所）にある。平手からの手順（ツリーの開始局面までの手順＋たどった手）が
 //          研究手順の途中と同じなら★、同じ手順で終わる研究手順があれば「★ 名前」。保存は平手からの手順にして独立した研究手順へ。
+//          段階10-2：「この手順を研究として保存」は「定跡帳に足す」（自分の側だけ確かめる。名前は自動）。足した後・★ の手順なら「定跡帳で開く」。
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { Board } from '../components/Board';
@@ -28,7 +29,7 @@ import { countRemoved, deleteMove, makeMainMove } from '../tree/edit';
 import { LABEL_TEXT, labelOf } from '../tree/labels';
 import type { PresetId } from '../tree/presets';
 import { closestTemplate, templateLine } from '../tree/templates';
-import { defaultStudyName, movesOfPath, newStudyId, startsWith, studyEndingAt, studyMovesText, studyNextMoves, traceStudy, treeBaseMoves } from '../tree/studies';
+import { movesOfPath, startsWith, studyEndingAt, studyMovesText, studyNextMoves, traceStudy, treeBaseMoves } from '../tree/studies';
 import { boardFitProps, measureBoardFit, useBoardFit } from './boardFit';
 import { availablePresets } from './engineService';
 import type { Study, TreeData, TreeEdge } from '../tree/types';
@@ -50,7 +51,8 @@ import { generationSettingsFor, presetLabel, settings } from './settings';
 import { OUTCOME_TEXT, copyText, shareFile } from './share';
 import { RegisterTemplateDialog, allTemplates } from './TemplateDialogs';
 import { StudyEditDialog, StudyViewDialog } from './StudyDialogs';
-import { ensureStudies, library, removeStudy, saveStudies, updateStudyFields } from './studies';
+import { AddToBookDialog, addProblem, studyBookUrl } from './addToBook';
+import { ensureStudies, library, removeStudy, updateStudyFields } from './studies';
 
 
 export function TreeScreen({ id, studyId, ply }: { id: string; studyId?: string; ply?: number }) {
@@ -106,7 +108,7 @@ function TreeView({ tree, studies, studyId, ply }: { tree: TreeData; studies: re
   /** 戻ったときに覚えておく「進む」先（スワイプで進む用） */
   const [forward, setForward] = useState<string[]>([]);
   /** 開いている小窓（ここから展開・書き出し） */
-  const [dialog, setDialog] = useState<'expand' | 'export' | 'register' | 'study-edit' | 'study-view' | null>(null);
+  const [dialog, setDialog] = useState<'expand' | 'export' | 'register' | 'study-edit' | 'study-view' | 'add-book' | null>(null);
   /** 「⋯」を押した候補手（手のメニューを出す） */
   const [menuEdge, setMenuEdge] = useState<TreeEdge | null>(null);
   /** 除外した手の欄を開いているか */
@@ -244,38 +246,30 @@ function TreeView({ tree, studies, studyId, ply }: { tree: TreeData; studies: re
     setNote('');
     await saveEdited(tree);
   }
-  /** 「この手順を研究として保存」：平手からの手順にして保存する。同じ手順がもうあれば、それを直す画面 */
+  /**
+   * 「定跡帳に足す」（段階10-2）：平手からの手順にして、自分の側だけ確かめて足す（名前は自動）。
+   * この局面で終わる研究手順がもうあれば「定跡帳で開く」（その研究手順の終わりの局面で定跡帳）
+   */
   function openStudy() {
-    if (!fullMoves) {
-      setNote('平手の初期局面から始まるツリーだけ、研究手順を保存できます（SFEN で途中の局面から始めたツリーは保存できません）。');
+    if (studyHere) {
+      go(studyBookUrl(studyHere));
+      return;
+    }
+    const problem = addProblem(fullMoves);
+    if (problem) {
+      setNote(problem);
       return;
     }
     setNote('');
-    setDialog('study-edit');
+    setDialog('add-book');
   }
+  /** 研究手順の名前・メモ・自分の側を直す（★ の窓の「直す」） */
   async function saveStudy(f: { name: string; note: string; mySide: Study['mySide'] }) {
     setDialog(null);
-    if (!fullMoves) return;
+    if (!studyHere) return;
     try {
-      if (studyHere) {
-        await updateStudyFields(studyHere, f);
-        setNote(`研究手順「${f.name.trim()}」を直しました`);
-      } else {
-        const now = Date.now();
-        const template = closestTemplate(templates, fullMoves);
-        const study: Study = {
-          id: newStudyId(),
-          name: f.name.trim(),
-          note: f.note.trimEnd(),
-          moves: fullMoves,
-          mySide: f.mySide,
-          ...(template ? { templateId: template.id } : {}),
-          createdAt: now,
-          updatedAt: now,
-        };
-        await saveStudies([study]);
-        setNote(`研究手順「${study.name}」を保存しました。トップ画面の「研究手順」から開けます。`);
-      }
+      await updateStudyFields(studyHere, f);
+      setNote(`研究手順「${f.name.trim()}」を直しました`);
     } catch (e) {
       setNote(`保存できませんでした（${e instanceof Error ? e.message : String(e)}）`);
     }
@@ -519,7 +513,7 @@ function TreeView({ tree, studies, studyId, ply }: { tree: TreeData; studies: re
               </button>
             )}
             <button type="button" class="btn" data-testid="study-open" onClick={openStudy} disabled={fullMoves?.length === 0}>
-              {studyHere ? '研究手順を直す' : 'この手順を研究として保存'}
+              {studyHere ? '定跡帳で開く' : '定跡帳に足す'}
             </button>
             <button type="button" class="btn" data-testid="copy-kif" onClick={() => void copyKif()}>
               KIFをコピー
@@ -633,11 +627,27 @@ function TreeView({ tree, studies, studyId, ply }: { tree: TreeData; studies: re
         </Dialog>
       )}
 
-      {dialog === 'study-edit' && fullMoves && (
+      {dialog === 'add-book' && fullMoves && (
+        <AddToBookDialog
+          moves={fullMoves}
+          side={tree.mySide}
+          onDone={(r) => {
+            setDialog(null);
+            setNote(
+              r.kind === 'added'
+                ? `定跡帳に足しました：「${r.study.name}」（「定跡帳で開く」で開けます）`
+                : `この手順は、研究手順「${r.study.name}」としてすでにあります`,
+            );
+          }}
+          onClose={() => setDialog(null)}
+        />
+      )}
+
+      {dialog === 'study-edit' && studyHere && (
         <StudyEditDialog
           study={studyHere}
-          defaultName={defaultStudyName({ moves: fullMoves }, templates)}
-          movesText={studyMovesText({ moves: fullMoves }, templates)}
+          defaultName={studyHere.name}
+          movesText={studyMovesText(studyHere, templates)}
           side={tree.mySide}
           onSave={(f) => void saveStudy(f)}
           onClose={() => setDialog(null)}
@@ -647,7 +657,7 @@ function TreeView({ tree, studies, studyId, ply }: { tree: TreeData; studies: re
       {dialog === 'study-view' && studyHere && (
         <StudyViewDialog
           study={studyHere}
-          onOpen={() => go(`/study/${studyHere.id}`)}
+          onOpen={() => go(studyBookUrl(studyHere))}
           onEdit={() => setDialog('study-edit')}
           onDelete={() => void deleteStudy()}
           onClose={() => setDialog(null)}

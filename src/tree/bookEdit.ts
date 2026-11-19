@@ -14,14 +14,35 @@
 //   - ここで終わりにする：here より先へ進む研究手順をまとめて消す
 //   - どちらも、消した結果 here を通る研究手順が 1 本も無くなるなら、1 本だけ here で終わる研究手順として残す
 //     （今たどっている研究手順。それが消すものでなければ、いちばん最近直したもの）。
-//     here が定跡帳の出発点（または初期局面）なら、残すと 0 手の研究手順になるので残さない
+//     here が定跡帳の出発点・戦型の出発点・初期局面なら、残すと 0 手の研究手順になるので残さない
 // 取り消し：変更（BookChange）と、変更する前の一覧から、元に戻す変更を作る（inverseChange）
 
-import { nameFromTexts, moveTexts, startsWith, studyTemplate, findSameStudy } from './studies';
-import { templateIdFor } from './studyEdit';
-import type { OpeningTemplate } from './templates';
+import { nameFromTexts, moveTexts, startsWith, studyStartIndex, studyTemplate, findSameStudy, defaultStudyName } from './studies';
+import { closestTemplate, type OpeningTemplate } from './templates';
 import type { Study } from './types';
 import type { Side } from '../shogi/position';
+
+/** 手順から付け直す戦型（いちばん長く一致する戦型。無ければ付けない） */
+export function templateIdFor(moves: readonly string[], templates: readonly OpeningTemplate[]): string | undefined {
+  return closestTemplate(templates, moves)?.id;
+}
+
+/**
+ * 1 本の手順をそのまま研究手順にして定跡帳に足せるか（棋譜を貼る・ツリーや新しいツリーの画面から。段階10-2）：
+ * 手が 0 本（'empty'）、戦型の出発点そのもので終わる（'start'）なら足さない
+ */
+export function checkNewMoves(moves: readonly string[], templates: readonly OpeningTemplate[]): 'empty' | 'start' | null {
+  if (moves.length === 0) return 'empty';
+  if (studyStartIndex({ moves: [...moves] }, templates) >= moves.length) return 'start';
+  return null;
+}
+
+/** 1 本の手順から作る研究手順（名前は初期値、メモは空、戦型はいちばん長く一致するもの） */
+export function studyFromMoves(moves: readonly string[], side: Side, templates: readonly OpeningTemplate[], now: number, id: string): Study {
+  const templateId = templateIdFor(moves, templates);
+  const shape = { moves: [...moves], ...(templateId ? { templateId } : {}) };
+  return { id, name: defaultStudyName(shape, templates), note: '', ...shape, mySide: side, createdAt: now, updatedAt: now };
+}
 
 /** 研究手順の一覧への変更（put：保存する、remove：消す） */
 export interface BookChange {
@@ -137,7 +158,8 @@ function removeKeepingHere(pool: readonly Study[], here: readonly string[], remo
   const ids = new Set(removed.map((s) => s.id));
   const rest = pool.filter((s) => !ids.has(s.id));
   const covered = rest.some((s) => startsWith(s.moves, here));
-  if (covered || here.length === 0 || here.length <= ctx.start) return { put: [], remove: [...removed], kept: null };
+  // 出発点（定跡帳の出発点・戦型の出発点・初期局面）で終わる研究手順は残さない
+  if (covered || here.length <= ctx.start || checkNewMoves(here, ctx.templates) !== null) return { put: [], remove: [...removed], kept: null };
   const keep = removed.find((s) => s.id === currentId) ?? [...removed].sort(byLatest)[0];
   const kept = reshaped(keep, here, rest, ctx);
   return { put: [kept], remove: removed.filter((s) => s.id !== keep.id), kept };

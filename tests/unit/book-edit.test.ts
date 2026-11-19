@@ -11,6 +11,9 @@ import {
   isDefaultName,
   playInBook,
   settleView,
+  checkNewMoves,
+  studyFromMoves,
+  templateIdFor,
   type BookCtx,
 } from '../../src/tree/bookEdit';
 import { kifSide } from '../../src/tree/kifImport';
@@ -250,5 +253,39 @@ describe('変化付き KIF の取り込み：自分の側の初期値（段階10
     expect(kifSide(read, [], [['7g7f', '3c3d'], ['2g2f', '8c8d']])).toBe('white');
     expect(kifSide(read, [], [['7g7f'], ['2g2f', '8c8d', '2f2e']])).toBe('black');
     expect(kifSide(read, [], [['7g7f'], ['2g2f', '8c8d']])).toBe('black'); // 本譜 ▲7六歩 で終わる → 先手
+  });
+});
+
+describe('1 本の手順を定跡帳に足す（棋譜を貼る・ツリーから。段階10-2）', () => {
+  it('手が 0 本・戦型の出発点そのもので終わる手順は足さない。1 手でも先なら足せる', () => {
+    expect(checkNewMoves([], TEMPLATES)).toBe('empty');
+    expect(checkNewMoves(K, TEMPLATES)).toBe('start');
+    expect(checkNewMoves(['5g5f'], TEMPLATES)).toBe('start'); // 中飛車の出発点
+    expect(checkNewMoves([...K, '3d3f'], TEMPLATES)).toBeNull();
+    expect(checkNewMoves(['7g7f'], TEMPLATES)).toBeNull(); // どの戦型にも当てはまらない 1 手
+  });
+
+  it('作る研究手順：名前は初期値（戦型の出発点の後の手順から）、メモは空、戦型はいちばん長く一致するもの、自分の側は選んだもの', () => {
+    const s = studyFromMoves([...K, '3d3f', '8f8d'], 'black', TEMPLATES, 50, 'x');
+    expect(s).toEqual({
+      id: 'x',
+      name: '▲３六飛 △８四飛',
+      note: '',
+      moves: [...K, '3d3f', '8f8d'],
+      templateId: KAKU.id,
+      mySide: 'black',
+      createdAt: 50,
+      updatedAt: 50,
+    });
+    expect('templateId' in studyFromMoves(['7g7f', '3c3d'], 'white', TEMPLATES, 1, 'y')).toBe(false);
+  });
+
+  it('戦型は手順から付け直す（延ばした・縮めたときも。外れたら付けない）', () => {
+    expect(templateIdFor(['5g5f', '3c3d'], TEMPLATES)).toBe(NAKA.id);
+    expect(templateIdFor(['7g7f'], TEMPLATES)).toBeUndefined();
+    const plan = cutBranch([A], [...K, '3d3f'], '8f8d', 'A', ctx({ start: 0 }));
+    expect(plan?.kept?.templateId).toBe(KAKU.id);
+    // 平手からの定跡帳（出発点 0）でも、戦型の出発点で終わる研究手順は残さない
+    expect(cutBranch([A], K, '3d3f', 'A', ctx({ start: 0 }))?.kept).toBeNull();
   });
 });

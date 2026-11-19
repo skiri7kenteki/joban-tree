@@ -93,42 +93,33 @@ const KIF = (handicap: string, moves: string[]) =>
   [`手合割：${handicap}`, '手数----指手---------消費時間--', ...moves.map((m, i) => `${String(i + 1).padStart(4)} ${m}   ( 0:00/00:00:00)`), ''].join('\n');
 
 test.describe('8-1 登録（エンジンを使わない）', () => {
-  test('盤で指して登録 → 一覧に出る → 開く（終わりの局面）→ 前後に動かす → この局面からツリーを作る', async ({ page }) => {
+  // 段階10-2：登録の画面（#/new/study）を片付けたので、棋譜を貼って 1 本登録する窓と定跡帳で確かめる
+  test('棋譜を貼って 1 本登録 → 定跡帳（終わりの局面）が開く → 一覧に出る → 前後に動かす → この局面からツリーを作る', async ({ page }) => {
     await openHome(page);
     await page.getByTestId('tab-studies').click();
     await expect(page.getByTestId('studies-empty')).toBeVisible();
     await page.getByTestId('study-register').click();
-    await page.getByTestId('study-register-board').click();
-    await expect(page).toHaveURL(/#\/new\/study$/);
-    await expect(page.locator('h1')).toHaveText('研究手順を登録');
-    // 作るボタンは無く、「研究手順として保存」
-    await expect(page.getByTestId('start-normal')).toHaveCount(0);
-    await expect(page.getByTestId('study-save-open')).toBeVisible();
-    // 初期局面では保存できない
-    await page.getByTestId('study-save-open').click();
-    await expect(page.getByTestId('study-note-line')).toContainText('1 手以上進めた局面');
-
-    await play(page, '77', '76');
-    await play(page, '33', '34');
-    await play(page, '27', '26');
-    await expect(page.getByTestId('start-bar')).toContainText('3手目 ▲２六歩までを保存（自分は☗先手）');
-    await page.getByTestId('study-save-open').click();
-    await expect(page.getByTestId('study-dialog')).toContainText('研究手順として保存');
-    await expect(page.getByTestId('study-moves')).toHaveText('▲７六歩 △３四歩 ▲２六歩');
-    await expect(page.getByTestId('study-name')).toHaveValue('▲７六歩 △３四歩 ▲２六歩');
-    await expect(page.getByTestId('study-side-black')).toHaveAttribute('aria-checked', 'true');
+    await page.getByTestId('study-register-paste').click();
+    await page.getByTestId('kif-paste-input').fill(KIF('平手', ['７六歩(77)', '３四歩(33)', '２六歩(27)']));
+    await page.getByTestId('kif-paste-read').click();
+    await expect(page.getByTestId('kif-paste-moves')).toHaveText('3 手：▲７六歩 △３四歩 ▲２六歩');
+    // 自分の側の初期値：戦型が無ければ最後の手を指した側（先手）
+    await expect(page.getByTestId('kif-paste-side-black')).toHaveAttribute('aria-checked', 'true');
+    await page.getByTestId('kif-paste-add').click();
+    await expect(page).toHaveURL(/#\/book\/[^/]+\/s-[\w-]+\/3$/);
+    await expect(page.getByTestId('book-title')).toHaveText('定跡帳平手から（先手番）');
+    await expect(page.getByTestId('study-title')).toHaveText('▲７六歩 △３四歩 ▲２六歩');
+    await expect(page.getByTestId('study-position')).toHaveText('3手目 ▲２六歩');
+    // メモは ★ の行から
+    await page.getByTestId('book-head').click();
     await page.getByTestId('study-note').fill('狙い：早めの▲2六歩\n2 行目');
     await page.getByTestId('study-save').click();
-    await expect(page.getByTestId('study-note-line')).toContainText('研究手順として保存しました');
+    await expect(page.getByTestId('study-screen-note')).toHaveText('狙い：早めの▲2六歩\n2 行目');
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 
-    // 同じ手順でもう一度押すと、新しく作らずに直す画面
-    await page.getByTestId('study-save-open').click();
-    await expect(page.getByTestId('study-dialog')).toContainText('研究手順を直す');
-    await page.getByTestId('study-dialog').getByRole('button', { name: 'やめる' }).click();
-
     // 一覧に出る
-    await page.goto('./');
+    await page.getByRole('button', { name: '‹ 一覧' }).click();
+    await page.getByTestId('tab-studies').click();
     await expect(page.getByTestId('tab-studies')).toContainText('研究手順 1');
     const item = page.getByTestId('study-item');
     await expect(item).toHaveCount(1);
@@ -137,13 +128,9 @@ test.describe('8-1 登録（エンジンを使わない）', () => {
     await expect(item.getByTestId('study-item-note')).toHaveText('狙い：早めの▲2六歩');
     await expect(page.getByTestId('tree-group-head')).toHaveText([/その他（先手番）\s*1/]);
 
-    // 開く（段階10-1 から定跡帳の、その研究手順の終わりの局面）：名前・メモ
+    // 開く（定跡帳の、その研究手順の終わりの局面）
     await item.click();
-    await expect(page).toHaveURL(/#\/book\/[^/]+\/s-[\w-]+\/3$/);
-    await expect(page.getByTestId('book-title')).toHaveText('定跡帳平手から（先手番）');
-    await expect(page.getByTestId('study-title')).toHaveText('▲７六歩 △３四歩 ▲２六歩');
     await expect(page.getByTestId('study-position')).toHaveText('3手目 ▲２六歩');
-    await expect(page.getByTestId('study-screen-note')).toHaveText('狙い：早めの▲2六歩\n2 行目');
     await expect(page.getByTestId('study-meta')).toContainText('狙い：早めの');
     // ツリーが無いので「ツリーで見る」は出ない（⋯ の中）
     await page.getByTestId('book-menu').click();
@@ -156,7 +143,6 @@ test.describe('8-1 登録（エンジンを使わない）', () => {
     await page.getByTestId('study-crumb').first().click();
     await expect(page.getByTestId('study-position')).toHaveText('1手目 ▲７六歩');
     await page.getByTestId('study-next').click();
-    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 
     // この局面からツリーを作る（⋯ の中）：新しいツリーの画面に、手順を読み込んだ状態で移る（その局面・自分の側）
     await page.getByTestId('book-menu').click();
@@ -170,49 +156,48 @@ test.describe('8-1 登録（エンジンを使わない）', () => {
     await expect(page.getByTestId('start-normal')).toBeVisible();
   });
 
-  test('棋譜を貼って登録：手順を前後して終わりの局面を選ぶ。戦型の後の手順で名前を付ける。平手以外は登録できない', async ({ page }) => {
+  test('棋譜を貼って登録：戦型の後の手順で名前を付ける。同じ手順・平手以外・戦型の出発点そのものは足さない', async ({ page }) => {
     await openHome(page);
-    await page.goto('./#/new/study');
-    await page.getByTestId('kifu-open').click();
-    await page.getByTestId('kifu-input').fill(KIF('平手', ['７六歩(77)', '３四歩(33)', '２六歩(27)', '８四歩(83)']));
-    await page.getByTestId('kifu-load').click();
-    await expect(page.getByTestId('input-position')).toHaveText('4手目 △８四歩');
-    await page.getByTestId('input-prev').click();
-    await page.getByTestId('study-save-open').click();
-    await expect(page.getByTestId('study-name')).toHaveValue('▲７六歩 △３四歩 ▲２六歩');
-    await page.getByTestId('study-save').click();
-    await expect(page.getByTestId('study-note-line')).toContainText('保存しました');
-
-    // 戦型の手順で始まる棋譜：名前は戦型の出発点の後の手順から
-    await page.getByTestId('kifu-open').click();
-    const yokofu = ['７六歩(77)', '３四歩(33)', '２六歩(27)', '８四歩(83)', '２五歩(26)', '８五歩(84)', '７八金(69)', '３二金(41)', '２四歩(25)', '同　歩(23)', '同　飛(28)', '８六歩(85)', '同　歩(87)', '同　飛(82)', '３四飛(24)', '３三角(22)', '３六飛(34)', '８四飛(86)'];
-    await page.getByTestId('kifu-input').fill(KIF('平手', yokofu));
-    await page.getByTestId('kifu-load').click();
-    await page.getByTestId('study-save-open').click();
-    // 同梱の戦型「横歩取り △3三角型（▲3六飛まで）」がいちばん長く一致するので、その後の手順から
-    await expect(page.getByTestId('study-moves')).toHaveText('横歩取り △3三角型（▲3六飛まで） → △８四飛');
-    await expect(page.getByTestId('study-name')).toHaveValue('△８四飛');
-    await page.getByTestId('study-save').click();
-    await expect(page.getByTestId('study-note-line')).toContainText('保存しました');
-
-    // 香落ちの棋譜は登録できない
-    await page.getByTestId('kifu-open').click();
-    await page.getByTestId('kifu-input').fill(KIF('香落ち', ['３四歩(33)', '７六歩(77)']));
-    await page.getByTestId('kifu-load').click();
-    await page.getByTestId('study-save-open').click();
-    await expect(page.getByTestId('study-note-line')).toContainText('平手の初期局面から始まる手順だけ');
-    await expect(page.getByTestId('study-dialog')).toHaveCount(0);
-
-    await page.goto('./');
     await page.getByTestId('tab-studies').click();
-    await expect(page.getByTestId('study-item')).toHaveCount(2);
-    // 戦型の手順で始まるものは、その戦型のグループ
-    await expect(page.getByTestId('tree-group-head')).toHaveText([/横歩取り（後手番）\s*1/, /その他（先手番）\s*1/]);
+    const yokofu = ['７六歩(77)', '３四歩(33)', '２六歩(27)', '８四歩(83)', '２五歩(26)', '８五歩(84)', '７八金(69)', '３二金(41)', '２四歩(25)', '同　歩(23)', '同　飛(28)', '８六歩(85)', '同　歩(87)', '同　飛(82)', '３四飛(24)', '３三角(22)', '３六飛(34)'];
+    const paste = async (kif: string) => {
+      await page.getByTestId('study-register').click();
+      await page.getByTestId('study-register-paste').click();
+      await page.getByTestId('kif-paste-input').fill(kif);
+      await page.getByTestId('kif-paste-read').click();
+    };
+    // 同梱の戦型「横歩取り △3三角型（▲3六飛まで）」がいちばん長く一致するので、その後の手順から。側は後手に切り替える
+    await paste(KIF('平手', [...yokofu, '８四飛(86)']));
+    await expect(page.getByTestId('kif-paste-moves')).toHaveText('18 手：横歩取り △3三角型（▲3六飛まで） → △８四飛');
+    await page.getByTestId('kif-paste-side-white').click();
+    await page.getByTestId('kif-paste-add').click();
+    await expect(page.getByTestId('book-title')).toHaveText('定跡帳横歩取り（後手番）');
+    await expect(page.getByTestId('study-title')).toHaveText('△８四飛');
+
+    // 同じ手順：足さずに知らせ、定跡帳で開ける
+    await page.getByRole('button', { name: '‹ 一覧' }).click();
+    await page.getByTestId('tab-studies').click();
+    await paste(KIF('平手', [...yokofu, '８四飛(86)']));
+    await page.getByTestId('kif-paste-add').click();
+    await expect(page.getByTestId('kif-paste-exists')).toContainText('研究手順「△８四飛」としてすでにあります');
+    await page.getByTestId('kif-paste-open-existing').click();
+    await expect(page.getByTestId('study-title')).toHaveText('△８四飛');
+
+    // 戦型の出発点そのもの・香落ちは足さない
+    await page.getByRole('button', { name: '‹ 一覧' }).click();
+    await page.getByTestId('tab-studies').click();
+    await paste(KIF('平手', yokofu));
+    await expect(page.getByTestId('kif-paste-message')).toContainText('戦型の出発点そのものは研究手順にできません');
+    await page.getByTestId('kif-paste-input').fill(KIF('香落ち', ['３四歩(33)', '７六歩(77)']));
+    await page.getByTestId('kif-paste-read').click();
+    await expect(page.getByTestId('kif-paste-message')).toContainText('平手の初期局面から始まる手順だけ');
+    await page.keyboard.press('Escape');
+    await expect(page.getByTestId('study-item')).toHaveCount(1);
   });
 });
 
 test.describe('8-1 ツリーとのつながり・復習', () => {
-  test('ツリーを開くと★が付く（独立して登録した研究手順でも）。終わりの局面で名前。ツリーで見る。ツリーから保存', async ({ page }) => {
+  test('ツリーを開くと★が付く（独立して登録した研究手順でも）。終わりの局面で名前。ツリーで見る。ツリーから定跡帳に足す', async ({ page }) => {
     await openHome(page);
     await importTrees(page, [lineTree('line', '研究用ツリー')]);
     await importStudies(page, [study('s-a', '研究A', ['7g7f', '3c3d', '2g2f'], { note: 'Aのメモ' }), study('s-b', '研究B', ['2g2f', '3c3d'])]);
@@ -229,44 +214,54 @@ test.describe('8-1 ツリーとのつながり・復習', () => {
     await expect(cand.filter({ hasText: '▲６六歩' }).getByTestId('study-star')).toHaveCount(0);
     await cand.filter({ hasText: '▲２六歩' }).click();
     await expect(page.getByTestId('study-here')).toHaveText('★ 研究A');
-    await expect(page.getByTestId('study-open')).toHaveText('研究手順を直す');
+    await expect(page.getByTestId('study-open')).toHaveText('定跡帳で開く');
     // 手順前後で同じ局面（▲2六歩 △8四歩）でも、研究B（▲2六歩 △3四歩）とは違う手順なので★は付かない
     await page.getByTestId('crumb-start').click();
     await cand.filter({ hasText: '▲２六歩' }).click();
     await expect(cand.filter({ hasText: '△８四歩' }).getByTestId('study-star')).toHaveCount(0);
 
-    // ツリーから保存（平手からの手順にして保存）
+    // ツリーから定跡帳に足す（段階10-2。平手からの手順にして、自分の側だけ確かめる。名前は自動）
     await page.getByTestId('crumb-start').click();
     await cand.filter({ hasText: '▲７六歩' }).click();
     await cand.filter({ hasText: '△３四歩' }).click();
     await cand.filter({ hasText: '▲６六歩' }).click();
+    await expect(page.getByTestId('study-open')).toHaveText('定跡帳に足す');
     await page.getByTestId('study-open').click();
-    await expect(page.getByTestId('study-name')).toHaveValue('▲７六歩 △３四歩 ▲６六歩');
-    await expect(page.getByTestId('study-side-white')).toHaveAttribute('aria-checked', 'true');
-    await page.getByTestId('study-save').click();
+    await expect(page.getByTestId('add-book-moves')).toHaveText('▲７六歩 △３四歩 ▲６六歩');
+    await expect(page.getByTestId('add-book-side-white')).toHaveAttribute('aria-checked', 'true');
+    await page.getByTestId('add-book-ok').click();
     await expect(page.getByTestId('study-here')).toHaveText('★ ▲７六歩 △３四歩 ▲６六歩');
+    await expect(page.getByTestId('tree-note')).toContainText('定跡帳に足しました');
+    await expect(page.getByTestId('study-open')).toHaveText('定跡帳で開く');
 
-    // 研究手順の画面で開く → ツリーで見る（今の局面）
+    // ★ の窓の「定跡帳で開く」→ 定跡帳の ⋯ の「ツリーで見る」（今の局面）
     await page.getByTestId('crumb').nth(1).click();
     await cand.filter({ hasText: '▲２六歩' }).click();
     await page.getByTestId('study-here').click();
     await expect(page.getByTestId('study-view-note')).toHaveText('Aのメモ');
     await page.getByTestId('study-view-open').click();
-    await expect(page).toHaveURL(/#\/study\/s-a$/);
+    await expect(page).toHaveURL(/#\/book\/[^/]+\/s-a\/3$/);
     await page.getByTestId('study-prev').click();
+    await page.getByTestId('book-menu').click();
     await page.getByTestId('study-open-tree').click();
     await expect(page).toHaveURL(/#\/tree\/line\/study\/s-a\/2$/);
     await expect(page.getByTestId('crumb')).toHaveText(['▲７六歩', '△３四歩']);
 
-    // 研究B はツリーで最後までたどれない（▲2六歩 △3四歩 はツリーに無い）。1 手目まで戻せばツリーで見られる
+    // 研究B はツリーで最後までたどれない（▲2六歩 △3四歩 はツリーに無い）。1 手目まで戻せばツリーで見られる。
+    // 古い研究手順の画面の URL は、その研究手順の定跡帳へ移る
     await page.goto('./#/study/s-b');
+    await expect(page).toHaveURL(/#\/book\/[^/]+\/s-b\/2$/);
     await expect(page.getByTestId('study-title')).toHaveText('研究B');
+    await page.getByTestId('book-menu').click();
+    await expect(page.getByTestId('study-make-tree')).toBeVisible();
     await expect(page.getByTestId('study-open-tree')).toHaveCount(0);
+    await page.keyboard.press('Escape');
     await page.getByTestId('study-prev').click();
+    await page.getByTestId('book-menu').click();
     await expect(page.getByTestId('study-open-tree')).toBeVisible();
   });
 
-  test('研究手順だけの復習が、ツリーなしの研究手順で動く（1 本・グループ・研究手順の画面から）', async ({ page }) => {
+  test('研究手順だけの復習が、ツリーなしの研究手順で動く（1 本・グループ・定跡帳から）', async ({ page }) => {
     await openHome(page);
     await importStudies(page, [
       study('s-1', '研究1', ['7g7f', '3c3d', '2g2f', '8c8d'], { note: 'メモの 1 行目\n2 行目', updatedAt: 3 }),
@@ -300,9 +295,11 @@ test.describe('8-1 ツリーとのつながり・復習', () => {
     await expect(page.getByTestId('review-summary')).toContainText('「その他（後手番）」の研究手順 2 本・問題 3（まだ 1・前回まちがい 1');
     await expect(page.getByTestId('review-prompt')).toHaveAttribute('data-phase', 'ask');
 
-    // 研究手順の画面から
+    // 定跡帳の ⋯ から（古い研究手順の画面の URL は定跡帳へ移る）
     await page.goto('./#/study/s-2');
-    await page.getByTestId('study-screen-review').click();
+    await expect(page.getByTestId('book-title')).toBeVisible();
+    await page.getByTestId('book-menu').click();
+    await page.getByTestId('book-study-review').click();
     await expect(page).toHaveURL(/#\/study-review\/s-2$/);
     await expect(page.getByTestId('review-opponent')).toHaveText('相手は ▲２六歩');
     await play(page, '83', '84');
