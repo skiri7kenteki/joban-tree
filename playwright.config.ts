@@ -8,7 +8,8 @@ export default defineConfig({
   testDir: 'e2e',
   timeout: 180_000,
   retries: process.env.CI ? 1 : 0,
-  reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
+  // CI では失敗をアノテーション（GitHub の実行結果に出る注記）にも出す（ログを開かなくても、どのテストが落ちたか分かるように）
+  reporter: process.env.CI ? [['list'], ['github'], ['html', { open: 'never' }]] : 'list',
   use: {
     baseURL: `http://localhost:${PORT}/joban-tree/`,
     trace: 'retain-on-failure',
