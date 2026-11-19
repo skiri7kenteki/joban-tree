@@ -26,7 +26,7 @@ import {
   studyRecordKey,
   summarizeStudies,
 } from '../review/studyReview';
-import { groupStudies } from '../tree/organize';
+import { bookLabel, bookPool } from '../tree/organize';
 import { moveTexts, studyStartIndex, treeBaseMoves } from '../tree/studies';
 import type { OpeningTemplate } from '../tree/templates';
 import type { Study, TreeData } from '../tree/types';
@@ -86,9 +86,9 @@ async function choose(target: StudyReviewTarget, studies: Study[], templates: Op
     const pool = studies.filter((s) => s.id === target.studyId);
     return { pool, startOf: fromTemplate, tree: null, label: `研究「${pool[0]?.name ?? '（見つかりません）'}」だけ・` };
   }
-  const group = groupStudies(studies, templates, '').find((g) => g.key === target.key);
-  const pool = group?.items ?? [];
-  return { pool, startOf: fromTemplate, tree: null, label: `${group ? `「${group.label}」の` : ''}研究手順 ${pool.length} 本・` };
+  // グループの key か、定跡帳の key（平手からの定跡帳はその側の研究手順すべて。段階10-1）
+  const pool = bookPool(target.key, studies, templates);
+  return { pool, startOf: fromTemplate, tree: null, label: `${pool.length > 0 ? `「${bookLabel(target.key)}」の` : ''}研究手順 ${pool.length} 本・` };
 }
 
 type Phase = { kind: 'ask'; firstTry: boolean } | { kind: 'wrong'; tried: string } | { kind: 'answered'; ok: boolean } | { kind: 'end' } | { kind: 'start' };

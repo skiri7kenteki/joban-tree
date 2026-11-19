@@ -40,7 +40,7 @@ export function StudyKifImportScreen() {
       const existing = await ensureStudies();
       setProgress({ done: 0, total: r.ends.length });
       const list = await buildCandidates(r, templates, existing, (done, total) => setProgress({ done, total }));
-      setSide(kifSide(r, templates));
+      setSide(kifSide(r, templates, list.map((c) => c.moves)));
       setCandidates(list);
       setChecked(new Set(list.filter((c) => !c.existing).map((c) => c.index)));
     } catch (e) {
@@ -144,7 +144,7 @@ export function StudyKifImportScreen() {
             <strong>{candidates.length} 本</strong>の研究手順になります
             {existingCount > 0 ? `（同じ手順がすでにある ${existingCount} 本は外してあります）` : ''}。
           </p>
-          <div class="side-choice" role="radiogroup" aria-label="自分は">
+          <div class="side-choice side-choice-strong" role="radiogroup" aria-label="自分は">
             <span>自分は</span>
             {(['black', 'white'] as Side[]).map((s) => (
               <button

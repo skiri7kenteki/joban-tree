@@ -1,7 +1,7 @@
 // 端末にある研究手順（段階8-1）を画面どうしで共有する。読み込みは最初に使うときに 1 回（あとは保存のたびに読み直す）。
 
 import { signal } from '@preact/signals';
-import { deleteStudy, listStudies, putStudies } from '../storage/studies';
+import { deleteStudy, listStudies, putStudies, writeStudies } from '../storage/studies';
 import { findSameStudy, missingStudies } from '../tree/studies';
 import type { Study } from '../tree/types';
 
@@ -45,6 +45,12 @@ export async function updateStudyFields(study: Study, f: { name: string; note: s
   const next: Study = { ...study, name: f.name.trim(), note: f.note.trimEnd(), mySide: f.mySide ?? study.mySide, updatedAt: Date.now() };
   await saveStudies([next]);
   return next;
+}
+
+/** まとめて保存・消す（定跡帳の書き込み。段階10-1）して、一覧を読み直す */
+export async function applyStudyChange(change: { put: readonly Study[]; remove: readonly Pick<Study, 'id'>[] }): Promise<Study[]> {
+  await writeStudies(change.put, change.remove.map((s) => s.id));
+  return refreshStudies();
 }
 
 /** 消す（画面で確認を出してから呼ぶ） */

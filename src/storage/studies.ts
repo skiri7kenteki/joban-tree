@@ -25,3 +25,13 @@ export async function deleteStudy(id: string): Promise<void> {
   tx.objectStore(STUDIES).delete(id);
   await finished(tx);
 }
+
+/** まとめて保存して、まとめて消す（1 回の書き込みで。定跡帳で手を足す・消す・取り消すとき。段階10-1） */
+export async function writeStudies(put: readonly Study[], removeIds: readonly string[]): Promise<void> {
+  const db = await openDb();
+  const tx = db.transaction(STUDIES, 'readwrite');
+  const store = tx.objectStore(STUDIES);
+  for (const id of removeIds) store.delete(id);
+  for (const s of put) store.put(structuredClone(s));
+  await finished(tx);
+}

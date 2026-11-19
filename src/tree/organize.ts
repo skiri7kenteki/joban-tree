@@ -136,11 +136,81 @@ export function groupStudies<S extends StudyItem>(studies: readonly S[], templat
       templateId: s.templateId && templates.some((t) => t.id === s.templateId && startsWithMoves(s.moves, t.moves)) ? s.templateId : undefined,
       prefix: { initialSfen: STARTPOS_SFEN, moves: [...s.moves] },
     }));
-  return groupTrees(items, templates).map((g) => ({
-    key: `${STUDY_GROUP_PREFIX}${g.key}`,
-    label: g.label,
-    items: g.items.sort((a, b) => b.updatedAt - a.updatedAt).map((x) => x.study),
-  }));
+  return groupTrees(items, templates).flatMap((g) => {
+    const list = g.items.sort((a, b) => b.updatedAt - a.updatedAt).map((x) => x.study);
+    if (g.key !== OTHER_GROUP) return [{ key: `${STUDY_GROUP_PREFIX}${g.key}`, label: g.label, items: list }];
+    // 段階10-1（持ち主の判断 2026-11-19）：「その他」も自分の側で分ける（定跡帳で手を足すときに側が決まるように）。後手番 → 先手番
+    return (['white', 'black'] as Side[]).flatMap((side) => {
+      const items2 = list.filter((s) => s.mySide === side);
+      return items2.length > 0 ? [{ key: otherStudyKey(side), label: groupLabel('その他', side), items: items2 }] : [];
+    });
+  });
+}
+
+/** 研究手順の「その他」のグループの key（自分の側ごと） */
+export function otherStudyKey(side: Side): string {
+  return `${STUDY_GROUP_PREFIX}${OTHER_GROUP}|${side}`;
+}
+
+/** その研究手順が入る、一覧のグループの key（groupStudies と同じ決まり） */
+export function studyGroupKey(study: Pick<StudyItem, 'moves' | 'mySide' | 'templateId'>, templates: readonly OpeningTemplate[]): string {
+  const valid = study.templateId ? templates.find((t) => t.id === study.templateId && startsWithMoves(study.moves, t.moves)) : undefined;
+  const t = valid ?? closestTemplate(templates, study.moves);
+  return t ? `${STUDY_GROUP_PREFIX}${t.group}|${study.mySide}` : otherStudyKey(study.mySide);
+}
+
+// ---------------------------------------------------------------------------
+// 定跡帳の key（段階9-2・10-1）
+//   - 戦型のグループの定跡帳：グループの key そのまま（study:<グループ>|<側>）。中身はそのグループの研究手順
+//   - 平手からの定跡帳：study:hirate|<側>。中身はその側の研究手順すべて（平手から指していって戦型の形になっても消えないように）。
+//     「その他」のグループから開く定跡帳はこれ
+
+const HIRATE_BOOK = `${STUDY_GROUP_PREFIX}hirate|`;
+
+/** 平手からの定跡帳の key */
+export function hirateBookKey(side: Side): string {
+  return `${HIRATE_BOOK}${side}`;
+}
+
+/** 平手からの定跡帳か */
+export function isHirateBook(key: string): boolean {
+  return key.startsWith(HIRATE_BOOK);
+}
+
+/** 一覧のグループから開く定跡帳の key（「その他」は平手からの定跡帳） */
+export function bookKeyOfGroup(groupKey: string): string {
+  const other = `${STUDY_GROUP_PREFIX}${OTHER_GROUP}|`;
+  return groupKey.startsWith(other) ? hirateBookKey(groupKey.slice(other.length) as Side) : groupKey;
+}
+
+/** 定跡帳の自分の側（key から。分からなければ null） */
+export function bookSide(key: string): Side | null {
+  const side = key.slice(key.lastIndexOf('|') + 1);
+  return side === 'black' || side === 'white' ? side : null;
+}
+
+/** 定跡帳の見出し（例：「横歩取り（後手番）」「平手から（先手番）」） */
+export function bookLabel(key: string): string {
+  const side = bookSide(key);
+  if (!side) return 'その他';
+  if (isHirateBook(key)) return groupLabel('平手から', side);
+  const group = key.slice(STUDY_GROUP_PREFIX.length, key.lastIndexOf('|'));
+  return groupLabel(group === OTHER_GROUP ? 'その他' : group, side);
+}
+
+/** 定跡帳の研究手順（グループの研究手順。平手からの定跡帳はその側の研究手順すべて。並びは直した日の新しい順） */
+export function bookPool<S extends StudyItem>(key: string, studies: readonly S[], templates: readonly OpeningTemplate[]): S[] {
+  if (isHirateBook(key)) {
+    const side = bookSide(key);
+    return studies.filter((s) => s.mySide === side).sort((a, b) => b.updatedAt - a.updatedAt);
+  }
+  return groupStudies(studies, templates, '').find((g) => g.key === key)?.items ?? [];
+}
+
+/** その研究手順を、定跡帳 key に入れてよいか（グループから外れる手は足さない。平手からの定跡帳は側が同じなら何でも） */
+export function fitsBook(key: string, study: Pick<StudyItem, 'moves' | 'mySide' | 'templateId'>, templates: readonly OpeningTemplate[]): boolean {
+  if (isHirateBook(key)) return study.mySide === bookSide(key);
+  return studyGroupKey(study, templates) === key;
 }
 
 const startsWithMoves = (moves: readonly string[], head: readonly string[]) => moves.length >= head.length && head.every((m, i) => moves[i] === m);

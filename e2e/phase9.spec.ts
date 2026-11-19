@@ -38,9 +38,16 @@ const study = (id: string, name: string, moves: string[], opts: Partial<Study> =
   ...opts,
 });
 
-/** 一覧から研究手順を開く */
+/**
+ * 研究手順の画面（#/study/<id>）で開く。段階10-1 から一覧の行は定跡帳を開くので、定跡帳の URL から id を取って移る
+ * （研究手順の画面と編集モードは段階10-2 で片付けるので、そのときにこのテストも書き直す）
+ */
 async function openStudy(page: Page, name: string) {
   await page.getByTestId('study-item').filter({ hasText: name }).click();
+  await expect(page).toHaveURL(/#\/book\/[^/]+\/s-[\w-]+\/\d+$/);
+  const id = /\/(s-[\w-]+)\/\d+$/.exec(page.url())![1];
+  await page.evaluate((sid) => (location.hash = `/study/${sid}`), id);
+  await expect(page).toHaveURL(new RegExp(`#/study/${id}$`));
   await expect(page.getByTestId('study-title')).toHaveText(name);
 }
 
@@ -274,12 +281,14 @@ test.describe('9-2 研究手順どうしをつないで見る', () => {
     await expect(page.getByTestId('study-title')).toHaveText('研究C');
     // 研究C の終わり：通るのは 1 本だけ
     await expect(page.getByTestId('study-book-list')).toHaveCount(0);
-    // 戻るボタンで一覧へ（切り替えで履歴は増えていない）
+    // 戻るボタンで、開く前の画面へ（切り替えで履歴は増えていない。段階10-1 から、一覧 → 定跡帳 → 研究手順の画面の順に開いている）
+    await page.goBack();
+    await expect(page.getByTestId('book-title')).toBeVisible();
     await page.goBack();
     await expect(page.getByTestId('study-item').first()).toBeVisible();
   });
 
-  test('定跡帳として見る：出発点からたどる・研究手順の数・ここで終わる研究・まとめて復習・定跡帳から編集', async ({ page }) => {
+  test('定跡帳として見る：出発点からたどる・研究手順の数・ここで終わる研究・まとめて復習・定跡帳で指して延ばす', async ({ page }) => {
     await openHome(page);
     await importStudies(page, BOOK);
     await page.getByTestId('study-group-menu-open').first().click();
@@ -309,13 +318,9 @@ test.describe('9-2 研究手順どうしをつないで見る', () => {
     await expect(page.getByTestId('study-book-ending')).toContainText('研究B');
     await expect(page.getByTestId('study-book-ending')).toHaveAttribute('data-current', 'true');
 
-    // 定跡帳から編集：1 手足して保存 → 定跡帳に戻る（研究B・20 手目）
-    await page.getByTestId('study-edit-start').click();
-    await expect(page).toHaveURL(/#\/study\/s-b\/edit$/);
+    // 定跡帳の盤で指すと研究B が延びる（段階10-1。研究B・20 手目）
     await play(page, '51', '52');
-    await page.getByTestId('study-edit-save').click();
     await expect(page).toHaveURL(/#\/book\/[^/]+\/s-b\/20$/);
-    await expect(page.getByTestId('book-title')).toBeVisible();
     await expect(page.getByTestId('study-title')).toHaveText('研究B');
     await expect(page.getByTestId('study-position')).toContainText('20手目');
 

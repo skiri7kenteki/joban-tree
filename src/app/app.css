@@ -1408,3 +1408,84 @@
   gap: var(--space-1);
   font-size: var(--font-size-small);
 }
+
+/* ---- 段階10-1：定跡帳で直接指して研究を足す ---- */
+
+/* 研究の木の外の手（まだどの研究手順も通っていない） */
+.crumb.crumb-outside {
+  border-style: dashed;
+  opacity: 0.6;
+}
+
+/* ★ の行（押すと名前・メモを直す）：見た目は今までの 1 行のまま */
+.book-head-btn {
+  width: 100%;
+  min-height: var(--touch-min);
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.book-empty {
+  display: flex;
+  align-items: center;
+  margin: 0;
+  font-size: var(--font-size-small);
+}
+
+.menu-section-title {
+  margin: var(--space-2) 0 var(--space-1);
+  font-size: var(--font-size-small);
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 取り消しの知らせ（画面の下に 5 秒） */
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: max-content;
+  max-width: calc(100vw - 2 * var(--space-3));
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
+  border-radius: var(--radius-card);
+  background: var(--color-text);
+  color: var(--color-bg);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.3);
+}
+
+.toast-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toast-btn {
+  flex: 0 0 auto;
+  min-height: var(--touch-min);
+  border: none;
+  background: transparent;
+  color: var(--color-bg);
+  font-weight: bold;
+  text-decoration: underline;
+}
+
+/* 「自分は」の行を目立たせる（新しい研究・変化付き KIF の取り込みの確認。段階10-1） */
+.side-choice.side-choice-strong {
+  padding: var(--space-2);
+  border: 2px solid var(--color-accent);
+  border-radius: var(--radius-card);
+  font-weight: bold;
+}

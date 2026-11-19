@@ -114,7 +114,7 @@ describe('戦型（7-1 と同じ決まり）', () => {
       ['study:横歩取り|white', '横歩取り（後手番）', ['b', 'a']],
       ['study:横歩取り|black', '横歩取り（先手番）', ['c']],
       ['study:中飛車|black', '中飛車（先手番）', ['e']],
-      ['study:other', 'その他', ['d']],
+      ['study:other|white', 'その他（後手番）', ['d']],
     ]);
     expect(groupStudies(list, TEMPLATES, '８四飛').flatMap((g) => g.items.map((s) => s.id))).toEqual(['a']);
     expect(groupStudies(list, TEMPLATES, 'zzz')).toEqual([]);

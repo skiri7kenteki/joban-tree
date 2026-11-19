@@ -21,6 +21,7 @@ export function StudyEditDialog({
   defaultName,
   movesText,
   side,
+  hideSide = false,
   onSave,
   onClose,
 }: {
@@ -30,6 +31,8 @@ export function StudyEditDialog({
   movesText: string;
   /** 自分の側の初期値（直すときは研究手順の側） */
   side: Side;
+  /** 自分の側を出さない（定跡帳から直すとき。側を変えると別の定跡帳へ移ってしまうので。段階10-1） */
+  hideSide?: boolean;
   onSave: (f: { name: string; note: string; mySide: Side }) => void;
   onClose: () => void;
 }) {
@@ -49,7 +52,7 @@ export function StudyEditDialog({
 
   return (
     <Dialog title={study ? '研究手順を直す' : '研究手順として保存'} onClose={onClose} testId="study-dialog">
-      {study && <p class="muted">この手順は、もう研究手順として保存してあります。名前・メモ・自分の側を直せます。</p>}
+      {study && !hideSide && <p class="muted">この手順は、もう研究手順として保存してあります。名前・メモ・自分の側を直せます。</p>}
       <p class="study-moves muted" data-testid="study-moves">
         {movesText}
       </p>
@@ -69,22 +72,24 @@ export function StudyEditDialog({
           onInput={(e) => setNote((e.target as HTMLTextAreaElement).value)}
         />
       </label>
-      <div class="side-choice" role="radiogroup" aria-label="自分は">
-        <span>自分は</span>
-        {(['black', 'white'] as Side[]).map((s) => (
-          <button
-            type="button"
-            key={s}
-            role="radio"
-            aria-checked={mySide === s}
-            data-testid={`study-side-${s}`}
-            class={mySide === s ? 'btn btn-toggle on' : 'btn btn-toggle'}
-            onClick={() => setMySide(s)}
-          >
-            {SIDE_TEXT[s]}
-          </button>
-        ))}
-      </div>
+      {!hideSide && (
+        <div class="side-choice" role="radiogroup" aria-label="自分は">
+          <span>自分は</span>
+          {(['black', 'white'] as Side[]).map((s) => (
+            <button
+              type="button"
+              key={s}
+              role="radio"
+              aria-checked={mySide === s}
+              data-testid={`study-side-${s}`}
+              class={mySide === s ? 'btn btn-toggle on' : 'btn btn-toggle'}
+              onClick={() => setMySide(s)}
+            >
+              {SIDE_TEXT[s]}
+            </button>
+          ))}
+        </div>
+      )}
       {error && (
         <p class="status-ng" role="alert">
           {error}

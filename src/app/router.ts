@@ -7,7 +7,9 @@
 //   #/study/<研究手順の id> … 研究手順を開く（軽い見返しの画面。段階8-1）
 //   #/study/<研究手順の id>/<手数> … 研究手順を、平手から「手数」手目の局面で開く（段階9-2。「この局面からの研究」で切り替えたとき）
 //   #/study/<研究手順の id>/edit … 研究手順の手順を編集する（段階9-1）
-//   #/book/<グループの key>[/<研究手順の id>/<手数>] … 定跡帳として見る（そのグループの研究手順をつないだツリー。段階9-2）
+//   #/book/<グループの key>[/<研究手順の id>/<手数>] … 定跡帳として見る（そのグループの研究手順をつないだツリー。段階9-2）。
+//     段階10-1 から、定跡帳の盤で指すとその場で研究手順に足す。key が study:hirate|<側> なら平手からの定跡帳（その側の研究手順すべて）
+//   #/book/<key>/t/<戦型の id> … 定跡帳を、その戦型の出発点で開く（新しい研究を始めるとき。研究手順がまだ無くても開ける。段階10-1）
 //   #/study-import … 変化付き KIF から研究手順をまとめて取り込む（段階8-2）
 //   #/settings   … 設定
 //   #/review/<id> … 復習モード
@@ -24,7 +26,7 @@ export type Route =
   | { name: 'settings' }
   | { name: 'tree'; id: string; study?: string; ply?: number }
   | { name: 'study'; id: string; edit?: boolean; ply?: number }
-  | { name: 'book'; key: string; study?: string; ply?: number }
+  | { name: 'book'; key: string; study?: string; ply?: number; template?: string }
   | { name: 'study-import' }
   | { name: 'review'; id: string; studies?: boolean }
   | { name: 'study-review'; study?: string; group?: string };
@@ -45,6 +47,8 @@ function parse(hash: string): Route {
     if (study[2] === 'edit') return { name: 'study', id: study[1], edit: true };
     return study[2] ? { name: 'study', id: study[1], ply: Number(study[2]) } : { name: 'study', id: study[1] };
   }
+  const bookT = /^\/book\/([^/]+)\/t\/([^/]+)$/.exec(path);
+  if (bookT) return { name: 'book', key: safeDecode(bookT[1]), template: safeDecode(bookT[2]) };
   const book = /^\/book\/([^/]+)(?:\/([\w-]+)\/(\d+))?$/.exec(path);
   if (book) {
     const key = safeDecode(book[1]);
@@ -91,6 +95,11 @@ export function groupReviewPath(key: string): string {
 export function bookPath(key: string, study?: string, ply?: number): string {
   const base = `/book/${encodeURIComponent(key)}`;
   return study !== undefined && ply !== undefined ? `${base}/${study}/${ply}` : base;
+}
+
+/** 定跡帳を、戦型の出発点で開く（新しい研究を始めるとき） */
+export function bookTemplatePath(key: string, templateId: string): string {
+  return `/book/${encodeURIComponent(key)}/t/${encodeURIComponent(templateId)}`;
 }
 
 /** 前の画面に戻る（履歴が無ければトップへ） */

@@ -12,6 +12,7 @@ import { InputScreen } from './app/InputScreen';
 import { TreeScreen } from './app/TreeScreen';
 import { SettingsScreen } from './app/SettingsScreen';
 import { ReviewScreen } from './app/ReviewScreen';
+import { BookScreen } from './app/BookScreen';
 import { StudyScreen } from './app/StudyScreen';
 import { StudyReviewScreen } from './app/StudyReviewScreen';
 import { StudyKifImportScreen } from './app/StudyKifImportScreen';
@@ -35,7 +36,7 @@ function App() {
         {r.name === 'new' && <InputScreen key={r.study ? 'study' : 'tree'} forStudy={r.study} />}
         {r.name === 'tree' && <TreeScreen id={r.id} studyId={r.study} ply={r.ply} />}
         {r.name === 'study' && <StudyScreen key={r.id} id={r.id} edit={r.edit === true} ply={r.ply} />}
-        {r.name === 'book' && <StudyScreen key={`book:${r.key}`} book={r.key} id={r.study} ply={r.ply} />}
+        {r.name === 'book' && <BookScreen key={`book:${r.key}`} bookKey={r.key} id={r.study} ply={r.ply} template={r.template} />}
         {r.name === 'study-import' && <StudyKifImportScreen />}
         {r.name === 'settings' && <SettingsScreen />}
         {r.name === 'review' && !r.studies && <ReviewScreen key={r.id} id={r.id} />}

@@ -3,8 +3,9 @@
 // 段階7-2：「ツリー｜研究手順」の切り替え。
 // 段階8-1：研究手順はツリーから独立したデータ（src/tree/studies.ts）。研究手順のタブ：
 //   - 「＋ 研究手順を登録」（盤で指す・棋譜を貼る／変化付き KIF からまとめて取り込む（段階8-2）／JSON を取り込む）、「書き出し」（選んで JSON・KIF）
+//     段階10-1：「＋ 研究手順を登録」は［平手から］［戦型から選ぶ］→ 自分の側 → 定跡帳が開いて、そのまま指せる。棋譜・KIF・JSON は下に小さく
 //   - 研究手順も戦型のグループ × 自分の側でまとめる。グループの ⋯ から「定跡帳として見る」（段階9-2）「このグループの研究手順を復習」「このグループを書き出す」
-//   - 行をタップで研究手順の画面（#/study/<id>）。行の ⋯：この研究手順を復習・名前・メモを直す・書き出す・消す（確認あり）
+//   - 行をタップで研究手順の画面（#/study/<id>）。段階10-1 から、その研究手順の終わりの局面で定跡帳を開く。行の ⋯：この研究手順を復習・名前・メモを直す・書き出す・消す（確認あり）
 //   - ツリーの JSON（形式 6 まで）を取り込むと、中の研究手順も研究手順として取り込む（同じ手順がすでにあれば足さない）
 //   - 端末の保存場所を新しい版にしたときの移し替えの結果を、一度だけ知らせる
 
@@ -14,15 +15,27 @@ import { takeMigrationNote } from '../storage/migrate';
 import { deleteTree, listTrees, loadTree, newTreeId, saveTree, type TreeSummary } from '../storage/trees';
 import { fileNameOf, parseTreeJson, treeToJson } from '../tree/backup';
 import { latestBundled } from '../tree/bundledCatalog';
-import { RECENT_MIN_TREES, filterByName, groupStudies, groupTrees, normalizeForSearch, recentItems, type TreeGroup } from '../tree/organize';
+import {
+  RECENT_MIN_TREES,
+  bookKeyOfGroup,
+  filterByName,
+  groupStudies,
+  groupTrees,
+  hirateBookKey,
+  normalizeForSearch,
+  recentItems,
+  type TreeGroup,
+} from '../tree/organize';
+import type { Side } from '../shogi/position';
+import { listName, type OpeningTemplate } from '../tree/templates';
 import { firstLine, liftTreeStudies, studyMovesText } from '../tree/studies';
 import { parseStudiesJson, planStudyImport, resolveStudyImport, type StudyConflictChoice, type StudyImportPlan } from '../tree/studyFile';
 import type { Study, TreeData } from '../tree/types';
 import { generation, isGenerating, openTree, treeVersion } from './generation';
 import { collapsedGroups, forgetOpened, homeTab, recentOpened, setHomeTab, toggleGroup } from './recent';
-import { bookPath, go, groupReviewPath } from './router';
+import { bookPath, bookTemplatePath, go, groupReviewPath } from './router';
 import { OUTCOME_TEXT, shareFile } from './share';
-import { allTemplates, myTemplates, refreshMyTemplates } from './TemplateDialogs';
+import { TemplatePicker, allTemplates, myTemplates, refreshMyTemplates } from './TemplateDialogs';
 import { StudyEditDialog, StudyExportDialog, shareStudies } from './StudyDialogs';
 import { ensureStudies, homeNotice, importLiftedStudies, library, removeStudy, saveStudies, updateStudyFields } from './studies';
 
@@ -45,6 +58,8 @@ export function HomeScreen({ isolationMessage }: { isolationMessage: string | nu
   const [menuGroup, setMenuGroup] = useState<TreeGroup<Study> | null>(null);
   /** 「＋ 研究手順を登録」のメニュー */
   const [registerMenu, setRegisterMenu] = useState(false);
+  /** 新しい研究：戦型を選ぶ窓（picking）・自分の側を選ぶ窓（start。template が null なら平手から） */
+  const [newStudy, setNewStudy] = useState<{ kind: 'picking' } | { kind: 'start'; template: OpeningTemplate | null } | null>(null);
   /** 研究手順の書き出し（initial：初めに選んでおく研究手順） */
   const [exporting, setExporting] = useState<{ initial?: string[] } | null>(null);
   /** 取り込もうとしたツリーが既にあるとき */
@@ -293,7 +308,7 @@ export function HomeScreen({ isolationMessage }: { isolationMessage: string | nu
               onMenu={searching ? undefined : () => setMenuGroup(allStudyGroups.find((x) => x.key === g.key) ?? g)}
             >
               {g.items.map((s) => (
-                <StudyRow key={s.id} study={s} onMenu={() => setMenuStudy(s)} />
+                <StudyRow key={s.id} study={s} bookKey={bookKeyOfGroup(g.key)} onMenu={() => setMenuStudy(s)} />
               ))}
             </GroupSection>
           ))}
@@ -311,9 +326,35 @@ export function HomeScreen({ isolationMessage }: { isolationMessage: string | nu
 
       {registerMenu && (
         <Dialog title="研究手順を登録" onClose={() => setRegisterMenu(false)} testId="study-register-menu">
+          <p class="muted">定跡帳が開きます。盤で指すと、その場で研究手順に足されます（名前は自動。あとで直せます）。</p>
           <div class="dialog-actions dialog-actions-column">
-            <button type="button" class="btn btn-primary" data-testid="study-register-board" onClick={() => go('/new/study')}>
-              盤で指す・棋譜を貼る（1 本）
+            <button
+              type="button"
+              class="btn btn-primary"
+              data-testid="study-register-hirate"
+              onClick={() => {
+                setRegisterMenu(false);
+                setNewStudy({ kind: 'start', template: null });
+              }}
+            >
+              平手から
+            </button>
+            <button
+              type="button"
+              class="btn btn-primary"
+              data-testid="study-register-template"
+              onClick={() => {
+                setRegisterMenu(false);
+                setNewStudy({ kind: 'picking' });
+              }}
+            >
+              戦型から選ぶ
+            </button>
+          </div>
+          <p class="menu-section-title">棋譜・ファイルから</p>
+          <div class="dialog-actions dialog-actions-column">
+            <button type="button" class="btn" data-testid="study-register-board" onClick={() => go('/new/study')}>
+              棋譜を貼って 1 本登録
             </button>
             <button type="button" class="btn" data-testid="study-register-kif" onClick={() => go('/study-import')}>
               変化付き KIF からまとめて取り込む
@@ -328,10 +369,16 @@ export function HomeScreen({ isolationMessage }: { isolationMessage: string | nu
         </Dialog>
       )}
 
+      {newStudy?.kind === 'picking' && (
+        <TemplatePicker onPick={(t) => setNewStudy({ kind: 'start', template: t })} onClose={() => setNewStudy(null)} />
+      )}
+
+      {newStudy?.kind === 'start' && <NewStudyDialog template={newStudy.template} onClose={() => setNewStudy(null)} />}
+
       {menuGroup && (
         <Dialog title={menuGroup.label} onClose={() => setMenuGroup(null)} testId="study-group-menu">
           <div class="dialog-actions dialog-actions-column">
-            <button type="button" class="btn btn-primary" data-testid="study-group-book" onClick={() => go(bookPath(menuGroup.key))}>
+            <button type="button" class="btn btn-primary" data-testid="study-group-book" onClick={() => go(bookPath(bookKeyOfGroup(menuGroup.key)))}>
               定跡帳として見る
             </button>
             <button type="button" class="btn" data-testid="study-group-review" onClick={() => go(groupReviewPath(menuGroup.key))}>
@@ -503,11 +550,11 @@ function GroupSection<T>({
 }
 
 /** 研究手順の 1 行（★名前・メモの最初の 1 行・手数・日付）。タップで研究手順の画面 */
-function StudyRow({ study, onMenu }: { study: Study; onMenu: () => void }) {
+function StudyRow({ study, bookKey, onMenu }: { study: Study; bookKey: string; onMenu: () => void }) {
   const note = firstLine(study.note);
   return (
     <li class="tree-row">
-      <button type="button" class="tree-item" data-testid="study-item" onClick={() => go(`/study/${study.id}`)}>
+      <button type="button" class="tree-item" data-testid="study-item" onClick={() => go(bookPath(bookKey, study.id, study.moves.length))}>
         <span class="tree-item-title">
           {/* ★ は名前の中に入れる（長い名前が折り返しても、★ だけの行にならないように） */}
           <span class="tree-item-name">
@@ -757,4 +804,47 @@ function formatShortDate(ms: number, now: number = Date.now()): string {
   if (days === 1) return '昨日';
   if (d.getFullYear() === today.getFullYear()) return `${d.getMonth() + 1}/${d.getDate()}`;
   return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+const SIDE_CHOICE_TEXT: Record<Side, string> = { black: '☗先手', white: '☖後手' };
+
+/**
+ * 新しい研究を始める（段階10-1）：自分の側を選んで、定跡帳を開く。
+ * 側の初期値は戦型の側（平手なら先手）。その戦型と側のグループに研究手順があれば、その定跡帳を戦型の出発点で開く。無ければ空の定跡帳
+ */
+function NewStudyDialog({ template, onClose }: { template: OpeningTemplate | null; onClose: () => void }) {
+  const [side, setSide] = useState<Side>(template?.mySide ?? 'black');
+  function open() {
+    if (!template) go(bookPath(hirateBookKey(side)));
+    else go(bookTemplatePath(`study:${template.group}|${side}`, template.id));
+  }
+  return (
+    <Dialog title="新しい研究" onClose={onClose} testId="new-study-dialog">
+      <p data-testid="new-study-from">出発点：{template ? listName(template) : '平手の初期局面'}</p>
+      <div class="side-choice side-choice-strong" role="radiogroup" aria-label="自分は">
+        <span>自分は</span>
+        {(['black', 'white'] as Side[]).map((s) => (
+          <button
+            type="button"
+            key={s}
+            role="radio"
+            aria-checked={side === s}
+            data-testid={`new-study-side-${s}`}
+            class={side === s ? 'btn btn-toggle on' : 'btn btn-toggle'}
+            onClick={() => setSide(s)}
+          >
+            {SIDE_CHOICE_TEXT[s]}
+          </button>
+        ))}
+      </div>
+      <div class="dialog-actions">
+        <button type="button" class="btn btn-primary" data-testid="new-study-open" onClick={open}>
+          定跡帳を開く
+        </button>
+        <button type="button" class="btn" onClick={onClose}>
+          やめる
+        </button>
+      </div>
+    </Dialog>
+  );
 }

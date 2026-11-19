@@ -135,17 +135,21 @@ test.describe('8-1 登録（エンジンを使わない）', () => {
     await expect(item).toContainText('▲７六歩 △３四歩 ▲２六歩');
     await expect(item).toContainText('3 手');
     await expect(item.getByTestId('study-item-note')).toHaveText('狙い：早めの▲2六歩');
-    await expect(page.getByTestId('tree-group-head')).toHaveText([/その他\s*1/]);
+    await expect(page.getByTestId('tree-group-head')).toHaveText([/その他（先手番）\s*1/]);
 
-    // 開く：終わりの局面・名前・メモ
+    // 開く（段階10-1 から定跡帳の、その研究手順の終わりの局面）：名前・メモ
     await item.click();
-    await expect(page).toHaveURL(/#\/study\/s-[\w-]+$/);
+    await expect(page).toHaveURL(/#\/book\/[^/]+\/s-[\w-]+\/3$/);
+    await expect(page.getByTestId('book-title')).toHaveText('定跡帳平手から（先手番）');
     await expect(page.getByTestId('study-title')).toHaveText('▲７六歩 △３四歩 ▲２六歩');
     await expect(page.getByTestId('study-position')).toHaveText('3手目 ▲２六歩');
     await expect(page.getByTestId('study-screen-note')).toHaveText('狙い：早めの▲2六歩\n2 行目');
-    await expect(page.getByTestId('study-meta')).toContainText('3 手');
-    // ツリーが無いので「ツリーで見る」は出ない
+    await expect(page.getByTestId('study-meta')).toContainText('狙い：早めの');
+    // ツリーが無いので「ツリーで見る」は出ない（⋯ の中）
+    await page.getByTestId('book-menu').click();
+    await expect(page.getByTestId('study-make-tree')).toBeVisible();
     await expect(page.getByTestId('study-open-tree')).toHaveCount(0);
+    await page.keyboard.press('Escape');
     // 前後に動かす
     await page.getByTestId('study-prev').click();
     await expect(page.getByTestId('study-position')).toHaveText('2手目 △３四歩');
@@ -154,7 +158,8 @@ test.describe('8-1 登録（エンジンを使わない）', () => {
     await page.getByTestId('study-next').click();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 
-    // この局面からツリーを作る：新しいツリーの画面に、手順を読み込んだ状態で移る（その局面・自分の側）
+    // この局面からツリーを作る（⋯ の中）：新しいツリーの画面に、手順を読み込んだ状態で移る（その局面・自分の側）
+    await page.getByTestId('book-menu').click();
     await page.getByTestId('study-make-tree').click();
     await expect(page).toHaveURL(/#\/new$/);
     await expect(page.locator('h1')).toHaveText('新しいツリー');
@@ -202,7 +207,7 @@ test.describe('8-1 登録（エンジンを使わない）', () => {
     await page.getByTestId('tab-studies').click();
     await expect(page.getByTestId('study-item')).toHaveCount(2);
     // 戦型の手順で始まるものは、その戦型のグループ
-    await expect(page.getByTestId('tree-group-head')).toHaveText([/横歩取り（後手番）\s*1/, /その他\s*1/]);
+    await expect(page.getByTestId('tree-group-head')).toHaveText([/横歩取り（後手番）\s*1/, /その他（先手番）\s*1/]);
   });
 });
 
@@ -292,7 +297,7 @@ test.describe('8-1 ツリーとのつながり・復習', () => {
     await page.getByTestId('study-group-menu-open').click();
     await page.getByTestId('study-group-review').click();
     await expect(page).toHaveURL(/#\/study-review\/group\//);
-    await expect(page.getByTestId('review-summary')).toContainText('「その他」の研究手順 2 本・問題 3（まだ 1・前回まちがい 1');
+    await expect(page.getByTestId('review-summary')).toContainText('「その他（後手番）」の研究手順 2 本・問題 3（まだ 1・前回まちがい 1');
     await expect(page.getByTestId('review-prompt')).toHaveAttribute('data-phase', 'ask');
 
     // 研究手順の画面から
@@ -438,7 +443,8 @@ test.describe('8-1 移し替え（段階7の研究手順 → 独立した研究�
     // メモは両方残る。記録も写っている（▲7六歩の後の △3四歩 は「覚えた」）
     await page.getByTestId('study-item').first().click();
     await expect(page.getByTestId('study-screen-note')).toHaveText('新しいメモ\n――\n古いメモ');
-    await page.getByTestId('study-screen-review').click();
+    await page.getByTestId('book-menu').click();
+    await page.getByTestId('book-study-review').click();
     await expect(page.getByTestId('review-summary')).toContainText('問題 1（まだ 0・前回まちがい 0・覚えた 1）');
 
     // ツリーには研究手順が無くなっても★は付く（手順が同じなので）
@@ -545,12 +551,13 @@ test.describe('8-2 変化付き KIF からまとめて取り込む', () => {
     await expect(page).toHaveURL(/#\/$/);
     await expect(page.getByTestId('home-message')).toHaveText('研究手順 2 本を KIF から取り込みました（1 本は取り込みませんでした）');
     await expect(page.getByTestId('tab-studies')).toHaveAttribute('aria-selected', 'true');
-    await expect(page.getByTestId('study-item')).toHaveText([/3手目 ▲６六歩/, /4手目 △６二銀/, /前から登録した本譜/]);
+    // 「その他」は自分の側で分かれる（後手番 → 先手番。段階10-1）
+    await expect(page.getByTestId('study-item')).toHaveText([/前から登録した本譜/, /3手目 ▲６六歩/, /4手目 △６二銀/]);
 
     // メモ：その変化の終わりまでの手のコメントを手数付きで。「#」の行は入らない
-    await page.getByTestId('study-item').first().click();
+    await page.getByTestId('study-item').filter({ hasText: '3手目 ▲６六歩' }).click();
     await expect(page.getByTestId('study-screen-note')).toHaveText('1手目 ▲７六歩：初手は角道\n4手目 △８四歩：△8四歩なら');
-    await expect(page.getByTestId('study-meta')).toContainText('自分は☗先手');
+    await expect(page.getByTestId('book-title')).toContainText('平手から（先手番）');
   });
 
   test('ファイルを選んで取り込む（Shift_JIS の .kif も読める）。平手以外は理由を出して取り込まない', async ({ page }) => {

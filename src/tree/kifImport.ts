@@ -179,8 +179,13 @@ export async function buildCandidates(
   return out;
 }
 
-/** 自分の側の初期値（本譜から推定） */
-export function kifSide(read: Extract<KifReadResult, { ok: true }>, templates: readonly OpeningTemplate[]): Side {
+/**
+ * 自分の側の初期値：取り込む研究手順の終わりの手が全部後手の手なら後手、全部先手の手なら先手（段階10-1 の小さな直し）。
+ * 混ざっていれば（または ends を渡さなければ）本譜から推定（戦型が分かればその側、無ければ本譜の最後の手を指した側）
+ */
+export function kifSide(read: Extract<KifReadResult, { ok: true }>, templates: readonly OpeningTemplate[], ends: readonly (readonly string[])[] = []): Side {
+  const lasts = ends.filter((m) => m.length > 0).map((m) => (m.length % 2 === 1 ? 'black' : 'white'));
+  if (lasts.length > 0 && lasts.every((s) => s === lasts[0])) return lasts[0];
   return guessSide(read.mainMoves, templates);
 }
 
