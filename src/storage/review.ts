@@ -14,6 +14,12 @@ export async function saveReview(record: ReviewRecord): Promise<void> {
   await done(db.transaction(REVIEW, 'readwrite').objectStore(REVIEW).put(structuredClone(record)));
 }
 
+/** 全部の記録（ツリーごと＋研究手順用。復習のタブのまとめ用。段階11-1） */
+export async function loadAllReviews(): Promise<ReviewRecord[]> {
+  const db = await openDb();
+  return (await done(db.transaction(REVIEW).objectStore(REVIEW).getAll())) as ReviewRecord[];
+}
+
 /** 記録を消す（「記録を消す」ボタン。画面で確認を出してから呼ぶ） */
 export async function clearReview(treeId: string): Promise<void> {
   const db = await openDb();

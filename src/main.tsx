@@ -1,16 +1,18 @@
 // アプリ本体の入口。画面の切り替え（router.ts）に合わせて、トップ・入力・閲覧・設定・復習の画面を出す。
+// 段階11-1：一覧の画面（定跡帳・ツリー・復習・設定のタブ）だけ、画面の下にタブを出す。バージョンと「気づきを送る」は設定のタブへ。
 import { render } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
 import './styles/base.css';
 import './app/app.css';
-import { Footer } from './components/Footer';
+import { TabBar } from './components/TabBar';
 import { ensureCrossOriginIsolated, type IsolationState } from './isolation';
 import { pruneOldBigFiles } from './engine/config';
-import { route } from './app/router';
+import { route, tabOf } from './app/router';
 import { HomeScreen } from './app/HomeScreen';
 import { InputScreen } from './app/InputScreen';
 import { TreeScreen } from './app/TreeScreen';
 import { SettingsScreen } from './app/SettingsScreen';
+import { ReviewsScreen } from './app/ReviewsScreen';
 import { ReviewScreen } from './app/ReviewScreen';
 import { BookScreen } from './app/BookScreen';
 import { RegisterRedirect, StudyRedirect } from './app/LegacyRedirect';
@@ -30,10 +32,13 @@ function App() {
   }, []);
 
   const r = route.value;
+  const tab = tabOf(r);
   return (
-    <div class="app" data-testid="isolation" data-state={isolation}>
+    <div class={tab ? 'app has-tabs' : 'app'} data-testid="isolation" data-state={isolation}>
       <main class="main">
-        {r.name === 'home' && <HomeScreen isolationMessage={isolationMessage(isolation)} />}
+        {r.name === 'home' && <HomeScreen key="studies" list="studies" isolationMessage={isolationMessage(isolation)} />}
+        {r.name === 'trees' && <HomeScreen key="trees" list="trees" isolationMessage={isolationMessage(isolation)} />}
+        {r.name === 'reviews' && <ReviewsScreen />}
         {r.name === 'new' && (r.study ? <RegisterRedirect /> : <InputScreen />)}
         {r.name === 'tree' && <TreeScreen id={r.id} studyId={r.study} ply={r.ply} />}
         {r.name === 'study' && <StudyRedirect key={r.id} id={r.id} ply={r.ply} />}
@@ -49,7 +54,7 @@ function App() {
           />
         )}
       </main>
-      <Footer />
+      {tab && <TabBar current={tab} />}
     </div>
   );
 }

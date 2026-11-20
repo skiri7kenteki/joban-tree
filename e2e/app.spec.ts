@@ -3,14 +3,14 @@ import { expect, test, type Page } from '@playwright/test';
 
 /** トップから「新しいツリー」の画面を開く（service worker の準備が終わるのを待つ） */
 async function openNewTree(page: Page) {
-  await page.goto('./');
+  await page.goto('./#/trees');
   await expect(page.getByTestId('isolation')).toHaveAttribute('data-state', 'isolated', { timeout: 30_000 });
   await page.getByTestId('new-tree').click();
   await expect(page.getByRole('heading', { name: '新しいツリー' })).toBeVisible();
 }
 
 test('ホーム画面に追加するための manifest とアイコンがある', async ({ page, request }) => {
-  await page.goto('./');
+  await page.goto('./#/trees');
   const href = await page.locator('link[rel="manifest"]').getAttribute('href');
   expect(href).toBe('/joban-tree/manifest.webmanifest');
   const manifest = await (await request.get(href!)).json();
@@ -121,7 +121,7 @@ test.describe('エンジンを使う通し確認', () => {
     await page.getByTestId('nav-back').click();
 
     // 一覧に保存されている
-    await page.goto('./');
+    await page.goto('./#/trees');
     await expect(page.getByTestId('tree-item').first()).toContainText('自分は先手', { timeout: 10_000 });
     await page.getByTestId('tree-item').first().click();
     await expect(page.getByTestId('candidate').first()).toBeVisible();

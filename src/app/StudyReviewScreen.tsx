@@ -235,7 +235,7 @@ function StudyReviewView({ target, pool, startOf, record: initialRecord, tree, l
             ‹ ツリー
           </button>
         ) : (
-          <button type="button" class="btn btn-ghost" data-testid="study-review-back" onClick={back}>
+          <button type="button" class="btn btn-ghost" data-testid="study-review-back" onClick={() => back()}>
             ‹ 戻る
           </button>
         )}
@@ -249,7 +249,7 @@ function StudyReviewView({ target, pool, startOf, record: initialRecord, tree, l
           session={session}
           overall={overall}
           onMore={more}
-          onEnd={() => (tree ? go(`/tree/${tree.id}`) : back())}
+          onEnd={() => back('/reviews')}
         />
       ) : (
         <>

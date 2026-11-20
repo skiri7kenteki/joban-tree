@@ -37,7 +37,7 @@ const TREES = [
 ];
 
 async function openHome(page: Page) {
-  await page.goto('./');
+  await page.goto('./#/trees');
   await expect(page.getByTestId('isolation')).toHaveAttribute('data-state', 'isolated', { timeout: 30_000 });
 }
 
@@ -164,7 +164,7 @@ test.describe('7-1 トップ画面（スマホ縦 360×740）', () => {
     await expect(page).toHaveURL(/#\/tree\//);
     // エンジンが無い環境でもツリー自体は保存される。止めて一覧へ
     if (await page.getByTestId('gen-stop').isVisible().catch(() => false)) await page.getByTestId('gen-stop').click();
-    await page.goto('./');
+    await page.goto('./#/trees');
     // 青野流（▲5八玉まで）は先手番の戦型
     await expect(page.getByTestId('tree-group-head')).toHaveText([/横歩取り（先手番）\s*1/]);
     await expect(page.getByTestId('tree-item')).toContainText('青野流');

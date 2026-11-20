@@ -14,7 +14,7 @@ async function closeDialog(page: Page) {
 }
 
 async function openNewTree(page: Page) {
-  await page.goto('./');
+  await page.goto('./#/trees');
   await expect(page.getByTestId('isolation')).toHaveAttribute('data-state', 'isolated', { timeout: 30_000 });
   await page.getByTestId('new-tree').click();
   await expect(page.getByRole('heading', { name: '新しいツリー' })).toBeVisible();
@@ -283,7 +283,7 @@ test.describe('5-2 自分で戦型を登録する・配る', () => {
 
   test('閲覧画面の局面から登録（開始局面までの手順＋たどった手）', async ({ page }) => {
     const tree = smallTree('p52-tree', ['7g7f'], '3c3d', '2g2f');
-    await page.goto('./');
+    await page.goto('./#/trees');
     await expect(page.getByTestId('isolation')).toHaveAttribute('data-state', 'isolated', { timeout: 30_000 });
     await page.getByTestId('import-file').setInputFiles({ name: 't.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(tree)) });
     await expect(page.getByTestId('home-message')).toContainText('取り込みました');

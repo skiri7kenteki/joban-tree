@@ -42,7 +42,7 @@ function reviewTree(): TreeData {
 }
 
 async function openReview(page: Page) {
-  await page.goto('./');
+  await page.goto('./#/trees');
   await expect(page.getByTestId('isolation')).toHaveAttribute('data-state', 'isolated', { timeout: 30_000 });
   await page.getByTestId('import-file').setInputFiles({
     name: 'tree.json',
@@ -126,7 +126,7 @@ function dubiousTree(): TreeData {
 }
 
 test('復習モード：相手の疑問手には、咎める 1 手だけを出して手順を終える', async ({ page }) => {
-  await page.goto('./');
+  await page.goto('./#/trees');
   await expect(page.getByTestId('isolation')).toHaveAttribute('data-state', 'isolated', { timeout: 30_000 });
   await page.getByTestId('import-file').setInputFiles({
     name: 'tree.json',

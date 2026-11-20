@@ -50,7 +50,7 @@ const OPENING = makeTree('p4-opening', ['7g7f'], [
 ]);
 
 async function openTree(page: Page, tree: TreeData) {
-  await page.goto('./');
+  await page.goto('./#/trees');
   await expect(page.getByTestId('isolation')).toHaveAttribute('data-state', 'isolated', { timeout: 30_000 });
   await page.getByTestId('import-file').setInputFiles({ name: 't.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(tree)) });
   await expect(page.getByTestId('home-message')).toContainText('取り込みました');
@@ -275,10 +275,10 @@ test.describe('4-2 スマホ縦（390×844）', () => {
 
   test('一覧：自分の側と、開始局面までの最後の数手。速度測定は設定画面へ', async ({ page }) => {
     await openTree(page, makeTree('p42-list', ['7g7f', '3c3d', '2g2f', '8c8d'], [['2f2e', 0, null, false]]));
-    await page.goto('./');
+    await page.goto('./#/trees');
     await expect(page.getByTestId('tree-item-position')).toHaveText('自分：☖後手・…△３四歩 ▲２六歩 △８四歩');
     await expect(page.getByText('エンジンの速度測定')).toHaveCount(0);
-    await page.getByTestId('open-settings').click();
+    await page.getByTestId('tab-settings').click();
     await expect(page.getByTestId('open-bench')).toHaveAttribute('href', /bench\.html$/);
   });
 

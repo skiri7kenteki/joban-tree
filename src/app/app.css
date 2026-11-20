@@ -1534,3 +1534,107 @@
 .review-result-actions {
   margin-top: var(--space-3);
 }
+
+/* 画面の下のタブ（段階11-1）：定跡帳／ツリー／復習／設定。一覧の画面にだけ出す。
+   高さ 56px＋端末の下の余白。中身が隠れないよう、タブのある画面は下に同じだけ空ける */
+.app.has-tabs {
+  padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
+}
+
+.tabbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+.tabbar-inner {
+  display: flex;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.tabbar-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: var(--tabbar-h);
+  min-width: var(--touch-min);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-size: var(--font-size-small);
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.tabbar-tab.on {
+  color: var(--color-accent);
+  font-weight: 700;
+}
+
+.tabbar-icon {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.tabbar-tab.on .tabbar-icon {
+  stroke-width: 2.2;
+}
+
+/* 設定のタブのいちばん下：バージョンと「気づきを送る」（画面の下から移した） */
+.app-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-6);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: var(--font-size-small);
+}
+
+/* 復習のタブ（段階11-1） */
+.reviews-heading {
+  margin-top: var(--space-4);
+}
+
+.review-entry {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.review-entry-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.review-entry-start {
+  flex: none;
+  color: var(--color-accent);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* 定跡帳・ツリーのタブの見出し：本数は見出しのすぐ横（広い画面で真ん中に離れないように） */
+.list-header h1 {
+  flex: 0 1 auto;
+}

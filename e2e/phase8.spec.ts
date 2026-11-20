@@ -18,7 +18,7 @@ async function closeDialog(page: Page) {
 test.use({ viewport: { width: 360, height: 740 }, hasTouch: true });
 
 async function openHome(page: Page) {
-  await page.goto('./');
+  await page.goto('./#/trees');
   await expect(page.getByTestId('isolation')).toHaveAttribute('data-state', 'isolated', { timeout: 30_000 });
 }
 
@@ -32,6 +32,8 @@ async function importTrees(page: Page, trees: TreeData[]) {
 /** 研究手順の JSON を取り込む（トップ画面の研究手順のタブから） */
 async function importStudies(page: Page, studies: Study[]) {
   await page.getByTestId('tab-studies').click();
+  // タブが切り替わってから（前のタブの画面に渡さないように。段階11-1）
+  await expect(page.getByTestId('study-register')).toBeVisible();
   await page.getByTestId('study-import-file').setInputFiles({
     name: 'studies.json',
     mimeType: 'application/json',
@@ -129,7 +131,7 @@ test.describe('8-1 登録（エンジンを使わない）', () => {
     // 一覧に出る
     await page.getByRole('button', { name: '‹ 一覧' }).click();
     await page.getByTestId('tab-studies').click();
-    await expect(page.getByTestId('tab-studies')).toContainText('研究手順 1');
+    await expect(page.getByTestId('study-count')).toHaveText('研究手順 1 本');
     const item = page.getByTestId('study-item');
     await expect(item).toHaveCount(1);
     await expect(item).toContainText('▲７六歩 △３四歩 ▲２六歩');
@@ -298,7 +300,7 @@ test.describe('8-1 ツリーとのつながり・復習', () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 
     // グループ（その他）の研究手順を復習：記録は研究手順どうしで共通
-    await page.goto('./');
+    await page.goto('./#/trees');
     await page.getByTestId('tab-studies').click();
     await page.getByTestId('study-group-menu-open').click();
     await page.getByTestId('study-group-review').click();
@@ -317,7 +319,7 @@ test.describe('8-1 ツリーとのつながり・復習', () => {
     await expect(page.getByTestId('review-end')).toContainText('研究「研究2」を最後まで答えました（1 問中 1 問');
 
     // ツリーの復習画面の「研究手順だけ」：ツリーの開始局面を通る研究手順
-    await page.goto('./');
+    await page.goto('./#/trees');
     await importTrees(page, [lineTree('rv', '復習するツリー')]);
     await page.getByTestId('tab-trees').click();
     await page.getByTestId('tree-item').click();
@@ -438,8 +440,8 @@ test.describe('8-1 移し替え（段階7の研究手順 → 独立した研究�
     await page.reload();
     await expect(page.getByTestId('home-message')).toContainText('研究手順 2 本を「研究手順」の一覧に移しました');
     await expect(page.getByTestId('home-message')).toContainText('途中の局面から始まるツリーの研究手順 1 本は移せませんでした');
-    await expect(page.getByTestId('tab-studies')).toContainText('研究手順 2');
     await page.getByTestId('tab-studies').click();
+    await expect(page.getByTestId('study-count')).toHaveText('研究手順 2 本');
     await expect(page.getByTestId('study-item')).toHaveText([/新しい名前/, /研究2/]);
     await expect(page.getByTestId('study-item').first().getByTestId('study-item-note')).toHaveText('新しいメモ');
 
@@ -456,7 +458,7 @@ test.describe('8-1 移し替え（段階7の研究手順 → 独立した研究�
     await expect(page.getByTestId('review-summary')).toContainText('問題 1（まだ 0・前回まちがい 0・覚えた 1）');
 
     // ツリーには研究手順が無くなっても★は付く（手順が同じなので）
-    await page.goto('./');
+    await page.goto('./#/trees');
     await page.getByTestId('tab-trees').click();
     await page.getByTestId('tree-item').filter({ hasText: 'ツリーB' }).click();
     await expect(page.getByTestId('candidate').filter({ hasText: '▲７六歩' }).getByTestId('study-star')).toHaveCount(1);
@@ -558,7 +560,7 @@ test.describe('8-2 変化付き KIF からまとめて取り込む', () => {
     await page.getByTestId('kif-bulk-import').click();
     await expect(page).toHaveURL(/#\/$/);
     await expect(page.getByTestId('home-message')).toHaveText('研究手順 2 本を KIF から取り込みました（1 本は取り込みませんでした）');
-    await expect(page.getByTestId('tab-studies')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByTestId('tab-studies')).toHaveAttribute('aria-current', 'page');
     // 「その他」は自分の側で分かれる（後手番 → 先手番。段階10-1）
     await expect(page.getByTestId('study-item')).toHaveText([/前から登録した本譜/, /3手目 ▲６六歩/, /4手目 △６二銀/]);
 
@@ -602,6 +604,6 @@ test.describe('8-2 変化付き KIF からまとめて取り込む', () => {
     await expect(page.getByTestId('kif-bulk-import')).toHaveText('120 本を取り込む');
     await page.getByTestId('kif-bulk-import').click();
     await expect(page.getByTestId('home-message')).toContainText('研究手順 120 本を KIF から取り込みました');
-    await expect(page.getByTestId('tab-studies')).toContainText('研究手順 120');
+    await expect(page.getByTestId('study-count')).toHaveText('研究手順 120 本');
   });
 });

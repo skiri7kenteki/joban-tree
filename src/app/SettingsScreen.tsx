@@ -8,7 +8,7 @@ import type { PcInfo } from '../engine/pcEngine';
 import type { PresetId } from '../tree/presets';
 import { availablePresets, defaultPcThreads, defaultThreads, pcEngine } from './engineService';
 import { isGenerating } from './generation';
-import { go } from './router';
+import { AppInfo } from '../components/Footer';
 import { HASH_CHOICES, PC_HASH_CHOICES, REVIEW_BATCH_CHOICES, presetLabel, resetSettings, settings, updateSettings, type AppSettings, type PresetValues } from './settings';
 
 export function SettingsScreen() {
@@ -25,9 +25,6 @@ export function SettingsScreen() {
   return (
     <>
       <div class="screen-header">
-        <button type="button" class="btn btn-ghost" onClick={() => go('/')}>
-          ‹ 一覧
-        </button>
         <h1>設定</h1>
       </div>
       <p class="muted">変えるとすぐ保存されます（この端末の中だけ）。エンジンの設定は、次に生成するときから使われます。</p>
@@ -237,6 +234,9 @@ export function SettingsScreen() {
           </>
         )}
       </div>
+
+      {/* 段階11-1：画面のいちばん下から移した */}
+      <AppInfo />
     </>
   );
 }

@@ -1,4 +1,4 @@
-// 段階11：画面の刷新（11-4 復習を小分けにする）
+// 段階11：画面の刷新（11-4 復習を小分けにする・11-1 画面の下のタブ）
 import { expect, test, type Page } from '@playwright/test';
 import type { Study } from '../src/tree/types';
 
@@ -38,11 +38,12 @@ test.describe('11-4 復習を小分けにする', () => {
   test('1 回の問題の数（設定で 5 問）を答えたら結果：正解の数・まちがえた問題（大きく見られる）・全体の数、もう 5 問', async ({ page }) => {
     await openHome(page);
     // 設定で 1 回 5 問に
-    await page.getByTestId('open-settings').click();
+    await page.getByTestId('tab-settings').click();
     await expect(page.getByTestId('review-batch-10')).toHaveAttribute('aria-checked', 'true');
     await page.getByTestId('review-batch-5').click();
     await page.goto('./');
     await page.getByTestId('tab-studies').click();
+    await expect(page.getByTestId('study-register')).toBeVisible();
     await page.getByTestId('study-import-file').setInputFiles({
       name: 's.json',
       mimeType: 'application/json',
@@ -82,5 +83,97 @@ test.describe('11-4 復習を小分けにする', () => {
     await expect(page.getByTestId('review-more')).toHaveText('もう 5 問');
     await page.getByTestId('review-more').click();
     await expect(progress).toHaveText('今日 1／5問');
+  });
+});
+
+test.describe('11-1 画面の下のタブ', () => {
+  test('開くと定跡帳。タブで切り替え、戻るボタンで前のタブ。盤の画面にはタブを出さない。設定のタブにバージョン', async ({ page }) => {
+    await openHome(page);
+    await expect(page.getByRole('heading', { name: '定跡帳' })).toBeVisible();
+    await expect(page.getByTestId('tab-studies')).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByTestId('study-register')).toBeVisible();
+    await expect(page.getByTestId('new-tree')).toHaveCount(0);
+
+    await page.getByTestId('tab-trees').click();
+    await expect(page).toHaveURL(/#\/trees$/);
+    await expect(page.getByRole('heading', { name: 'ツリー' })).toBeVisible();
+    await expect(page.getByTestId('new-tree')).toBeVisible();
+    await expect(page.getByTestId('import-json')).toBeVisible();
+    await expect(page.getByTestId('study-register')).toHaveCount(0);
+
+    await page.getByTestId('tab-reviews').click();
+    await expect(page).toHaveURL(/#\/reviews$/);
+    await expect(page.getByTestId('reviews-batch')).toHaveText('1 回 10 問');
+    await expect(page.getByTestId('reviews-studies-empty')).toBeVisible();
+    await expect(page.getByTestId('reviews-trees-empty')).toBeVisible();
+
+    await page.getByTestId('tab-settings').click();
+    await expect(page).toHaveURL(/#\/settings$/);
+    await expect(page.getByTestId('app-version')).toHaveText(/^v\d+\.\d+\.\d+$/);
+    await expect(page.getByTestId('feedback-open')).toBeVisible();
+    // いちばん下まで送っても、タブに隠れない
+    await page.getByTestId('feedback-open').scrollIntoViewIfNeeded();
+    const tabTop = (await page.getByTestId('tabbar').boundingBox())!.y;
+    const infoBottom = await page.getByTestId('feedback-open').evaluate((e) => e.getBoundingClientRect().bottom);
+    expect(infoBottom).toBeLessThanOrEqual(tabTop);
+
+    // 戻るボタンで前のタブへ
+    await page.goBack();
+    await expect(page.getByTestId('tab-reviews')).toHaveAttribute('aria-current', 'page');
+    await page.goBack();
+    await expect(page.getByTestId('tab-trees')).toHaveAttribute('aria-current', 'page');
+    await page.goBack();
+    await expect(page.getByTestId('tab-studies')).toHaveAttribute('aria-current', 'page');
+
+    // 盤の画面（新しいツリー・定跡帳）にはタブを出さない
+    await page.getByTestId('tab-trees').click();
+    await page.getByTestId('new-tree').click();
+    await expect(page.getByTestId('board')).toBeVisible();
+    await expect(page.getByTestId('tabbar')).toHaveCount(0);
+    await page.goto(`./#/book/${encodeURIComponent('study:hirate|black')}`);
+    await expect(page.getByTestId('board')).toBeVisible();
+    await expect(page.getByTestId('tabbar')).toHaveCount(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+  });
+
+  test('復習のタブ：研究手順のグループごとに、前回まちがえた数と最後に復習した日。押すと復習、「終わる」で戻る', async ({ page }) => {
+    await openHome(page);
+    await page.getByTestId('tab-settings').click();
+    await page.getByTestId('review-batch-5').click();
+    await page.getByTestId('tab-studies').click();
+    await expect(page.getByTestId('study-register')).toBeVisible();
+    await page.getByTestId('study-import-file').setInputFiles({
+      name: 's.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies: [LINE] })),
+    });
+    await expect(page.getByTestId('study-item')).toHaveCount(1);
+    await page.getByTestId('tab-reviews').click();
+    const group = page.getByTestId('reviews-group');
+    await expect(group).toHaveCount(1);
+    await expect(group).toContainText('1 本');
+    await expect(group.getByTestId('reviews-overview')).toHaveText('まだ復習していません');
+
+    await group.click();
+    await expect(page).toHaveURL(/#\/study-review\/group\//);
+    const progress = page.getByTestId('review-progress');
+    await expect(progress).toHaveText('今日 1／5問');
+    await play(page, '17', '16'); // 1 問目 まちがい
+    await page.getByTestId('review-show').click();
+    await page.getByTestId('review-continue').click();
+    await expect(progress).toHaveText('今日 2／5問');
+    await play(page, '27', '26');
+    await expect(progress).toHaveText('今日 3／5問');
+    await play(page, '26', '25');
+    await expect(progress).toHaveText('今日 4／5問');
+    await play(page, '69', '78');
+    await expect(progress).toHaveText('今日 5／5問');
+    await play(page, '25', '24'); // 5 問目 → 結果
+    await expect(page.getByTestId('review-result-score')).toHaveText('5 問中 4 問正解（1 回目で）');
+
+    // 終わる → 始めた画面（復習のタブ）へ。まとめが新しくなる
+    await page.getByTestId('review-finish').click();
+    await expect(page).toHaveURL(/#\/reviews$/);
+    await expect(page.getByTestId('reviews-group').getByTestId('reviews-overview')).toHaveText('前回まちがえた 1 問・最後に復習 今日');
   });
 });

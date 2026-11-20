@@ -14,13 +14,14 @@ async function closeDialog(page: Page) {
 test.use({ viewport: { width: 360, height: 740 }, hasTouch: true });
 
 async function openHome(page: Page) {
-  await page.goto('./');
+  await page.goto('./#/trees');
   await expect(page.getByTestId('isolation')).toHaveAttribute('data-state', 'isolated', { timeout: 30_000 });
 }
 
 /** 研究手順の JSON を取り込む（トップ画面の研究手順のタブから） */
 async function importStudies(page: Page, studies: Study[]) {
   await page.getByTestId('tab-studies').click();
+  await expect(page.getByTestId('study-register')).toBeVisible();
   await page.getByTestId('study-import-file').setInputFiles({
     name: 'studies.json',
     mimeType: 'application/json',
@@ -272,7 +273,7 @@ test.describe('10-2 使わなくなった画面と道筋の整理', () => {
     await page.goto('./#/new/study');
     await expect(page).toHaveURL(/#\/$/);
     await expect(page.getByTestId('study-register-menu')).toBeVisible();
-    await expect(page.getByTestId('tab-studies')).toHaveAttribute('aria-selected', 'true');
+    await expect(page.getByTestId('tab-studies')).toHaveAttribute('aria-current', 'page');
   });
 
   test('新しいツリーの画面の「この手順を定跡帳に足す」：初期局面では足せない。足すと「定跡帳で開く」', async ({ page }) => {

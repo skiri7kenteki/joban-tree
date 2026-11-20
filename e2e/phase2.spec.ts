@@ -29,7 +29,7 @@ function sampleTree(id = 'e2e-tree-1', name = 'テスト用ツリー'): TreeData
 }
 
 async function openHome(page: Page) {
-  await page.goto('./');
+  await page.goto('./#/trees');
   await expect(page.getByTestId('isolation')).toHaveAttribute('data-state', 'isolated', { timeout: 30_000 });
 }
 
@@ -135,7 +135,7 @@ test('盤は常に先手が手前（自分が後手でも、9 一が左上・1 �
 
 test('設定：変えた値が保存され、プリセットのボタンに反映される。初期値に戻せる', async ({ page }) => {
   await openHome(page);
-  await page.getByTestId('open-settings').click();
+  await page.getByTestId('tab-settings').click();
   await expect(page.getByRole('heading', { name: '設定' })).toBeVisible();
   await page.getByTestId('normal-total').fill('90');
   await page.getByTestId('normal-total').blur();
@@ -181,7 +181,7 @@ test('オフラインでも開ける（一度開いたあとは、電波がな�
   await expect(page.getByTestId('tree-item')).toHaveCount(1);
   await context.setOffline(true);
   await page.reload();
-  await expect(page.getByTestId('app-version')).toBeVisible();
+  await expect(page.getByTestId('tabbar')).toBeVisible();
   await page.getByTestId('tree-item').first().click();
   await expect(page.getByTestId('candidate').first()).toContainText('▲７六歩');
   await context.setOffline(false);
@@ -189,6 +189,8 @@ test('オフラインでも開ける（一度開いたあとは、電波がな�
 
 test('気づきを送る：GitHub の Issue 作成画面を開くリンクに、入力した文が入る（ツリーは入らない）', async ({ page }) => {
   await openHome(page);
+  // 気づきは設定のタブから送る（段階11-1）。「画面：」は設定のタブの前に見ていた画面
+  await page.getByTestId('tab-settings').click();
   await page.getByTestId('feedback-open').click();
   // 空のままだと開かない
   await page.getByTestId('feedback-send').click();
@@ -198,7 +200,7 @@ test('気づきを送る：GitHub の Issue 作成画面を開くリンクに、
   expect(href).toContain('https://github.com/skiri7kenteki/joban-tree/issues/new?title=');
   const url = new URL(href!);
   expect(url.searchParams.get('title')).toBe('【気づき】盤をもう少し大きく');
-  expect(url.searchParams.get('body')).toContain('画面：一覧');
+  expect(url.searchParams.get('body')).toContain('画面：ツリー（一覧）');
   expect(url.searchParams.get('body')).toMatch(/アプリのバージョン：\d+\.\d+\.\d+/);
 });
 

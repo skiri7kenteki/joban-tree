@@ -1,5 +1,7 @@
 // 画面の切り替え。URL の「#」より後ろで、どの画面かを表す（スマホの戻るボタンがそのまま効く）。
-//   #/           … 一覧（トップ）
+//   #/           … 定跡帳のタブ（研究手順の一覧。アプリを開くといつもここ。段階11-1）
+//   #/trees      … ツリーのタブ（ツリーの一覧。段階11-1）
+//   #/reviews    … 復習のタブ（復習の入口。段階11-1）
 //   #/new        … 新しいツリー（局面の入力）
 //   #/new/study  … （段階10-2 で片付けた。トップ画面で「研究手順を登録」の窓を開く。src/app/LegacyRedirect.tsx）
 //   #/tree/<id>  … ツリーの閲覧
@@ -10,7 +12,7 @@
 //     段階10-1 から、定跡帳の盤で指すとその場で研究手順に足す。key が study:hirate|<側> なら平手からの定跡帳（その側の研究手順すべて）
 //   #/book/<key>/t/<戦型の id> … 定跡帳を、その戦型の出発点で開く（新しい研究を始めるとき。研究手順がまだ無くても開ける。段階10-1）
 //   #/study-import … 変化付き KIF から研究手順をまとめて取り込む（段階8-2）
-//   #/settings   … 設定
+//   #/settings   … 設定のタブ
 //   #/review/<id> … 復習モード
 //   #/review/<id>/study … 研究手順だけの復習（そのツリーの開始局面を通る研究手順）
 //   #/study-review/<研究手順の id> … 研究手順だけの復習（その 1 本だけ。段階8-1）
@@ -21,6 +23,8 @@ import { signal } from '@preact/signals';
 
 export type Route =
   | { name: 'home' }
+  | { name: 'trees' }
+  | { name: 'reviews' }
   | { name: 'new'; study?: boolean }
   | { name: 'settings' }
   | { name: 'tree'; id: string; study?: string; ply?: number }
@@ -35,6 +39,8 @@ function parse(hash: string): Route {
   if (path === '/new') return { name: 'new' };
   if (path === '/new/study') return { name: 'new', study: true };
   if (path === '/settings') return { name: 'settings' };
+  if (path === '/trees') return { name: 'trees' };
+  if (path === '/reviews') return { name: 'reviews' };
   if (path === '/study-import') return { name: 'study-import' };
   const tree = /^\/tree\/([\w-]+)(?:\/study\/([\w-]+)(?:\/(\d+))?)?$/.exec(path);
   if (tree) {
@@ -101,8 +107,22 @@ export function bookTemplatePath(key: string, templateId: string): string {
   return `/book/${encodeURIComponent(key)}/t/${encodeURIComponent(templateId)}`;
 }
 
-/** 前の画面に戻る（履歴が無ければトップへ） */
-export function back(): void {
+/** 画面の下のタブ（段階11-1）。一覧の画面にだけ出す */
+export type TabName = 'home' | 'trees' | 'reviews' | 'settings';
+export const TAB_PATHS: Record<TabName, string> = { home: '/', trees: '/trees', reviews: '/reviews', settings: '/settings' };
+
+/** その画面がタブの画面なら、そのタブ（盤のある画面は null） */
+export function tabOf(r: Route): TabName | null {
+  return r.name === 'home' || r.name === 'trees' || r.name === 'reviews' || r.name === 'settings' ? r.name : null;
+}
+
+/** 今の画面を、履歴を増やさずに別の画面にする（戻るボタンで前の画面に戻れるように） */
+export function replaceTo(path: string): void {
+  location.replace(`#${path}`);
+}
+
+/** 前の画面に戻る（履歴が無ければ fallback へ。初期値は定跡帳） */
+export function back(fallback = '/'): void {
   if (history.length > 1) history.back();
-  else go('/');
+  else go(fallback);
 }

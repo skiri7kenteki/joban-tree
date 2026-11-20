@@ -6,13 +6,14 @@ import type { Study } from '../src/tree/types';
 test.use({ viewport: { width: 360, height: 740 }, hasTouch: true });
 
 async function openHome(page: Page) {
-  await page.goto('./');
+  await page.goto('./#/trees');
   await expect(page.getByTestId('isolation')).toHaveAttribute('data-state', 'isolated', { timeout: 30_000 });
 }
 
 /** 研究手順の JSON を取り込む（トップ画面の研究手順のタブから） */
 async function importStudies(page: Page, studies: Study[]) {
   await page.getByTestId('tab-studies').click();
+  await expect(page.getByTestId('study-register')).toBeVisible();
   await page.getByTestId('study-import-file').setInputFiles({
     name: 'studies.json',
     mimeType: 'application/json',

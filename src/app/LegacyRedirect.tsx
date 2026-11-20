@@ -6,7 +6,6 @@
 // 移るときは location.replace（履歴に古い URL を残さない。戻るボタンで行ったり来たりしないように）
 
 import { useEffect, useState } from 'preact/hooks';
-import { setHomeTab } from './recent';
 import { go } from './router';
 import { ensureStudies, library } from './studies';
 import { myTemplates, refreshMyTemplates } from './TemplateDialogs';
@@ -52,7 +51,6 @@ export function StudyRedirect({ id, ply }: { id: string; ply?: number }) {
 export function RegisterRedirect() {
   useEffect(() => {
     registerRequest.value = true;
-    setHomeTab('studies');
     location.replace('#/');
   }, []);
   return <p class="muted">読み込み中…</p>;

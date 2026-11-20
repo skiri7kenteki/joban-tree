@@ -50,5 +50,7 @@
   --radius-chip: 999px;
 
   --touch-min: 44px;
+  /* 画面の下のタブの高さ（段階11-1） */
+  --tabbar-h: 56px;
   --row-min: 48px;
 }

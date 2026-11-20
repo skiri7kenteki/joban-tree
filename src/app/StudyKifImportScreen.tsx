@@ -8,7 +8,6 @@
 import { useRef, useState } from 'preact/hooks';
 import type { Side } from '../shogi/position';
 import { buildCandidates, candidateName, candidatesToStudies, decodeKifFile, kifSide, readKif, type KifCandidate } from '../tree/kifImport';
-import { setHomeTab } from './recent';
 import { back, go } from './router';
 import { ensureStudies, homeNotice, saveStudies } from './studies';
 import { allTemplates, myTemplates, refreshMyTemplates } from './TemplateDialogs';
@@ -76,7 +75,6 @@ export function StudyKifImportScreen() {
       await saveStudies(candidatesToStudies(chosen, side, allTemplates(), Date.now()));
       const skipped = candidates.length - chosen.length;
       homeNotice.value = `研究手順 ${chosen.length} 本を KIF から取り込みました${skipped > 0 ? `（${skipped} 本は取り込みませんでした）` : ''}`;
-      setHomeTab('studies');
       go('/');
     } catch (e) {
       setError(`保存できませんでした（${e instanceof Error ? e.message : String(e)}）`);
@@ -89,7 +87,7 @@ export function StudyKifImportScreen() {
   return (
     <>
       <div class="screen-header">
-        <button type="button" class="btn btn-ghost" onClick={back}>
+        <button type="button" class="btn btn-ghost" onClick={() => back()}>
           ‹ 戻る
         </button>
         <h1 class="tree-title">KIF から取り込む</h1>

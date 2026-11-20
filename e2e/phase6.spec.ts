@@ -8,7 +8,7 @@ const FILE = 'yokofu-33kaku-gote.v1.json';
 const NAME = '横歩取り △3三角（後手番）';
 
 async function openNewTree(page: Page) {
-  await page.goto('./');
+  await page.goto('./#/trees');
   await expect(page.getByTestId('isolation')).toHaveAttribute('data-state', 'isolated', { timeout: 30_000 });
   await page.getByTestId('new-tree').click();
   await expect(page.getByRole('heading', { name: '新しいツリー' })).toBeVisible();
@@ -36,7 +36,7 @@ test.describe('6-3 用意済みのツリーを開く', () => {
     // 戦型を選ぶ前（平手の初期局面）には出ない
     await expect(page.getByTestId('bundled-offer')).toHaveCount(0);
     await expect(page.getByTestId('start-normal')).toHaveClass(/btn-primary/);
-    await page.goto('./');
+    await page.goto('./#/trees');
     await pick33kaku(page);
 
     const open = page.getByTestId('bundled-open');
@@ -72,7 +72,7 @@ test.describe('6-3 用意済みのツリーを開く', () => {
     await expect(page.getByTestId('gen-status')).toHaveCount(0);
 
     // 一覧：「用意済み」の印・局面の数
-    await page.goto('./');
+    await page.goto('./#/trees');
     const items = page.getByTestId('tree-item');
     await expect(items).toHaveCount(1);
     await expect(items.first()).toContainText(NAME);
@@ -85,7 +85,7 @@ test.describe('6-3 用意済みのツリーを開く', () => {
     await expect(page.getByTestId('bundled-copy-again')).toBeVisible();
     await page.getByTestId('bundled-open').click();
     await expect(page).toHaveURL(firstUrl);
-    await page.goto('./');
+    await page.goto('./#/trees');
     await expect(items).toHaveCount(1);
 
     // 「新しくコピー」を選ぶと 2 つ目のコピー（名前に番号）
@@ -93,7 +93,7 @@ test.describe('6-3 用意済みのツリーを開く', () => {
     await page.getByTestId('bundled-copy-again').click();
     await expect(page).toHaveURL(/#\/tree\/[\w-]+$/);
     expect(page.url()).not.toBe(firstUrl);
-    await page.goto('./');
+    await page.goto('./#/trees');
     await expect(items).toHaveCount(2);
     await expect(page.getByTestId('tree-item').filter({ hasText: `${NAME}（2）` })).toHaveCount(1);
     await expect(page.getByTestId('bundled-chip')).toHaveCount(2);
@@ -101,7 +101,7 @@ test.describe('6-3 用意済みのツリーを開く', () => {
 
   test('開いたツリーで、閲覧（たどる）・ここから展開・復習が使える', async ({ page }) => {
     await openNewTree(page);
-    await page.goto('./');
+    await page.goto('./#/trees');
     await pick33kaku(page);
     await page.getByTestId('bundled-open').click();
     await expect(page.getByTestId('candidate')).toHaveCount(4);
@@ -130,7 +130,7 @@ test.describe('6-3 用意済みのツリーを開く', () => {
         await new Promise((resolve) => navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true }));
       }
     });
-    await page.goto('./');
+    await page.goto('./#/trees');
     await page.reload();
     await pick33kaku(page);
     await page.getByTestId('bundled-open').click();
@@ -143,24 +143,24 @@ test.describe('6-3 用意済みのツリーを開く', () => {
     expect(cached).toBeGreaterThanOrEqual(1);
 
     await context.setOffline(true);
-    await page.goto('./');
+    await page.goto('./#/trees');
     await page.reload();
-    await expect(page.getByTestId('app-version')).toBeVisible();
+    await expect(page.getByTestId('tabbar')).toBeVisible();
     await page.getByTestId('tree-item').first().click();
     await expect(page.getByTestId('candidate')).toHaveCount(4);
     // 通信なしで新しくコピーもできる（端末に保存したファイルから）
-    await page.goto('./');
+    await page.goto('./#/trees');
     await pick33kaku(page);
     await page.getByTestId('bundled-copy-again').click();
     await expect(page.getByTestId('candidate')).toHaveCount(4);
-    await page.goto('./');
+    await page.goto('./#/trees');
     await expect(page.getByTestId('tree-item')).toHaveCount(2);
     await context.setOffline(false);
   });
 
   test('新しい版の知らせ（仕組み）：前の版のコピーだけがあると「新しい版があります」。開くと新しいコピーを作り、前のコピーは残す', async ({ page }) => {
     await openNewTree(page);
-    await page.goto('./');
+    await page.goto('./#/trees');
     // 前の版（版 0）のコピーがある状態を作る（取り込みで入れる）
     const file = JSON.parse(readFileSync(new URL(`../public/trees/${FILE}`, import.meta.url), 'utf8')) as BundledTreeFile;
     const old = {
@@ -180,12 +180,12 @@ test.describe('6-3 用意済みのツリーを開く', () => {
     // 前の版を開くこともできる
     await page.getByTestId('bundled-open-old').click();
     await expect(page).toHaveURL(/#\/tree\/old-copy$/);
-    await page.goto('./');
+    await page.goto('./#/trees');
     await pick33kaku(page);
     await page.getByTestId('bundled-open').click();
     await expect(page).toHaveURL(/#\/tree\/[\w-]+$/);
     expect(page.url()).not.toMatch(/old-copy$/);
-    await page.goto('./');
+    await page.goto('./#/trees');
     await expect(page.getByTestId('tree-item')).toHaveCount(2);
     await expect(oldItem).toHaveCount(1);
     // 新しい版のコピーができたので、知らせは消える

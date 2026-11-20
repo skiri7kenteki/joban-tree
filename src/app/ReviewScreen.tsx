@@ -25,7 +25,7 @@ import { addItem, newSession, progressText, sessionDone } from '../review/sessio
 import { ReviewResult } from './ReviewResult';
 import { boardFitProps, measureFitAbove, useBoardFit } from './boardFit';
 import { openTree } from './generation';
-import { go } from './router';
+import { back, go, replaceTo } from './router';
 import { settings } from './settings';
 import { ensureStudies, library } from './studies';
 
@@ -239,7 +239,7 @@ function ReviewView({ tree, initialRecord }: { tree: TreeData; initialRecord: Re
           session={session}
           overall={overall}
           onMore={more}
-          onEnd={() => go(`/tree/${tree.id}`)}
+          onEnd={() => back('/reviews')}
         />
       ) : (
         <>
@@ -378,7 +378,7 @@ export function ReviewModeTabs({ treeId, mode }: { treeId: string; mode: 'all' |
         aria-selected={mode === 'all'}
         class={mode === 'all' ? 'home-tab on' : 'home-tab'}
         data-testid="review-mode-all"
-        onClick={() => go(`/review/${treeId}`)}
+        onClick={() => replaceTo(`/review/${treeId}`)}
       >
         全部
       </button>
@@ -388,7 +388,7 @@ export function ReviewModeTabs({ treeId, mode }: { treeId: string; mode: 'all' |
         aria-selected={mode === 'studies'}
         class={mode === 'studies' ? 'home-tab on' : 'home-tab'}
         data-testid="review-mode-studies"
-        onClick={() => go(`/review/${treeId}/study`)}
+        onClick={() => replaceTo(`/review/${treeId}/study`)}
       >
         研究手順だけ
       </button>

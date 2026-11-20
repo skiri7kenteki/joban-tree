@@ -1,9 +1,10 @@
 // 画面の通し確認（段階1）：トップページが開き、service worker 経由で isolated になること
 import { expect, test } from '@playwright/test';
 
-test('トップページが開き、バージョンが出る', async ({ page }) => {
+test('トップページ（定跡帳のタブ）が開き、設定のタブにバージョンが出る', async ({ page }) => {
   await page.goto('./');
-  await expect(page.getByRole('heading', { name: '序盤ツリー' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '定跡帳' })).toBeVisible();
+  await page.getByTestId('tab-settings').click();
   await expect(page.getByTestId('app-version')).toHaveText(/^v\d+\.\d+\.\d+$/);
 });
 

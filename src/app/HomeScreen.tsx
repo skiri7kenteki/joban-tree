@@ -8,6 +8,8 @@
 //   - 行をタップで研究手順の画面（#/study/<id>）。段階10-1 から、その研究手順の終わりの局面で定跡帳を開く。行の ⋯：この研究手順を復習・名前・メモを直す・書き出す・消す（確認あり）
 //   - ツリーの JSON（形式 6 まで）を取り込むと、中の研究手順も研究手順として取り込む（同じ手順がすでにあれば足さない）
 //   - 端末の保存場所を新しい版にしたときの移し替えの結果を、一度だけ知らせる
+// 段階11-1：画面の下のタブに分けた。list='studies' が定跡帳のタブ（#/。いちばん目立つのは「＋ 研究手順を登録」）、
+//   list='trees' がツリーのタブ（#/trees。「＋ 新しいツリーを作る」・最近開いた・ツリーの取り込み）。画面の上の「ツリー｜研究手順」の切り替えはやめた
 
 import { signal } from '@preact/signals';
 import { useEffect, useRef, useState } from 'preact/hooks';
@@ -33,7 +35,7 @@ import { firstLine, liftTreeStudies, studyMovesText } from '../tree/studies';
 import { parseStudiesJson, planStudyImport, resolveStudyImport, type StudyConflictChoice, type StudyImportPlan } from '../tree/studyFile';
 import type { Study, TreeData } from '../tree/types';
 import { generation, isGenerating, openTree, treeVersion } from './generation';
-import { collapsedGroups, forgetOpened, homeTab, recentOpened, setHomeTab, toggleGroup } from './recent';
+import { collapsedGroups, forgetOpened, recentOpened, toggleGroup } from './recent';
 import { bookPath, bookTemplatePath, go, groupReviewPath } from './router';
 import { OUTCOME_TEXT, shareFile } from './share';
 import { TemplatePicker, allTemplates, myTemplates, refreshMyTemplates } from './TemplateDialogs';
@@ -45,7 +47,7 @@ export const registerRequest = signal(false);
 import { StudyEditDialog, StudyExportDialog, shareStudies } from './StudyDialogs';
 import { ensureStudies, homeNotice, importLiftedStudies, library, removeStudy, saveStudies, updateStudyFields } from './studies';
 
-export function HomeScreen({ isolationMessage }: { isolationMessage: string | null }) {
+export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'trees'; isolationMessage: string | null }) {
   const [trees, setTrees] = useState<TreeSummary[] | null>(null);
   const [error, setError] = useState('');
   // KIF から取り込んだ後などの一言（一度だけ）
@@ -112,7 +114,7 @@ export function HomeScreen({ isolationMessage }: { isolationMessage: string | nu
 
   const running = isGenerating() ? generation.value!.treeId : null;
   const searching = normalizeForSearch(query) !== '';
-  const tab = homeTab.value;
+  const tab = list;
   const templates = allTemplates();
   const groups = trees ? groupTrees(filterByName(trees, query), templates) : [];
   const studyGroups = studies ? groupStudies(studies, templates, query) : [];
@@ -202,7 +204,6 @@ export function HomeScreen({ isolationMessage }: { isolationMessage: string | nu
       if (plan.same > 0) parts.push(`まったく同じもの ${plan.same} 本は飛ばしました`);
       if (skipped > 0) parts.push(`同じ手順の ${skipped} 本は取り込みませんでした`);
       setMessage(parts.join('。'));
-      setHomeTab('studies');
     } catch (err) {
       setMessage(`取り込めませんでした（${err instanceof Error ? err.message : String(err)}）`);
     }
@@ -210,44 +211,40 @@ export function HomeScreen({ isolationMessage }: { isolationMessage: string | nu
 
   return (
     <>
-      <div class="screen-header">
-        <h1>序盤ツリー</h1>
+      <div class="screen-header list-header">
+        <h1>{tab === 'studies' ? '定跡帳' : 'ツリー'}</h1>
+        {tab === 'studies' && studies && (
+          <span class="muted num" data-testid="study-count">
+            研究手順 {studyCount} 本
+          </span>
+        )}
+        {tab === 'trees' && trees && (
+          <span class="muted num" data-testid="tree-count">
+            {trees.length} 本
+          </span>
+        )}
         <span class="spacer" />
-        <button type="button" class="btn btn-ghost" data-testid="open-settings" onClick={() => go('/settings')}>
-          設定
-        </button>
+        {tab === 'studies' && studyCount > 0 && (
+          <button type="button" class="btn btn-ghost" data-testid="study-export-open" onClick={() => setExporting({})}>
+            書き出し
+          </button>
+        )}
       </div>
       {isolationMessage && <p class="notice notice-danger">{isolationMessage}</p>}
       <div class="btn-row">
-        <button type="button" class="btn btn-primary btn-wide" data-testid="new-tree" onClick={() => go('/new')}>
-          ＋ 新しいツリーを作る
-        </button>
+        {tab === 'studies' ? (
+          <button type="button" class="btn btn-primary btn-wide" data-testid="study-register" onClick={() => setRegisterMenu(true)}>
+            ＋ 研究手順を登録
+          </button>
+        ) : (
+          <button type="button" class="btn btn-primary btn-wide" data-testid="new-tree" onClick={() => go('/new')}>
+            ＋ 新しいツリーを作る
+          </button>
+        )}
       </div>
 
       {trees && (
         <>
-          <div class="home-tabs" role="tablist" aria-label="一覧の切り替え">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={tab === 'trees'}
-              class={tab === 'trees' ? 'home-tab on' : 'home-tab'}
-              data-testid="tab-trees"
-              onClick={() => setHomeTab('trees')}
-            >
-              ツリー <span class="num">{trees.length}</span>
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={tab === 'studies'}
-              class={tab === 'studies' ? 'home-tab on' : 'home-tab'}
-              data-testid="tab-studies"
-              onClick={() => setHomeTab('studies')}
-            >
-              研究手順 <span class="num">{studyCount}</span>
-            </button>
-          </div>
           {(tab === 'trees' ? trees.length > 0 : studyCount > 0) && (
             <input
               type="search"
@@ -302,16 +299,6 @@ export function HomeScreen({ isolationMessage }: { isolationMessage: string | nu
 
       {trees && tab === 'studies' && (
         <>
-          <div class="btn-row study-tools">
-            <button type="button" class="btn btn-primary" data-testid="study-register" onClick={() => setRegisterMenu(true)}>
-              ＋ 研究手順を登録
-            </button>
-            {studyCount > 0 && (
-              <button type="button" class="btn" data-testid="study-export-open" onClick={() => setExporting({})}>
-                書き出し
-              </button>
-            )}
-          </div>
           {studies && studyCount === 0 && (
             <p class="muted" data-testid="studies-empty">
               研究手順はまだありません。「＋ 研究手順を登録」から戦型（または平手）を選ぶと定跡帳が開き、盤で指すとその場で研究手順になります（エンジンは使いません）。棋譜を貼る・ツリーの閲覧画面の「定跡帳に足す」でも登録できます。
@@ -338,13 +325,17 @@ export function HomeScreen({ isolationMessage }: { isolationMessage: string | nu
         </>
       )}
 
-      <div class="btn-row home-import">
-        <button type="button" class="btn" data-testid="import-json" onClick={() => fileRef.current?.click()}>
-          ツリーを取り込む（JSON）
-        </button>
-        <input ref={fileRef} type="file" accept=".json,application/json" hidden data-testid="import-file" onChange={(e) => void onFile(e)} />
-      </div>
-      <p class="muted">仲間から受け取ったツリー（このアプリで書き出した JSON）を開けます。</p>
+      {tab === 'trees' && (
+        <>
+          <div class="btn-row home-import">
+            <button type="button" class="btn" data-testid="import-json" onClick={() => fileRef.current?.click()}>
+              ツリーを取り込む（JSON）
+            </button>
+            <input ref={fileRef} type="file" accept=".json,application/json" hidden data-testid="import-file" onChange={(e) => void onFile(e)} />
+          </div>
+          <p class="muted">仲間から受け取ったツリー（このアプリで書き出した JSON）を開けます。</p>
+        </>
+      )}
       <input ref={studyFileRef} type="file" accept=".json,application/json" hidden data-testid="study-import-file" onChange={(e) => void onStudyFile(e)} />
 
       {registerMenu && (

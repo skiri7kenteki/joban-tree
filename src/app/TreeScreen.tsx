@@ -334,7 +334,7 @@ function TreeView({ tree, studies, studyId, ply }: { tree: TreeData; studies: re
   return (
     <>
       <div class="screen-header">
-        <button type="button" class="btn btn-ghost" onClick={() => go('/')}>
+        <button type="button" class="btn btn-ghost" onClick={() => go('/trees')}>
           ‹ 一覧
         </button>
         <h1 class="tree-title">{tree.name}</h1>
