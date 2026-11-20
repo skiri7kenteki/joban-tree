@@ -42,6 +42,7 @@ import { bookPath, go, groupReviewPath } from './router';
 import { OUTCOME_TEXT, copyText, shareFile } from './share';
 import { StudyEditDialog, shareStudies } from './StudyDialogs';
 import { applyStudyChange, ensureStudies, library, studiesNow } from './studies';
+import { KifuPanel, KifuSheet, useWideLayout, type KifuRow } from '../components/KifuList';
 import { allTemplates, myTemplates, refreshMyTemplates } from './TemplateDialogs';
 
 /** 「書き込む」の入／切（端末ごとに覚える。初期値は入） */
@@ -193,6 +194,21 @@ function BookViewScreen({
   /** 今の局面までの手順を含むツリー（「ツリーで見る」の候補） */
   const [trees, setTrees] = useState<TreeData[]>([]);
   const crumbsRef = useRef<HTMLDivElement>(null);
+  /** 棋譜欄（段階11-5）：広い画面は盤の横に常に、スマホ縦は手数を押すと画面下から */
+  const wide = useWideLayout();
+  const [kifuOpen, setKifuOpen] = useState(false);
+  // 出発点より前の手は薄く・押せない（この画面は出発点より前に戻らない）。出発点の行に戦型の名前、今より先の手は少し薄く
+  const kifuRows: KifuRow[] = [
+    { ply: 0, text: '初期局面', dim: minIndex > 0, disabled: minIndex > 0 },
+    ...texts.map((t, i) => ({
+      ply: i + 1,
+      text: t,
+      dim: i + 1 < minIndex,
+      disabled: i + 1 < minIndex,
+      ahead: i + 1 > index,
+      ...(i + 1 === minIndex ? { note: startName } : {}),
+    })),
+  ];
 
   // 今たどっている研究手順が無くなった（ほかの画面で消したなど）：近くの研究手順へ
   useEffect(() => {
@@ -500,9 +516,15 @@ function BookViewScreen({
             <button type="button" class="btn" aria-label="1手戻る" data-testid="study-prev" onClick={() => moveTo(index - 1)} disabled={index <= minIndex}>
               ‹
             </button>
-            <span class="move-nav-text num" data-testid="study-position">
+            <button
+              type="button"
+              class="move-nav-text kifu-open num"
+              data-testid="study-position"
+              aria-label="手順の一覧"
+              onClick={() => !wide && setKifuOpen(true)}
+            >
               {index === 0 ? '初期局面' : `${index}手目 ${texts[index - 1] ?? ''}`}
-            </span>
+            </button>
             <button type="button" class="btn" aria-label="1手進む" data-testid="study-next" onClick={() => moveTo(index + 1)} disabled={index >= last}>
               ›
             </button>
@@ -510,6 +532,8 @@ function BookViewScreen({
               ›|
             </button>
           </div>
+
+          {wide && <KifuPanel rows={kifuRows} current={index} onJump={moveTo} />}
 
           <div class="crumbs study-crumbs" ref={crumbsRef} data-testid="study-crumbs">
             {minIndex > 0 && (
@@ -571,6 +595,8 @@ function BookViewScreen({
           )}
         </div>
       </div>
+
+      {kifuOpen && <KifuSheet rows={kifuRows} current={index} onJump={moveTo} onClose={() => setKifuOpen(false)} />}
 
       {toast && (
         <div class="toast" role="status" data-testid="book-toast">

@@ -9,12 +9,15 @@ export function Dialog({
   onClose,
   children,
   testId,
+  sheet,
 }: {
   title: string;
   /** 閉じるとき（外側を押す・Esc・閉じるボタン） */
   onClose: () => void;
   children: ComponentChildren;
   testId?: string;
+  /** 画面の下から出す形（段階11-5 の棋譜欄など） */
+  sheet?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   /** 画面から外すとき（自分で閉じる）。そのときの close では onClose を呼ばない */
@@ -32,7 +35,7 @@ export function Dialog({
   return (
     <dialog
       ref={ref}
-      class="dialog"
+      class={sheet ? 'dialog dialog-sheet' : 'dialog'}
       data-testid={testId}
       aria-label={title}
       onCancel={(e) => {

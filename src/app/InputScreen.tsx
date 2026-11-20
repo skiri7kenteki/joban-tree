@@ -17,6 +17,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { Position, type Move } from 'tsshogi';
 import { Board } from '../components/Board';
 import { PromotionBox, useMoveInput } from '../components/useMoveInput';
+import { KifuPanel, KifuSheet, useWideLayout, type KifuRow } from '../components/KifuList';
 import { parseKifu, type LinePosition } from '../shogi/kifu';
 import { STARTPOS_SFEN, moveText, otherSide, sfenKey, sideToMove, type Side } from '../shogi/position';
 import { listTrees, saveTree, newTreeId, type TreeSummary } from '../storage/trees';
@@ -83,6 +84,18 @@ export function InputScreen() {
   const movesHere = line.slice(1, index + 1).map((p) => p.usi!);
   // この局面・この側から始まる同梱ツリー（用意済みのツリー）
   const bundled = bundledFor(sfenKey(current.sfen), mySide);
+
+  // 棋譜欄（段階11-5）：選んだ戦型の手順のところは薄く（押せる）、出発点の行に戦型の名前、今より先の手は少し薄く
+  const wide = useWideLayout();
+  const [kifuOpen, setKifuOpen] = useState(false);
+  const tplLen = template && template.moves.length < line.length && template.moves.every((m, i) => line[i + 1].usi === m) ? template.moves.length : 0;
+  const kifuRows: KifuRow[] = line.map((p, i) => ({
+    ply: i,
+    text: i === 0 ? '開始局面' : (p.text ?? ''),
+    dim: i < tplLen,
+    ahead: i > index,
+    ...(template && tplLen > 0 && i === tplLen ? { note: template.name } : {}),
+  }));
 
   function moveTo(i: number) {
     setIndex(Math.max(0, Math.min(line.length - 1, i)));
@@ -327,9 +340,15 @@ export function InputScreen() {
             <button type="button" class="btn" aria-label="1手戻る" data-testid="input-prev" onClick={() => moveTo(index - 1)} disabled={index === 0}>
               ‹
             </button>
-            <span class="move-nav-text num" data-testid="input-position">
+            <button
+              type="button"
+              class="move-nav-text kifu-open num"
+              data-testid="input-position"
+              aria-label="手順の一覧"
+              onClick={() => !wide && setKifuOpen(true)}
+            >
               {index === 0 ? '開始局面' : `${index}手目 ${current.text ?? ''}`}
-            </span>
+            </button>
             <button type="button" class="btn" aria-label="1手進む" data-testid="input-next" onClick={() => moveTo(index + 1)} disabled={index >= line.length - 1}>
               ›
             </button>
@@ -348,6 +367,9 @@ export function InputScreen() {
               onInput={(e) => moveTo(Number((e.target as HTMLInputElement).value))}
             />
           )}
+
+          {wide && line.length > 1 && <KifuPanel rows={kifuRows} current={index} onJump={moveTo} />}
+          {kifuOpen && <KifuSheet rows={kifuRows} current={index} onJump={moveTo} onClose={() => setKifuOpen(false)} />}
 
           {/* 選んだ戦型の名前とメモ（スマホでは盤と手順の操作のすぐ下、iPad 横では右の列） */}
           {onTemplate && (

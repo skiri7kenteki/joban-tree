@@ -17,6 +17,8 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { Board } from '../components/Board';
 import { Dialog } from '../components/Dialog';
+import { KifuPanel, KifuSheet, useWideLayout } from '../components/KifuList';
+import { treeKifu } from '../tree/treeKifu';
 import { PromotionBox, useMoveInput } from '../components/useMoveInput';
 import { formatScore, scoreToNumber, type Score } from '../engine/usi';
 import { STARTPOS_SFEN, moveText } from '../shogi/position';
@@ -188,6 +190,23 @@ function TreeView({ tree, studies, studyId, ply }: { tree: TreeData; studies: re
     if (length >= path.length) return;
     setForward([...path.slice(length), ...forward]);
     setPath(path.slice(0, length));
+    setNote('');
+  }
+
+  // 棋譜欄（段階11-5）：たどった手順と、その先（さっきまでいた手順・本線）。広い画面は盤の横、スマホ縦は「手順」で画面下から
+  const wide = useWideLayout();
+  const [kifuOpen, setKifuOpen] = useState(false);
+  const kifu = treeKifu(tree, path, forward);
+  function jumpPly(ply: number) {
+    const length = ply - kifu.base + 1;
+    if (length < 1) return;
+    if (length <= path.length) {
+      jumpTo(length);
+      return;
+    }
+    const add = kifu.ahead.slice(0, length - path.length);
+    setPath([...path, ...add]);
+    setForward(add.every((k, i) => forward[i] === k) ? forward.slice(add.length) : []);
     setNote('');
   }
 
@@ -387,7 +406,14 @@ function TreeView({ tree, studies, studyId, ply }: { tree: TreeData; studies: re
                 );
               })}
             </div>
+            {!wide && (
+              <button type="button" class="btn kifu-open-btn" data-testid="kifu-open" onClick={() => setKifuOpen(true)}>
+                手順 ▾
+              </button>
+            )}
           </div>
+          {wide && <KifuPanel rows={kifu.rows} current={kifu.current} onJump={jumpPly} />}
+          {kifuOpen && <KifuSheet rows={kifu.rows} current={kifu.current} onJump={jumpPly} onClose={() => setKifuOpen(false)} />}
 
           {picking && (
             <div class="card pick-bar" data-testid="pick-bar">

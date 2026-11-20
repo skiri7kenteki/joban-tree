@@ -1638,3 +1638,147 @@
 .list-header h1 {
   flex: 0 1 auto;
 }
+
+/* 手順の一覧＝棋譜欄（段階11-5）。1 行＝1 手、今の局面の行を目立たせる */
+.kifu-list {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.kifu-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: var(--touch-min);
+  padding: 0 var(--space-3);
+  border: 0;
+  border-bottom: 1px solid var(--color-border);
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.kifu-row:last-child {
+  border-bottom: 0;
+}
+
+.kifu-ply {
+  flex: 0 0 2.2em;
+  text-align: right;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-small);
+}
+
+.kifu-move {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kifu-note {
+  flex: none;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-small);
+  white-space: nowrap;
+}
+
+.kifu-row.ahead .kifu-move {
+  color: var(--color-text-muted);
+}
+
+.kifu-row.dim {
+  opacity: 0.5;
+}
+
+.kifu-row:disabled {
+  cursor: default;
+}
+
+.kifu-row.current {
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+  font-weight: bold;
+  opacity: 1;
+}
+
+.kifu-row.current .kifu-ply,
+.kifu-row.current .kifu-note,
+.kifu-row.current .kifu-move {
+  color: var(--color-accent-text);
+}
+
+/* 広い画面：盤の横に常に出す（高さを決めて、中だけスクロール） */
+.kifu-panel {
+  padding: 0;
+  margin: var(--space-2) 0;
+  overflow: hidden;
+}
+
+.kifu-panel .kifu-list {
+  max-height: min(36dvh, 300px);
+}
+
+/* スマホ縦：画面の下から出す窓（棋譜欄など） */
+.dialog.dialog-sheet {
+  width: 100%;
+  max-width: 560px;
+  margin: auto auto 0;
+  border-radius: var(--radius-card) var(--radius-card) 0 0;
+  border-bottom: 0;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.dialog-sheet .kifu-list {
+  max-height: 60dvh;
+  margin: var(--space-2) calc(-1 * var(--space-4)) calc(-1 * var(--space-4));
+  border-top: 1px solid var(--color-border);
+}
+
+/* 手数のところを押すと棋譜欄が開く（スマホ縦。広い画面では盤の横に出ているので押しても何もしない） */
+.kifu-open {
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  min-height: var(--touch-min);
+}
+
+.kifu-open::after {
+  content: ' ▾';
+  color: var(--color-text-muted);
+}
+
+.kifu-open-btn {
+  flex: none;
+  white-space: nowrap;
+  font-size: var(--font-size-small);
+}
+
+@media (min-width: 768px) and (orientation: landscape) {
+  .kifu-open {
+    cursor: default;
+  }
+
+  .kifu-open::after {
+    content: none;
+  }
+}
+
+/* 手数のボタン（段階11-5）は ‹ › のボタンと同じ高さ・同じ位置に（行を高くして盤を小さくしない） */
+.move-nav .kifu-open {
+  align-self: center;
+  height: var(--touch-min);
+  min-height: 0;
+  padding: 0 var(--space-1);
+  margin: 0;
+  line-height: var(--touch-min);
+  vertical-align: middle;
+}

@@ -1,6 +1,7 @@
-// 段階11：画面の刷新（11-4 復習を小分けにする・11-1 画面の下のタブ）
+// 段階11：画面の刷新（11-4 復習を小分けにする・11-1 画面の下のタブ・11-5 棋譜欄）
 import { expect, test, type Page } from '@playwright/test';
-import type { Study } from '../src/tree/types';
+import { STARTPOS_SFEN, applyUsiMove, sfenKey } from '../src/shogi/position';
+import { TREE_APP, TREE_FORMAT_VERSION, type Study, type TreeData, type TreeNode } from '../src/tree/types';
 
 /**
  * 開いている窓を × で閉じる（窓が本当に開くまで待ってから押し、閉じたのを確かめる）。
@@ -18,10 +19,12 @@ async function openHome(page: Page) {
   await expect(page.getByTestId('isolation')).toHaveAttribute('data-state', 'isolated', { timeout: 30_000 });
 }
 
-/** 画面の幅からはみ出している部品（「タグ.クラス 右端 "文字"」。無ければ空） */
+/** 画面が横にはみ出すとき、画面の幅からはみ出している部品（「タグ.クラス 右端 "文字"」。はみ出さなければ空） */
 async function overflowing(page: Page): Promise<string[]> {
   return page.evaluate(() => {
     const vw = document.documentElement.clientWidth;
+    // 画面が横にスクロールしないなら無し（横にスクロールする欄の中身＝パンくずなどは、はみ出しではない）
+    if (document.documentElement.scrollWidth <= vw) return [];
     const out: string[] = [];
     for (const e of Array.from(document.querySelectorAll('body *'))) {
       const b = e.getBoundingClientRect();
@@ -192,5 +195,150 @@ test.describe('11-1 画面の下のタブ', () => {
     await page.getByTestId('review-finish').click();
     await expect(page).toHaveURL(/#\/reviews$/);
     await expect(page.getByTestId('reviews-group').getByTestId('reviews-overview')).toHaveText('前回まちがえた 1 問・最後に復習 今日');
+  });
+});
+
+/** 平手からの 1 本道のツリー（開始局面までの手 prefix の後に moves。どの局面もいちばん上の手だけ） */
+function lineTree(id: string, prefix: string[], moves: string[]): TreeData {
+  let sfen = STARTPOS_SFEN;
+  for (const m of prefix) sfen = applyUsiMove(sfen, m)!.sfen;
+  const nodes: Record<string, TreeNode> = {};
+  const add = (s: string) => (nodes[sfenKey(s)] ??= { key: sfenKey(s), sfen: s, round: 0, edges: [] });
+  const root = add(sfen);
+  let node = root;
+  for (const m of moves) {
+    const next = add(applyUsiMove(node.sfen, m)!.sfen);
+    node.edges.push({ move: m, to: next.key, score: { kind: 'cp', value: 0 }, diff: 0 } as never);
+    node = next;
+  }
+  return {
+    app: TREE_APP,
+    version: TREE_FORMAT_VERSION,
+    id,
+    name: `棋譜欄 ${id}`,
+    createdAt: 1,
+    updatedAt: 1,
+    mySide: 'white',
+    rootKey: root.key,
+    prefix: { initialSfen: STARTPOS_SFEN, moves: prefix },
+    nodes,
+    settings: { totalMs: 120_000, movetimeMs: 1500, multiPV: 4, maxRounds: 4, maxNodes: 3000, windowCp: 300, replyMs: 1000, dubiousCp: 150 },
+  } as TreeData;
+}
+
+async function importStudy(page: Page, study: Study) {
+  await page.getByTestId('tab-studies').click();
+  await expect(page.getByTestId('study-register')).toBeVisible();
+  await page.getByTestId('study-import-file').setInputFiles({
+    name: 's.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies: [study] })),
+  });
+  await expect(page.getByTestId('study-item')).toHaveCount(1);
+}
+
+test.describe('11-5 手順の一覧（棋譜欄）', () => {
+  test('スマホ縦：定跡帳の手数を押すと画面下から開く。今の行が目立ち、押すとその局面へ移って閉じる', async ({ page }) => {
+    await openHome(page);
+    await importStudy(page, LINE);
+    await page.getByTestId('study-item').click();
+    const pos = page.getByTestId('study-position');
+    await expect(pos).toHaveText('11手目 ▲同　飛');
+    // スマホ縦では盤の横に出さない（盤の大きさは変わらない）
+    await expect(page.getByTestId('kifu-panel')).toHaveCount(0);
+    await pos.click();
+    const sheet = page.getByTestId('kifu-sheet');
+    await expect(sheet).toBeVisible();
+    const rows = sheet.getByTestId('kifu-row');
+    await expect(rows).toHaveCount(12);
+    await expect(rows.first()).toHaveText('初期局面');
+    await expect(sheet.locator('[aria-current="step"]')).toHaveAttribute('data-ply', '11');
+    await expect(sheet.locator('[aria-current="step"]')).toBeInViewport();
+    await rows.nth(3).click();
+    await expect(sheet).toHaveCount(0);
+    await expect(pos).toHaveText('3手目 ▲２六歩');
+    // 開き直すと、今の行は 3 手目。先の手は少し薄く
+    await pos.click();
+    await expect(page.getByTestId('kifu-sheet').locator('[aria-current="step"]')).toHaveAttribute('data-ply', '3');
+    await expect(page.getByTestId('kifu-sheet').getByTestId('kifu-row').nth(4)).toHaveClass(/ahead/);
+    await closeDialog(page);
+    expect(await overflowing(page)).toEqual([]);
+  });
+
+  test('スマホ縦：ツリーは「手順」で開く。たどった手の先に本線を薄く出し、押すとそこまで進む。開始局面より前の手は押せない', async ({ page }) => {
+    await openHome(page);
+    const tree = lineTree('k1', ['7g7f'], ['3c3d', '2g2f', '8c8d', '2f2e']);
+    await page.getByTestId('tab-trees').click();
+    await page.getByTestId('import-file').setInputFiles({ name: 't.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(tree)) });
+    await page.getByTestId('tree-item').click();
+    await expect(page.getByTestId('crumb')).toHaveCount(0);
+    await page.getByTestId('kifu-open').click();
+    const sheet = page.getByTestId('kifu-sheet');
+    const rows = sheet.getByTestId('kifu-row');
+    await expect(rows).toHaveText(['初期局面', /1▲７六歩開始局面/, /2△３四歩/, /3▲２六歩/, /4△８四歩/, /5▲２五歩/]);
+    await expect(rows.nth(0)).toBeDisabled();
+    await expect(rows.nth(1)).toHaveAttribute('aria-current', 'step');
+    await expect(rows.nth(3)).toHaveClass(/ahead/);
+    await rows.nth(4).click();
+    await expect(sheet).toHaveCount(0);
+    await expect(page.getByTestId('crumb')).toHaveText(['△３四歩', '▲２六歩', '△８四歩']);
+    // 戻っても、さっきまでいた手が先に出る
+    await page.getByTestId('crumb-start').click();
+    await page.getByTestId('kifu-open').click();
+    await expect(page.getByTestId('kifu-sheet').getByTestId('kifu-row')).toHaveCount(6);
+    await page.getByTestId('kifu-sheet').getByTestId('kifu-row').nth(2).click();
+    await expect(page.getByTestId('crumb')).toHaveText(['△３四歩']);
+    expect(await overflowing(page)).toEqual([]);
+  });
+
+  test('スマホ縦：新しいツリーの画面も同じ部品。手数を押して局面を選ぶ', async ({ page }) => {
+    await openHome(page);
+    await page.getByTestId('tab-trees').click();
+    await page.getByTestId('new-tree').click();
+    await page.getByTestId('kifu-open').click();
+    await page.getByTestId('kifu-input').fill('7g7f 3c3d 2g2f 8c8d');
+    await page.getByTestId('kifu-load').click();
+    const pos = page.getByTestId('input-position');
+    await expect(pos).toHaveText('4手目 △８四歩');
+    await pos.click();
+    const rows = page.getByTestId('kifu-sheet').getByTestId('kifu-row');
+    await expect(rows).toHaveCount(5);
+    await expect(rows.first()).toHaveText('開始局面');
+    await rows.nth(1).click();
+    await expect(pos).toHaveText('1手目 ▲７六歩');
+  });
+});
+
+test.describe('11-5 手順の一覧（iPad 横）', () => {
+  test.use({ viewport: { width: 1180, height: 820 } });
+
+  test('盤の横に常に出す。今の行が目立ち、押すとその局面へ（定跡帳・ツリー）', async ({ page }) => {
+    await openHome(page);
+    await importStudy(page, LINE);
+    await page.getByTestId('study-item').click();
+    const panel = page.getByTestId('kifu-panel');
+    await expect(panel).toBeVisible();
+    await expect(panel.locator('[aria-current="step"]')).toHaveAttribute('data-ply', '11');
+    await expect(panel.locator('[aria-current="step"]')).toBeInViewport();
+    // 手数を押しても窓は出ない（もう横に出ている）
+    await page.getByTestId('study-position').click();
+    await expect(page.getByTestId('kifu-sheet')).toHaveCount(0);
+    await panel.getByTestId('kifu-row').nth(5).click();
+    await expect(page.getByTestId('study-position')).toHaveText('5手目 ▲２五歩');
+    await expect(panel.locator('[aria-current="step"]')).toHaveAttribute('data-ply', '5');
+    // 盤と棋譜欄は左右に並ぶ
+    const board = (await page.getByTestId('study-board').boundingBox())!;
+    const box = (await panel.boundingBox())!;
+    expect(box.x).toBeGreaterThan(board.x + board.width - 1);
+
+    // ツリー
+    await page.goto('./#/trees');
+    const tree = lineTree('k2', [], ['7g7f', '3c3d', '2g2f']);
+    await page.getByTestId('import-file').setInputFiles({ name: 't.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(tree)) });
+    await page.getByTestId('tree-item').click();
+    await expect(page.getByTestId('kifu-open')).toHaveCount(0);
+    await page.getByTestId('kifu-panel').getByTestId('kifu-row').nth(2).click();
+    await expect(page.getByTestId('crumb')).toHaveText(['▲７六歩', '△３四歩']);
+    expect(await overflowing(page)).toEqual([]);
   });
 });
