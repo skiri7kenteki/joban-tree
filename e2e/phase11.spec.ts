@@ -18,6 +18,22 @@ async function openHome(page: Page) {
   await expect(page.getByTestId('isolation')).toHaveAttribute('data-state', 'isolated', { timeout: 30_000 });
 }
 
+/** 画面の幅からはみ出している部品（「タグ.クラス 右端 "文字"」。無ければ空） */
+async function overflowing(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const vw = document.documentElement.clientWidth;
+    const out: string[] = [];
+    for (const e of Array.from(document.querySelectorAll('body *'))) {
+      const b = e.getBoundingClientRect();
+      if (b.width > 0 && b.right > vw + 0.5) {
+        const cls = typeof (e as HTMLElement).className === 'string' ? (e as HTMLElement).className : '';
+        out.push(`${e.tagName.toLowerCase()}.${cls} ${Math.round(b.right)} "${(e.textContent ?? '').trim().slice(0, 20)}"`);
+      }
+    }
+    return out.slice(0, 8);
+  });
+}
+
 async function play(page: Page, from: string, to: string) {
   await page.locator(`[data-square="${from}"]`).click();
   await page.locator(`[data-square="${to}"]`).click();
@@ -131,9 +147,10 @@ test.describe('11-1 画面の下のタブ', () => {
     await expect(page.getByTestId('board')).toBeVisible();
     await expect(page.getByTestId('tabbar')).toHaveCount(0);
     await page.goto(`./#/book/${encodeURIComponent('study:hirate|black')}`);
-    await expect(page.getByTestId('board')).toBeVisible();
+    await expect(page.getByTestId('book-head-empty')).toBeVisible();
     await expect(page.getByTestId('tabbar')).toHaveCount(0);
-    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
+    // 横にはみ出す部品があれば、その名前を出す（GitHub の実行環境は字の幅が違うので、どこがはみ出したか分かるように）
+    expect(await overflowing(page)).toEqual([]);
   });
 
   test('復習のタブ：研究手順のグループごとに、前回まちがえた数と最後に復習した日。押すと復習、「終わる」で戻る', async ({ page }) => {
