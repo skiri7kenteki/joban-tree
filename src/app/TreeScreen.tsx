@@ -13,11 +13,13 @@
 // 段階8-1：研究手順はツリーの外（端末の研究手順の置き場所）にある。平手からの手順（ツリーの開始局面までの手順＋たどった手）が
 //          研究手順の途中と同じなら★、同じ手順で終わる研究手順があれば「★ 名前」。保存は平手からの手順にして独立した研究手順へ。
 //          段階10-2：「この手順を研究として保存」は「定跡帳に足す」（自分の側だけ確かめる。名前は自動）。足した後・★ の手順なら「定跡帳で開く」。
+// 段階11-2：‹ とパンくずの行をやめ、盤の下の固定バー（MoveBar）に。候補手の下の操作のボタンは見出しの ⋯ に移した。
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { Board } from '../components/Board';
 import { Dialog } from '../components/Dialog';
 import { KifuPanel, KifuSheet, useWideLayout } from '../components/KifuList';
+import { MoveBar, moveBarHeight } from '../components/MoveBar';
 import { treeKifu } from '../tree/treeKifu';
 import { PromotionBox, useMoveInput } from '../components/useMoveInput';
 import { formatScore, scoreToNumber, type Score } from '../engine/usi';
@@ -109,8 +111,8 @@ function TreeView({ tree, studies, studyId, ply }: { tree: TreeData; studies: re
   const [path, setPath] = useState<string[]>(initial.path);
   /** 戻ったときに覚えておく「進む」先（スワイプで進む用） */
   const [forward, setForward] = useState<string[]>([]);
-  /** 開いている小窓（ここから展開・書き出し） */
-  const [dialog, setDialog] = useState<'expand' | 'export' | 'register' | 'study-edit' | 'study-view' | 'add-book' | null>(null);
+  /** 開いている小窓（見出しの ⋯・ここから展開・書き出し） */
+  const [dialog, setDialog] = useState<'menu' | 'expand' | 'export' | 'register' | 'study-edit' | 'study-view' | 'add-book' | null>(null);
   /** 「⋯」を押した候補手（手のメニューを出す） */
   const [menuEdge, setMenuEdge] = useState<TreeEdge | null>(null);
   /** 除外した手の欄を開いているか */
@@ -123,11 +125,10 @@ function TreeView({ tree, studies, studyId, ply }: { tree: TreeData; studies: re
   const [deleting, setDeleting] = useState<TreeEdge | null>(null);
   /** 操作の結果（「コピーしました」など） */
   const [note, setNote] = useState(initial.note);
-  const crumbsRef = useRef<HTMLDivElement>(null);
   const boardRef = useRef<HTMLDivElement>(null);
   const sideRef = useRef<HTMLDivElement>(null);
-  // スマホ縦：候補手 3 行が画面に収まる盤の幅（制限しないときは null）
-  const boardFit = useBoardFit(boardRef, (board) => (sideRef.current ? measureBoardFit(board, sideRef.current) : null));
+  // スマホ縦：候補手 3 行が、画面の下に固定したバーの上に収まる盤の幅（制限しないときは null）
+  const boardFit = useBoardFit(boardRef, (board) => (sideRef.current ? measureBoardFit(board, sideRef.current, moveBarHeight()) : null));
   const thresholds = settings.value.thresholds;
 
   const key = path[path.length - 1];
@@ -162,12 +163,6 @@ function TreeView({ tree, studies, studyId, ply }: { tree: TreeData; studies: re
     setPicking(false);
     input.clear();
   }, [key]);
-
-  useEffect(() => {
-    // パンくずリストは、今の局面が見えるよう右端までスクロール
-    const el = crumbsRef.current;
-    if (el) el.scrollLeft = el.scrollWidth;
-  }, [path.length]);
 
   function advance(edge: TreeEdge) {
     setPath([...path, edge.to]);
@@ -209,6 +204,13 @@ function TreeView({ tree, studies, studyId, ply }: { tree: TreeData; studies: re
     setForward(add.every((k, i) => forward[i] === k) ? forward.slice(add.length) : []);
     setNote('');
   }
+  /** 固定バーの真ん中：今の局面（開始局面なら「開始局面」） */
+  const positionText = path.length === 1 ? '開始局面' : `${kifu.current}手目 ${kifu.rows[kifu.current]?.text ?? ''}`;
+  /** 見出しの ⋯ の中の操作：窓を閉じてから行う */
+  const fromMenu = (action: () => void) => () => {
+    setDialog(null);
+    action();
+  };
 
   function expand(id: PresetId) {
     setDialog(null);
@@ -356,9 +358,16 @@ function TreeView({ tree, studies, studyId, ply }: { tree: TreeData; studies: re
         <button type="button" class="btn btn-ghost" onClick={() => go('/trees')}>
           ‹ 一覧
         </button>
-        <h1 class="tree-title">{tree.name}</h1>
+        {/* 見出しは 2 段：小さく「ツリー」、その下に名前（長ければ …） */}
+        <h1 class="tree-title book-title" data-testid="tree-title">
+          <span class="book-kicker">ツリー</span>
+          <span class="book-label">{tree.name}</span>
+        </h1>
         <button type="button" class="btn" data-testid="review-open" onClick={() => go(`/review/${tree.id}`)}>
           復習
+        </button>
+        <button type="button" class="btn tree-menu-btn" aria-label="ツリーの操作" data-testid="tree-menu" onClick={() => setDialog('menu')}>
+          ⋯
         </button>
       </div>
 
@@ -380,38 +389,7 @@ function TreeView({ tree, studies, studyId, ply }: { tree: TreeData; studies: re
         </div>
 
         <div class="tree-side" ref={sideRef}>
-          {/* 1 手戻る＋手順のパンくずリストを 1 行に（「開始局面」のパンくずで開始局面へ戻る） */}
-          <div class="crumb-row">
-            <button type="button" class="crumb crumb-back" data-testid="nav-back" onClick={goBack} disabled={path.length <= 1} aria-label="1手戻る">
-              ‹
-            </button>
-            <div class="crumbs" ref={crumbsRef} data-testid="crumbs">
-              <button type="button" class={path.length === 1 ? 'crumb current' : 'crumb'} data-testid="crumb-start" onClick={() => jumpTo(1)}>
-                開始局面
-              </button>
-              {path.slice(1).map((k, i) => {
-                const from = tree.nodes[path[i]];
-                const edge = edgeBetween(tree, path[i], k);
-                const prev = i > 0 ? edgeBetween(tree, path[i - 1], path[i])?.move : undefined;
-                return (
-                  <button
-                    type="button"
-                    key={`${i}-${k}`}
-                    class={i + 2 === path.length ? 'crumb current' : 'crumb'}
-                    data-testid="crumb"
-                    onClick={() => jumpTo(i + 2)}
-                  >
-                    {edge ? moveText(from.sfen, edge.move, prev) : '?'}
-                  </button>
-                );
-              })}
-            </div>
-            {!wide && (
-              <button type="button" class="btn kifu-open-btn" data-testid="kifu-open" onClick={() => setKifuOpen(true)}>
-                手順 ▾
-              </button>
-            )}
-          </div>
+          {/* 手順の一覧：広い画面は盤の横に常に。スマホ縦は固定バーの真ん中を押すと画面下から（段階11-5・11-2） */}
           {wide && <KifuPanel rows={kifu.rows} current={kifu.current} onJump={jumpPly} />}
           {kifuOpen && <KifuSheet rows={kifu.rows} current={kifu.current} onJump={jumpPly} onClose={() => setKifuOpen(false)} />}
 
@@ -523,34 +501,6 @@ function TreeView({ tree, studies, studyId, ply }: { tree: TreeData; studies: re
             )}
           </div>
 
-          {/* 局面ごとの操作（主役の候補手リストを先に見せるため、その下に置く） */}
-          <div class="node-actions">
-            <button type="button" class="btn" data-testid="expand-here" onClick={() => setDialog('expand')} disabled={busy || node.terminal}>
-              ここから展開
-            </button>
-            {canVerify && (
-              <button type="button" class="btn" data-testid="verify-here" onClick={verify} disabled={busy}>
-                この手を検証
-              </button>
-            )}
-            {!opp && !node.terminal && (
-              <button type="button" class="btn" data-testid="explore-open" onClick={startPicking} disabled={busy || picking}>
-                別の手を調べる
-              </button>
-            )}
-            <button type="button" class="btn" data-testid="study-open" onClick={openStudy} disabled={fullMoves?.length === 0}>
-              {studyHere ? '定跡帳で開く' : '定跡帳に足す'}
-            </button>
-            <button type="button" class="btn" data-testid="copy-kif" onClick={() => void copyKif()}>
-              KIFをコピー
-            </button>
-            <button type="button" class="btn" data-testid="register-template" onClick={openRegister}>
-              戦型として登録
-            </button>
-            <button type="button" class="btn" data-testid="export-open" onClick={() => setDialog('export')}>
-              書き出し・共有
-            </button>
-          </div>
           {note && (
             <p class="muted" role="status" data-testid="tree-note">
               {note}
@@ -558,6 +508,59 @@ function TreeView({ tree, studies, studyId, ply }: { tree: TreeData; studies: re
           )}
         </div>
       </div>
+
+      {/* 盤の下の固定バー（段階11-2）：|‹ ‹ [n手目 ▲X ▾] › ›|。› はさっきまでいた手順、無ければ本線へ */}
+      <MoveBar
+        ids={{ bar: 'tree-nav', first: 'nav-first', prev: 'nav-back', center: 'tree-position', next: 'nav-forward', last: 'nav-last' }}
+        firstLabel="開始局面へ"
+        onFirst={() => jumpTo(1)}
+        onPrev={goBack}
+        onNext={goForward}
+        onLast={() => jumpPly(kifu.rows[kifu.rows.length - 1].ply)}
+        canPrev={path.length > 1}
+        canNext={node.edges.length > 0}
+        onCenter={wide ? undefined : () => setKifuOpen(true)}
+      >
+        {positionText}
+      </MoveBar>
+
+      {/* 見出しの ⋯（段階11-2）：前は候補手の下に並べていた操作 */}
+      {dialog === 'menu' && (
+        <Dialog title={tree.name} onClose={() => setDialog(null)} testId="tree-menu-dialog">
+          <p class="menu-section-title">この局面</p>
+          <div class="dialog-actions dialog-actions-column">
+            <button type="button" class="btn" data-testid="expand-here" onClick={() => setDialog('expand')} disabled={busy || node.terminal}>
+              ここから展開
+            </button>
+            {canVerify && (
+              <button type="button" class="btn" data-testid="verify-here" onClick={fromMenu(verify)} disabled={busy}>
+                この手を検証
+              </button>
+            )}
+            {!opp && !node.terminal && (
+              <button type="button" class="btn" data-testid="explore-open" onClick={fromMenu(startPicking)} disabled={busy || picking}>
+                別の手を調べる
+              </button>
+            )}
+            <button type="button" class="btn" data-testid="study-open" onClick={fromMenu(openStudy)} disabled={fullMoves?.length === 0}>
+              {studyHere ? '定跡帳で開く' : '定跡帳に足す'}
+            </button>
+            <button type="button" class="btn" data-testid="copy-kif" onClick={fromMenu(() => void copyKif())}>
+              KIFをコピー
+            </button>
+            <button type="button" class="btn" data-testid="register-template" onClick={fromMenu(openRegister)}>
+              戦型として登録
+            </button>
+          </div>
+          <p class="menu-section-title">このツリー</p>
+          <div class="dialog-actions dialog-actions-column">
+            <button type="button" class="btn" data-testid="export-open" onClick={() => setDialog('export')}>
+              書き出し・共有
+            </button>
+          </div>
+          {busy && <p class="muted">生成中は、展開・検証・別の手を調べるはできません。</p>}
+        </Dialog>
+      )}
 
       {dialog === 'expand' && (
         <Dialog title="ここから展開" onClose={() => setDialog(null)} testId="expand-dialog">

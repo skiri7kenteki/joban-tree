@@ -103,27 +103,6 @@
   resize: vertical;
 }
 
-.move-nav {
-  display: flex;
-  align-items: center;
-  gap: var(--space-1);
-  margin: var(--space-2) 0;
-}
-
-.move-nav .btn {
-  min-width: var(--touch-min);
-  padding: 0 var(--space-2);
-}
-
-.move-nav-text {
-  flex: 1;
-  text-align: center;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .move-slider {
   width: 100%;
   accent-color: var(--color-accent);
@@ -202,62 +181,6 @@
     flex: 1;
     min-width: 0;
   }
-}
-
-/* 手順のパンくずリスト（横にスクロール） */
-.crumbs {
-  display: flex;
-  gap: var(--space-1);
-  overflow-x: auto;
-  padding-bottom: var(--space-1);
-  -webkit-overflow-scrolling: touch;
-}
-
-.crumb {
-  flex: 0 0 auto;
-  display: inline-flex;
-  align-items: center;
-  min-height: var(--touch-min);
-  padding: 0 var(--space-2);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-button);
-  background: var(--color-surface);
-  color: var(--color-text);
-  font: inherit;
-  font-size: var(--font-size-small);
-  white-space: nowrap;
-  cursor: pointer;
-}
-
-.crumb.current {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
-  font-weight: bold;
-}
-
-/* 閲覧画面：「‹」（1 手戻る）とパンくずリストを 1 行に */
-.crumb-row {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-1);
-  margin-bottom: var(--space-1);
-}
-
-.crumb-row .crumbs {
-  flex: 1;
-  min-width: 0;
-}
-
-.crumb-back {
-  min-width: var(--touch-min);
-  font-size: var(--font-size-heading);
-  font-weight: bold;
-  color: var(--color-accent);
-}
-
-.crumb-back:disabled {
-  opacity: 0.4;
-  cursor: default;
 }
 
 /* 候補手リスト */
@@ -1057,11 +980,6 @@
   white-space: nowrap;
 }
 
-/* パンくずの行は押せる高さ（44px）ちょうどに（横スクロールのつまみの分の余白をなくす） */
-.crumb-row .crumbs {
-  padding-bottom: 0;
-}
-
 /* 盤の幅を、盤の下の大事な所（閲覧画面は候補手、入力画面は手順の操作、復習画面は問題）が画面に収まる幅
    （--board-fit-w。boardFit.ts が測る）までにして、左右の真ん中に置く。
    --board-bleed はスマホ縦で盤を画面の端まで広げている分（board.css） */
@@ -1221,15 +1139,6 @@
   font-size: var(--font-size-small);
 }
 
-/* 研究手順の画面の手順（全部の手。今の局面より先は薄く） */
-.study-crumbs {
-  margin: var(--space-1) 0;
-}
-
-.crumb.crumb-ahead {
-  color: var(--color-text-muted);
-}
-
 /* 「この局面からの研究」・定跡帳（段階9-2）：次の手ごとの研究手順。名前は 1 行（入りきらなければ …）。今見ている研究手順の手に印 */
 .book-list {
   margin: var(--space-1) 0;
@@ -1275,11 +1184,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* 研究手順の画面・定跡帳の手順の操作（‹ ›）：盤との間を詰める（一覧の 3 行目まで画面に収めるため） */
-.study-layout .move-nav {
-  margin: 0 0 var(--space-1);
 }
 
 .book-list {
@@ -1387,12 +1291,6 @@
 
 /* ---- 段階10-1：定跡帳で直接指して研究を足す ---- */
 
-/* 研究の木の外の手（まだどの研究手順も通っていない） */
-.crumb.crumb-outside {
-  border-style: dashed;
-  opacity: 0.6;
-}
-
 /* ★ の行（押すと名前・メモを直す）：見た目は今までの 1 行のまま */
 .book-head-btn {
   width: 100%;
@@ -1467,12 +1365,6 @@
 }
 
 /* ---- 段階11-4：復習を小分けにする ---- */
-
-/* 今の 1 回の進み具合（「今日 3／10問」） */
-.review-progress {
-  margin: 0 0 var(--space-1);
-  font-weight: bold;
-}
 
 .review-result-score {
   margin: var(--space-2) 0;
@@ -1756,12 +1648,6 @@
   color: var(--color-text-muted);
 }
 
-.kifu-open-btn {
-  flex: none;
-  white-space: nowrap;
-  font-size: var(--font-size-small);
-}
-
 @media (min-width: 768px) and (orientation: landscape) {
   .kifu-open {
     cursor: default;
@@ -1772,13 +1658,101 @@
   }
 }
 
-/* 手数のボタン（段階11-5）は ‹ › のボタンと同じ高さ・同じ位置に（行を高くして盤を小さくしない） */
-.move-nav .kifu-open {
-  align-self: center;
+/* ---- 段階11-2：盤の下の固定バー（MoveBar）「|‹ ‹ [17手目 ▲3六飛 ▾] › ›|」 ----
+   前の ‹ › の行と手順の行（パンくず）の代わり。定跡帳・ツリー・復習では画面の下に固定（高さ 56px＋端末の下の余白）、
+   新しいツリーでは作るボタンのバーの中（スマホ縦）か右の列の上（広い画面） */
+.move-bar-inner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: var(--movebar-h);
+}
+
+.move-bar-btn {
+  flex: none;
+  width: var(--touch-min);
   height: var(--touch-min);
-  min-height: 0;
-  padding: 0 var(--space-1);
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-button);
+  background: var(--color-surface);
+  color: var(--color-accent);
+  font: inherit;
+  font-size: var(--font-size-heading);
+  font-weight: bold;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.move-bar-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* 真ん中：今の局面（押すと手順の一覧）。入りきらなければ … */
+.move-bar-center {
+  flex: 1;
+  min-width: 0;
+  height: var(--touch-min);
   margin: 0;
+  padding: 0 var(--space-1);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: center;
   line-height: var(--touch-min);
-  vertical-align: middle;
+}
+
+/* 復習：「今日 3／10問」と、さかのぼって見ているときはその局面を 2 段で */
+div.move-bar-center {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  line-height: 1.25;
+}
+
+.move-bar-main {
+  font-weight: bold;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.move-bar-sub {
+  font-size: var(--font-size-small);
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 画面の下に固定するバー（下のタブと同じ作り） */
+.move-bar-fixed {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  padding: 0 calc(var(--space-2) + env(safe-area-inset-right)) env(safe-area-inset-bottom) calc(var(--space-2) + env(safe-area-inset-left));
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.move-bar-fixed .move-bar-inner {
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* 固定したバーの分だけ、画面の最後を空ける */
+.move-bar-space {
+  height: calc(var(--movebar-h) + env(safe-area-inset-bottom));
+}
+
+/* 定跡帳の「取り消す」の知らせは、固定したバーの上に */
+.move-bar-space ~ .toast {
+  bottom: calc(var(--movebar-h) + var(--space-2) + env(safe-area-inset-bottom, 0px));
+}
+
+/* 新しいツリー（スマホ縦）：作るボタンのバーのいちばん上 */
+.start-bar .move-bar-inner {
+  height: auto;
+  margin-bottom: var(--space-2);
 }

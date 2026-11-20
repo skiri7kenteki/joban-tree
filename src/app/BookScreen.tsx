@@ -7,6 +7,7 @@
 // - 「この局面からの研究」の行の ⋯ で「この手から先を消す」。⋯ に、今の研究手順の操作（復習・書き出し・ここで終わりにする・消す）、
 //   この局面の操作（ツリーを作る・ツリーで見る）、定跡帳の操作（KIF で書き出す・書き込む 入／切）
 // - ★ の行を押すと、今の研究手順の名前・メモを直す
+// - 段階11-2：‹ › の行と手順の行（パンくず）をやめ、盤の下の固定バー（MoveBar）に。手数を押すと手順の一覧
 // 研究手順の画面（StudyScreen）と編集モードは段階10-2 で片付けた（古い URL は src/app/LegacyRedirect.tsx でここへ移す）。
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
@@ -43,6 +44,7 @@ import { OUTCOME_TEXT, copyText, shareFile } from './share';
 import { StudyEditDialog, shareStudies } from './StudyDialogs';
 import { applyStudyChange, ensureStudies, library, studiesNow } from './studies';
 import { KifuPanel, KifuSheet, useWideLayout, type KifuRow } from '../components/KifuList';
+import { MoveBar, moveBarHeight } from '../components/MoveBar';
 import { allTemplates, myTemplates, refreshMyTemplates } from './TemplateDialogs';
 
 /** 「書き込む」の入／切（端末ごとに覚える。初期値は入） */
@@ -193,8 +195,7 @@ function BookViewScreen({
   const [undoCount, setUndoCount] = useState(0);
   /** 今の局面までの手順を含むツリー（「ツリーで見る」の候補） */
   const [trees, setTrees] = useState<TreeData[]>([]);
-  const crumbsRef = useRef<HTMLDivElement>(null);
-  /** 棋譜欄（段階11-5）：広い画面は盤の横に常に、スマホ縦は手数を押すと画面下から */
+  /** 棋譜欄（段階11-5）：広い画面は盤の横に常に、スマホ縦は固定バーの手数を押すと画面下から */
   const wide = useWideLayout();
   const [kifuOpen, setKifuOpen] = useState(false);
   // 出発点より前の手は薄く・押せない（この画面は出発点より前に戻らない）。出発点の行に戦型の名前、今より先の手は少し薄く
@@ -232,20 +233,6 @@ function BookViewScreen({
     return () => clearTimeout(timer);
   }, [toast?.seq]);
 
-  useEffect(() => {
-    // 今の手が見えるように手順の行を横にだけスクロール（画面の縦のスクロールは動かさない）
-    const box = crumbsRef.current;
-    const el = box?.querySelector<HTMLElement>('.crumb.current');
-    if (!box) return;
-    if (!el) {
-      box.scrollLeft = 0;
-      return;
-    }
-    const left = el.offsetLeft - box.offsetLeft;
-    if (left < box.scrollLeft) box.scrollLeft = left;
-    else if (left + el.offsetWidth > box.scrollLeft + box.clientWidth) box.scrollLeft = left + el.offsetWidth - box.clientWidth;
-  }, [index, line]);
-
   // 今の研究手順と局面を URL に書いておく（戻るボタンで戻ってきたときに同じところを開く）。画面は移らない（hashchange は起きない）
   useEffect(() => {
     const url = `#${current ? bookPath(bookKey, current.id, index) : bookPath(bookKey)}`;
@@ -254,20 +241,21 @@ function BookViewScreen({
 
   const treesHere = current ? trees.filter((t) => pathInTree(t, here) !== null) : [];
 
-  // スマホ縦：盤・手順の操作（‹ ›）・手順の行・「この局面からの研究」の 3 行目までが、スクロールせずに見える盤の幅（段階9-2 と同じ）
+  // スマホ縦：盤と「この局面からの研究」の 3 行目までが、画面の下に固定したバー（段階11-2）の上にスクロールせずに見える盤の幅
   const boardRef = useRef<HTMLDivElement>(null);
   const branchesRef = useRef<HTMLDivElement>(null);
-  /** 手順の行の下から、一覧の 3 行目の下までの高さ（最後に測った値）。一覧の行が少ない局面でも同じだけ空けて、盤の大きさを変えない */
+  /** 盤の下から、一覧の 3 行目の下までの高さ（最後に測った値）。一覧の行が少ない局面でも同じだけ空けて、盤の大きさを変えない */
   const listReserve = useRef<number | null>(null);
   const boardFit = useBoardFit(boardRef, (board) => {
-    const crumbs = crumbsRef.current;
     const rows = branchesRef.current?.querySelectorAll<HTMLElement>('.book-row');
-    if (crumbs && rows && rows.length > 0) {
+    if (rows && rows.length > 0) {
       const n = Math.min(3, rows.length);
       const rowH = rows[0].getBoundingClientRect().height;
-      listReserve.current = rows[n - 1].getBoundingClientRect().bottom - crumbs.getBoundingClientRect().bottom + (3 - n) * rowH;
+      // 成る・成らないの小窓は数えない（盤の大きさが変わらないように）
+      const promote = board.parentElement?.querySelector<HTMLElement>('.promote-box')?.getBoundingClientRect().height ?? 0;
+      listReserve.current = rows[n - 1].getBoundingClientRect().bottom - board.getBoundingClientRect().bottom + (3 - n) * rowH - promote;
     }
-    return measureFitAbove(board, crumbs, listReserve.current ?? LIST_GUESS);
+    return measureFitAbove(board, board, moveBarHeight() + (listReserve.current ?? LIST_GUESS));
   });
 
   const input = useMoveInput(sfen, (move) => void onPlay(move.usi), !busy);
@@ -509,54 +497,8 @@ function BookViewScreen({
 
         <div class="tree-side">
           <PromotionBox input={input} />
-          <div class="move-nav" data-testid="study-nav">
-            <button type="button" class="btn" aria-label="出発点へ" onClick={() => moveTo(0)} disabled={index <= minIndex}>
-              |‹
-            </button>
-            <button type="button" class="btn" aria-label="1手戻る" data-testid="study-prev" onClick={() => moveTo(index - 1)} disabled={index <= minIndex}>
-              ‹
-            </button>
-            <button
-              type="button"
-              class="move-nav-text kifu-open num"
-              data-testid="study-position"
-              aria-label="手順の一覧"
-              onClick={() => !wide && setKifuOpen(true)}
-            >
-              {index === 0 ? '初期局面' : `${index}手目 ${texts[index - 1] ?? ''}`}
-            </button>
-            <button type="button" class="btn" aria-label="1手進む" data-testid="study-next" onClick={() => moveTo(index + 1)} disabled={index >= last}>
-              ›
-            </button>
-            <button type="button" class="btn" aria-label="最後へ" data-testid="study-last" onClick={() => moveTo(last)} disabled={index >= last}>
-              ›|
-            </button>
-          </div>
-
+          {/* 手順の一覧：広い画面は盤の横に常に。スマホ縦は固定バーの手数を押すと画面下から（段階11-5・11-2） */}
           {wide && <KifuPanel rows={kifuRows} current={index} onJump={moveTo} />}
-
-          <div class="crumbs study-crumbs" ref={crumbsRef} data-testid="study-crumbs">
-            {minIndex > 0 && (
-              // 出発点より前の手は出さず、出発点（戦型の名前）を先頭に
-              <button type="button" class={index === minIndex ? 'crumb current' : 'crumb'} data-testid="book-start-crumb" onClick={() => moveTo(minIndex)}>
-                {startName}
-              </button>
-            )}
-            {texts.map(
-              (t, i) =>
-                i + 1 > minIndex && (
-                  <button
-                    type="button"
-                    key={`${i}-${t}`}
-                    class={`crumb${i + 1 === index ? ' current' : i + 1 > index ? ' crumb-ahead' : ''}${i + 1 > covered ? ' crumb-outside' : ''}`}
-                    data-testid="study-crumb"
-                    onClick={() => moveTo(i + 1)}
-                  >
-                    {t}
-                  </button>
-                ),
-            )}
-          </div>
 
           <BookBranches
             listRef={branchesRef}
@@ -595,6 +537,21 @@ function BookViewScreen({
           )}
         </div>
       </div>
+
+      {/* 盤の下の固定バー（段階11-2）：|‹（出発点へ） ‹ [n手目 ▲X ▾] › ›|（今の研究手順の終わりへ） */}
+      <MoveBar
+        ids={{ bar: 'study-nav', first: 'study-first', prev: 'study-prev', center: 'study-position', next: 'study-next', last: 'study-last' }}
+        firstLabel={`出発点（${startName}）へ`}
+        onFirst={() => moveTo(minIndex)}
+        onPrev={() => moveTo(index - 1)}
+        onNext={() => moveTo(index + 1)}
+        onLast={() => moveTo(last)}
+        canPrev={index > minIndex}
+        canNext={index < last}
+        onCenter={wide ? undefined : () => setKifuOpen(true)}
+      >
+        {index === 0 ? '初期局面' : `${index}手目 ${texts[index - 1] ?? ''}`}
+      </MoveBar>
 
       {kifuOpen && <KifuSheet rows={kifuRows} current={index} onJump={moveTo} onClose={() => setKifuOpen(false)} />}
 
@@ -775,8 +732,8 @@ function CutText({ plan }: { plan: CutPlan }) {
   );
 }
 
-/** 一覧の 3 行目までの高さの見込み（まだ測っていないとき。見出し＋3 行） */
-const LIST_GUESS = 190;
+/** 盤の下から一覧の 3 行目までの高さの見込み（まだ測っていないとき。間＋見出し＋3 行） */
+const LIST_GUESS = 200;
 
 /**
  * 「この局面からの研究」：次の手ごとに、その手を通る研究手順の名前と数。今たどっている研究手順の手に印。行の ⋯ で「この手から先を消す」。

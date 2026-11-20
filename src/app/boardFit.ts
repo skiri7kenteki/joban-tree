@@ -47,14 +47,13 @@ export function measureFitAbove(board: HTMLElement, target: HTMLElement | null, 
   return Math.max(MIN_BOARD_W, Math.floor((availH * svgRect.width) / svgRect.height));
 }
 
-/** 閲覧画面：盤の幅の上限（px）を測る。制限しないときは null */
-export function measureBoardFit(board: HTMLElement, side: HTMLElement): number | null {
+/** 閲覧画面：盤の幅の上限（px）を測る。reserve＝画面の下に固定したもの（px。段階11-2 の固定バー）。制限しないときは null */
+export function measureBoardFit(board: HTMLElement, side: HTMLElement, reserve = 0): number | null {
   if (window.matchMedia(SIDE_BY_SIDE).matches) return null;
   const svg = board.querySelector<SVGSVGElement>('svg.board');
   const wrap = board.querySelector<HTMLElement>('.board-wrap');
-  const crumb = side.querySelector<HTMLElement>('.crumb-row');
   const card = side.querySelector<HTMLElement>('.candidates');
-  if (!svg || !wrap || !crumb || !card) return null;
+  if (!svg || !wrap || !card) return null;
   const svgRect = svg.getBoundingClientRect();
   if (svgRect.width === 0 || svgRect.height === 0) return null;
   const wrapRect = wrap.getBoundingClientRect();
@@ -62,14 +61,12 @@ export function measureBoardFit(board: HTMLElement, side: HTMLElement): number |
 
   // 盤（SVG）の上端（ページの先頭から。スクロールしていても同じ値）
   const svgTop = svgRect.top + window.scrollY;
-  // 盤の下：先手の持ち駒の行、盤とパンくずの間
+  // 盤の下：先手の持ち駒の行、盤と下の列の間。「別の手を調べる」の案内などは数えない（盤の大きさが変わらないように）
   const belowSvg = wrapRect.bottom - svgRect.bottom;
   const gap = side.getBoundingClientRect().top - wrapRect.bottom;
-  // パンくずの行（下の余白を含む）。「別の手を調べる」の案内などは数えない（盤の大きさが変わらないように）
-  const crumbH = crumb.offsetHeight + parseFloat(getComputedStyle(crumb).marginBottom || '0');
   /** 候補手のカードの上端から y（画面上の位置）までを画面に収める盤の幅 */
   const widthFor = (y: number) => {
-    const availH = window.innerHeight - svgTop - belowSvg - gap - crumbH - (y - cardRect.top) - BOTTOM_MARGIN;
+    const availH = window.innerHeight - reserve - svgTop - belowSvg - gap - (y - cardRect.top) - BOTTOM_MARGIN;
     return Math.floor((availH * svgRect.width) / svgRect.height);
   };
 

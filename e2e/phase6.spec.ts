@@ -1,5 +1,6 @@
 // 段階6-3：用意済みのツリー（同梱ツリー）を開く
 import { expect, test, type Page } from '@playwright/test';
+import { inTreeMenu, treeMenu } from './treeMenu';
 import { readFileSync } from 'node:fs';
 import type { BundledTreeFile } from '../src/tree/bundled';
 import { TREE_FORMAT_VERSION } from '../src/tree/types';
@@ -111,11 +112,13 @@ test.describe('6-3 用意済みのツリーを開く', () => {
     await expect(page.getByTestId('mine-mark').first()).not.toHaveText('未検証');
     await page.getByTestId('candidate').first().click();
     await expect(page.getByTestId('candidate').first()).toBeVisible();
-    await expect(page.getByTestId('crumb')).toHaveCount(2);
-    // ここから展開のボタンが押せる（押すとプリセットを選ぶ。エンジンは動かさない）
-    await expect(page.getByTestId('expand-here')).toBeEnabled();
+    await expect(page.getByTestId('tree-position')).toContainText('18手目');
+    // ここから展開のボタンが押せる（見出しの ⋯ の中。押すとプリセットを選ぶ。エンジンは動かさない）
+    await inTreeMenu(page, async (menu) => {
+      await expect(menu.getByTestId('expand-here')).toBeEnabled();
+    });
     // 復習
-    await page.getByTestId('crumb-start').click();
+    await page.getByTestId('nav-first').click();
     await page.getByTestId('review-open').click();
     await expect(page.getByTestId('review-summary')).toContainText('問題');
     await expect(page.getByTestId('review-prompt')).toHaveAttribute('data-phase', 'ask');

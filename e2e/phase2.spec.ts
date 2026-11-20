@@ -1,6 +1,7 @@
 // 画面の通し確認（段階2）：取り込み・名前の変更・削除・書き出し・設定・オフライン・盤の向き・気づきを送る
 // エンジンを使わないものだけ（エンジンを使う流れは app.spec.ts）
 import { expect, test, type Page } from '@playwright/test';
+import { inTreeMenu, treeMenu } from './treeMenu';
 import { STARTPOS_SFEN, applyUsiMove, sfenKey } from '../src/shogi/position';
 import { TREE_APP, TREE_FORMAT_VERSION, type TreeData } from '../src/tree/types';
 
@@ -94,17 +95,19 @@ test('ツリー画面：ラベル・未検証の印、KIF のコピー、JSON・
   await expect(candidate).toContainText('本線');
   await candidate.click();
   await expect(page.getByTestId('candidate').first()).toContainText('未検証');
-  // 自分の手番で、まだ調べていない局面には「この手を検証」が出る
-  await expect(page.getByTestId('verify-here')).toBeVisible();
+  // 自分の手番で、まだ調べていない局面には「この手を検証」が出る（見出しの ⋯ の中。段階11-2）
+  await inTreeMenu(page, async (menu) => {
+    await expect(menu.getByTestId('verify-here')).toBeVisible();
+  });
 
   // KIF をコピー（この局面まで）
-  await page.getByTestId('copy-kif').click();
+  await treeMenu(page, 'copy-kif');
   await expect(page.getByTestId('tree-note')).toContainText('コピーしました');
   const copied = await page.evaluate(() => navigator.clipboard.readText());
   expect(copied).toContain('７六歩(77)');
 
   // 書き出し（この PC の Chromium には共有メニューが無いので、ダウンロードになる）
-  await page.getByTestId('export-open').click();
+  await treeMenu(page, 'export-open');
   const jsonDownload = page.waitForEvent('download');
   await page.getByTestId('export-json').click();
   const json = await jsonDownload;
@@ -113,7 +116,7 @@ test('ツリー画面：ラベル・未検証の印、KIF のコピー、JSON・
   expect(saved.app).toBe('joban-tree');
   expect(Object.keys(saved.nodes)).toHaveLength(3);
 
-  await page.getByTestId('export-open').click();
+  await treeMenu(page, 'export-open');
   const kifDownload = page.waitForEvent('download');
   await page.getByTestId('export-tree-kif').click();
   const kif = await kifDownload;

@@ -1,5 +1,6 @@
 // 段階5：戦型から選んでツリーを作る（5-1）・自分で戦型を登録する・配る（5-2）
 import { expect, test, type Page } from '@playwright/test';
+import { treeMenu } from './treeMenu';
 import type { Readable } from 'node:stream';
 import { STARTPOS_SFEN, applyUsiMove, sfenKey } from '../src/shogi/position';
 import { TREE_APP, TREE_FORMAT_VERSION, type TreeData, type TreeNode } from '../src/tree/types';
@@ -51,7 +52,7 @@ test.describe('5-1 戦型から選ぶ', () => {
     await expect(page.getByTestId('template-note')).toContainText('横歩取り △3三角型（▲3六飛まで）');
     await expect(page.getByTestId('template-note')).toContainText('△3三角 ▲3六飛 の基本形');
     await expect(page.getByTestId('side-black')).toHaveAttribute('aria-checked', 'true');
-    await expect(page.getByTestId('start-bar')).toContainText('17手目 ▲３六飛から作る（自分は☗先手）');
+    await expect(page.getByTestId('start-bar')).toContainText('この局面から作る（自分は☗先手）');
 
     // 手順を戻すと、戦型の途中なのでメモは隠れる。自分の側は先手のまま（戦型を選んだときは固定）
     await page.getByTestId('input-prev').click();
@@ -289,7 +290,7 @@ test.describe('5-2 自分で戦型を登録する・配る', () => {
     await expect(page.getByTestId('home-message')).toContainText('取り込みました');
     await page.goto(`./#/tree/${tree.id}`);
     await page.getByTestId('candidate').first().click();
-    await page.getByTestId('register-template').click();
+    await treeMenu(page, 'register-template');
     await expect(page.getByTestId('template-register')).toContainText('平手の初期局面から 2 手の局面を、自分は☗先手');
     await expect(page.getByTestId('template-name')).toHaveValue('2手目 △３四歩まで');
     await page.getByTestId('template-group-input').fill('自分の研究');

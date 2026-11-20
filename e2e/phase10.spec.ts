@@ -227,7 +227,7 @@ test.describe('10-1 定跡帳で直接指して研究を足す', () => {
     await expect(page.getByTestId('study-title')).toHaveText('本線');
 
     // 17 手目でここで終わりにする：出発点なので使えない
-    await page.getByTestId('book-start-crumb').click();
+    await page.getByTestId('study-first').click();
     await page.getByTestId('book-menu').click();
     await expect(page.getByTestId('book-end-here')).toBeDisabled();
     await closeDialog(page);
@@ -317,7 +317,7 @@ test.describe('定跡帳の出発点がずれる不具合の直し', () => {
     await expect(page.getByTestId('study-position')).toContainText('16手目');
     await play(page, '34', '36'); // ▲3六飛
     await expect(page.getByTestId('study-title')).toHaveText('▲３六飛');
-    await expect(page.getByTestId('book-start-crumb')).toContainText('△3三角（後手番）');
+    await expect(page.getByTestId('study-first')).toHaveAttribute('aria-label', /△3三角（後手番）/);
     await expect(page.getByTestId('study-prev')).toBeEnabled();
     await page.getByTestId('study-prev').click();
     await expect(page.getByTestId('study-position')).toContainText('16手目');
@@ -346,8 +346,8 @@ test.describe('定跡帳の出発点がずれる不具合の直し', () => {
     await play(page, '22', '33'); // △3三角
     await play(page, '34', '36'); // ▲3六飛
     await expect(page.getByTestId('study-title')).toHaveText('△３三角 ▲３六飛');
-    await expect(page.getByTestId('book-start-crumb')).toContainText('基本図');
-    await page.getByTestId('book-start-crumb').click();
+    await expect(page.getByTestId('study-first')).toHaveAttribute('aria-label', /基本図/);
+    await page.getByTestId('study-first').click();
     await expect(page.getByTestId('study-position')).toContainText('15手目');
     await play(page, '51', '52'); // △5二玉
     await expect(page.getByTestId('study-title')).toHaveText('△５二玉');
@@ -366,7 +366,7 @@ test('前の版でずれた研究手順（後手番に先手番の戦型・戦�
   await expect(page.getByTestId('study-item').filter({ hasText: '自分の名前' })).toHaveCount(1);
   await page.getByTestId('study-item').filter({ hasText: '▲３六飛' }).click();
   await expect(page.getByTestId('book-title')).toHaveText('定跡帳横歩取り（後手番）');
-  await expect(page.getByTestId('book-start-crumb')).toContainText('△3三角（後手番）');
+  await expect(page.getByTestId('study-first')).toHaveAttribute('aria-label', /△3三角（後手番）/);
   await page.getByTestId('study-prev').click();
   await expect(page.getByTestId('study-position')).toContainText('16手目');
 });

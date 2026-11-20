@@ -1,5 +1,6 @@
 // 画面の通し確認（段階1）：棋譜貼り付け → 局面選択 → 生成 → たどる → 自動保存
 import { expect, test, type Page } from '@playwright/test';
+import { inTreeMenu, treeMenu } from './treeMenu';
 
 /** トップから「新しいツリー」の画面を開く（service worker の準備が終わるのを待つ） */
 async function openNewTree(page: Page) {
@@ -93,21 +94,25 @@ test.describe('エンジンを使う通し確認', () => {
     let found = false;
     for (let i = 0; i < count && !found; i++) {
       await candidates.nth(i).click();
-      await expect(page.getByTestId('crumb')).toHaveCount(1);
-      found = (await page.getByTestId('verify-here').count()) > 0;
+      await expect(page.getByTestId('nav-back')).toBeEnabled();
+      await inTreeMenu(page, async (menu) => {
+        found = (await menu.getByTestId('verify-here').count()) > 0;
+      });
       if (!found) await page.getByTestId('nav-back').click();
     }
     expect(found).toBe(true);
-    await page.getByTestId('verify-here').click();
+    await treeMenu(page, 'verify-here');
     await expect(page.getByTestId('gen-status')).toHaveAttribute('data-kind', 'verify');
     await expect(page.getByTestId('gen-status')).toHaveAttribute('data-phase', 'done', { timeout: 30_000 });
     await expect(page.getByTestId('candidate').first()).toContainText(/▲/);
     await expect(page.getByTestId('candidate').first()).toContainText('検証済み');
-    await expect(page.getByTestId('verify-here')).toHaveCount(0);
+    await inTreeMenu(page, async (menu) => {
+      await expect(menu.getByTestId('verify-here')).toHaveCount(0);
+    });
 
     // ここから展開（ふつう）：確定した手の先で、相手の応手と、それへの自分の対応（自動で検証済み）が出る
     await page.getByTestId('candidate').first().click();
-    await page.getByTestId('expand-here').click();
+    await treeMenu(page, 'expand-here');
     await page.getByTestId('expand-normal').click();
     await expect(page.getByTestId('gen-status')).toHaveAttribute('data-kind', 'generate');
     await expect(page.getByTestId('candidate').first()).toBeVisible({ timeout: 60_000 });

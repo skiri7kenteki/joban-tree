@@ -12,12 +12,14 @@
 // 段階8-1：「この手順を研究手順として保存」。研究手順の画面（段階10-1 からは定跡帳）の「この局面からツリーを作る」から来たら、手順を読み込んでおく。
 // 段階10-2：研究手順の登録の画面（#/new/study）は片付けた（定跡帳で指す・棋譜を貼って 1 本登録へ）。保存は「この手順を定跡帳に足す」（src/app/addToBook.tsx）。
 // 用意済みのツリーの新しい版をコピーするときの「研究手順を引き継ぎますか？」はやめた（研究手順はツリーの外にあり、手順が同じなら★が付く）。
+// 段階11-2：手順の操作（|‹ ‹ [n手目 ▾] › ›|）は、スマホ縦では作るボタンのバーの中（画面の下）。広い画面は右の列の上。
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { Position, type Move } from 'tsshogi';
 import { Board } from '../components/Board';
 import { PromotionBox, useMoveInput } from '../components/useMoveInput';
 import { KifuPanel, KifuSheet, useWideLayout, type KifuRow } from '../components/KifuList';
+import { MoveBar } from '../components/MoveBar';
 import { parseKifu, type LinePosition } from '../shogi/kifu';
 import { STARTPOS_SFEN, moveText, otherSide, sfenKey, sideToMove, type Side } from '../shogi/position';
 import { listTrees, saveTree, newTreeId, type TreeSummary } from '../storage/trees';
@@ -188,12 +190,27 @@ export function InputScreen() {
     setBundledBusy(false);
   }
 
-  // スマホ縦：盤・持ち駒の行・手順の操作が、作るボタンのバーの上に収まる盤の幅（成る・成らないの小窓は数えない）
+  // スマホ縦：盤・持ち駒の行が、作るボタンのバー（段階11-2 から手順の操作 ‹ › もこの中）の上に収まる盤の幅（成る・成らないの小窓は数えない）
   const boardRef = useRef<HTMLDivElement>(null);
-  const navRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
   const boardFit = useBoardFit(boardRef, (board) =>
-    pasteOpen ? null : measureFitAbove(board, navRef.current, barRef.current?.offsetHeight ?? 0, [board.querySelector<HTMLElement>('.promote-box')]),
+    pasteOpen ? null : measureFitAbove(board, board, barRef.current?.offsetHeight ?? 0, [board.querySelector<HTMLElement>('.promote-box')]),
+  );
+  /** 手順の操作（段階11-2）：スマホ縦は作るボタンのバーの中、広い画面は右の列の上 */
+  const moveBar = (
+    <MoveBar
+      fixed={false}
+      ids={{ bar: 'input-nav', first: 'input-first', prev: 'input-prev', center: 'input-position', next: 'input-next', last: 'input-last' }}
+      onFirst={() => moveTo(0)}
+      onPrev={() => moveTo(index - 1)}
+      onNext={() => moveTo(index + 1)}
+      onLast={() => moveTo(line.length - 1)}
+      canPrev={index > 0}
+      canNext={index < line.length - 1}
+      onCenter={wide ? undefined : () => setKifuOpen(true)}
+    >
+      {index === 0 ? '開始局面' : `${index}手目 ${current.text ?? ''}`}
+    </MoveBar>
   );
 
   /** 「この局面を戦型として登録」を押した */
@@ -333,29 +350,7 @@ export function InputScreen() {
           <PromotionBox input={input} />
         </div>
         <div class="input-controls">
-          <div class="move-nav" ref={navRef} data-testid="input-nav">
-            <button type="button" class="btn" aria-label="最初へ" onClick={() => moveTo(0)} disabled={index === 0}>
-              |‹
-            </button>
-            <button type="button" class="btn" aria-label="1手戻る" data-testid="input-prev" onClick={() => moveTo(index - 1)} disabled={index === 0}>
-              ‹
-            </button>
-            <button
-              type="button"
-              class="move-nav-text kifu-open num"
-              data-testid="input-position"
-              aria-label="手順の一覧"
-              onClick={() => !wide && setKifuOpen(true)}
-            >
-              {index === 0 ? '開始局面' : `${index}手目 ${current.text ?? ''}`}
-            </button>
-            <button type="button" class="btn" aria-label="1手進む" data-testid="input-next" onClick={() => moveTo(index + 1)} disabled={index >= line.length - 1}>
-              ›
-            </button>
-            <button type="button" class="btn" aria-label="最後へ" onClick={() => moveTo(line.length - 1)} disabled={index >= line.length - 1}>
-              ›|
-            </button>
-          </div>
+          {wide && moveBar}
           {line.length > 2 && (
             <input
               type="range"
@@ -428,6 +423,7 @@ export function InputScreen() {
 
         {/* 作るボタン：画面の下に固定（ホーム画面アプリでは、下の端のバーを避ける） */}
         <div class="start-bar" ref={barRef} data-testid="start-bar">
+          {!wide && moveBar}
           {bundled && (
             <BundledOffer
               meta={bundled}
@@ -440,7 +436,8 @@ export function InputScreen() {
           {/* 用意済みのツリーがあるときは、作るボタンの説明の行を省く（小さい画面で盤を隠さないため。局面は盤の上、側は下の欄にある） */}
           {!bundled && (
             <p class="start-bar-caption muted">
-              {index === 0 ? '開始局面' : `${index}手目 ${current.text ?? ''}`}から作る（自分は{SIDE_TEXT[mySide]}）
+              {/* スマホ縦は局面がすぐ上の ‹ › の行にあるので「この局面から」 */}
+              {wide ? (index === 0 ? '開始局面' : `${index}手目 ${current.text ?? ''}`) : 'この局面'}から作る（自分は{SIDE_TEXT[mySide]}）
             </p>
           )}
           <div class="preset-buttons">

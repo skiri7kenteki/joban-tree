@@ -1,5 +1,6 @@
 // 段階4-1：閲覧画面（スマホ縦で盤＋候補手 3 つが 1 画面に収まる、自分の対応の併記、枝の先の様子）
 import { expect, test, type Page } from '@playwright/test';
+import { inTreeMenu, treeMenu } from './treeMenu';
 import { STARTPOS_SFEN, applyUsiMove, sfenKey } from '../src/shogi/position';
 import { TREE_APP, TREE_FORMAT_VERSION, type TreeData, type TreeNode } from '../src/tree/types';
 
@@ -159,9 +160,12 @@ for (const [width, height] of [
       await expect(page.getByTestId('candidates-title')).toHaveText('相手の応手（3）');
       const board = (await page.getByTestId('board').boundingBox())!;
       const third = (await page.getByTestId('candidate').nth(2).boundingBox())!;
-      expect(third.y + third.height).toBeLessThanOrEqual(height);
-      // 画面の端まで（左右 4px ずつの余白）の大きさのまま
-      expect(board.width).toBeGreaterThanOrEqual(width - 8 - 1);
+      // 段階11-2：3 行目は画面の下に固定したバーの上
+      const bar = (await page.getByTestId('tree-nav').boundingBox())!;
+      expect(third.y + third.height).toBeLessThanOrEqual(bar.y);
+      // 画面の端まで（左右 4px ずつの余白）の大きさのまま。そうでなければ、3 行目がちょうどバーの上に来る大きさ（4 行目のためには縮めていない）
+      const gap = bar.y - (third.y + third.height);
+      expect(board.width >= width - 8 - 1 || gap <= 12, `盤 ${board.width}・3 行目の下の空き ${gap}`).toBe(true);
     });
   });
 }
@@ -217,12 +221,15 @@ test.describe('スマホ縦（390×844）', () => {
     await expect(rows.nth(4).getByTestId('candidate-reply')).toHaveText('→ 未展開');
     // 行のタップは今までどおり 1 手進む
     await rows.nth(0).click();
-    await expect(page.getByTestId('crumb')).toHaveText(['△３四歩']);
+    await expect(page.getByTestId('tree-position')).toHaveText('2手目 △３四歩');
     await expect(rows.first()).toContainText('▲２六歩');
-    // 「‹」で 1 手戻る
+    // 「‹」（盤の下の固定バー）で 1 手戻る
     await page.getByTestId('nav-back').click();
-    await expect(page.getByTestId('crumb')).toHaveCount(0);
+    await expect(page.getByTestId('tree-position')).toHaveText('開始局面');
     await expect(page.getByTestId('nav-back')).toBeDisabled();
+    // 「›」で、さっきまでいた手へ進む
+    await page.getByTestId('nav-forward').click();
+    await expect(page.getByTestId('tree-position')).toHaveText('2手目 △３四歩');
   });
 
   test('盤上に候補手の矢印・丸印は描かない（持ち主の判断 2026-11-14）', async ({ page }) => {
@@ -257,20 +264,18 @@ test.describe('4-2 スマホ縦（390×844）', () => {
     await expect(page.getByTestId('start-normal')).toBeInViewport({ ratio: 1 });
     const bar = (await page.getByTestId('start-bar').boundingBox())!;
     expect(bar.y + bar.height).toBeLessThanOrEqual(844 + 1);
-    // 開いたときは、盤も手順の操作もバーの上（重なっていない）
+    // 開いたときは、盤はバーの上（重なっていない）。手順の操作はバーの中（段階11-2）
     const board = (await page.getByTestId('board').boundingBox())!;
     expect(board.y + board.height).toBeLessThanOrEqual(bar.y);
     const nav = (await page.getByTestId('input-next').boundingBox())!;
-    expect(nav.y + nav.height).toBeLessThanOrEqual(bar.y);
+    expect(nav.y).toBeGreaterThanOrEqual(bar.y);
+    expect(nav.y + nav.height).toBeLessThanOrEqual(bar.y + bar.height);
     // 貼り付け欄を開いても、作るボタンは押せる
     await page.getByTestId('kifu-open').click();
     await expect(page.getByTestId('start-normal')).toBeInViewport({ ratio: 1 });
-    // いちばん下までスクロールしても、手順の操作はバーに隠れない
+    // いちばん下までスクロールしても、手順の操作（バーの中）は押せる
     await page.mouse.wheel(0, 3000);
     await expect(page.getByTestId('input-next')).toBeInViewport({ ratio: 1 });
-    const next = (await page.getByTestId('input-next').boundingBox())!;
-    const bar2 = (await page.getByTestId('start-bar').boundingBox())!;
-    expect(next.y + next.height).toBeLessThanOrEqual(bar2.y);
   });
 
   test('一覧：自分の側と、開始局面までの最後の数手。速度測定は設定画面へ', async ({ page }) => {
@@ -294,9 +299,15 @@ test.describe('4-2 スマホ縦（390×844）', () => {
     // 「記録を消す…」は盤と問題の下
     const clear = (await page.getByTestId('review-clear').boundingBox())!;
     const prompt = (await page.getByTestId('review-prompt').boundingBox())!;
-    const line = (await page.getByTestId('review-line').boundingBox())!;
     expect(clear.y).toBeGreaterThan(prompt.y + prompt.height);
-    expect(clear.y).toBeGreaterThan(line.y + line.height);
+    // 盤の下の固定バー（段階11-2）に「今日 n／10問」。問題を出している間は ‹ › を押せない。いちばん下までスクロールすれば「記録を消す…」はバーに隠れない
+    await expect(page.getByTestId('review-progress')).toHaveText(/今日 1／\d+問/);
+    await expect(page.getByTestId('review-prev')).toBeDisabled();
+    await expect(page.getByTestId('review-next-move')).toBeDisabled();
+    await page.mouse.wheel(0, 3000);
+    const clear2 = (await page.getByTestId('review-clear').boundingBox())!;
+    const nav = (await page.getByTestId('review-nav').boundingBox())!;
+    expect(clear2.y + clear2.height).toBeLessThanOrEqual(nav.y);
   });
 });
 
@@ -429,10 +440,12 @@ test.describe('4-3 自分の手', () => {
 
   test('「別の手を調べる」で盤をタップして手を選ぶと、調べ方を選ぶ小窓が出る（やめられる）', async ({ page }) => {
     await openTree(page, OPENING);
-    // 相手の手番の局面には出さない
-    await expect(page.getByTestId('explore-open')).toHaveCount(0);
+    // 相手の手番の局面には出さない（見出しの ⋯ の中。段階11-2）
+    await inTreeMenu(page, async (menu) => {
+      await expect(menu.getByTestId('explore-open')).toHaveCount(0);
+    });
     await page.getByTestId('candidate').nth(0).click();
-    await page.getByTestId('explore-open').click();
+    await treeMenu(page, 'explore-open');
     await expect(page.getByTestId('pick-bar')).toBeVisible();
     await page.locator('[data-square="67"]').click();
     await page.locator('[data-square="66"]').click();
@@ -452,7 +465,7 @@ test.describe('4-3 自分の手', () => {
     test.setTimeout(120_000);
     await openTree(page, OPENING);
     await page.getByTestId('candidate').nth(0).click();
-    await page.getByTestId('explore-open').click();
+    await treeMenu(page, 'explore-open');
     // ▲９六歩（端歩。最善手ではないはず）
     await page.locator('[data-square="97"]').click();
     await page.locator('[data-square="96"]').click();
@@ -470,21 +483,23 @@ test.describe('4-3 自分の手', () => {
     await expect(page.getByTestId('gen-status')).toContainText('（自分の手から）');
     // 自分の手の先に進める
     await rows.nth(0).click();
-    await expect(page.getByTestId('crumb')).toHaveText(['△３四歩', '▲９六歩']);
+    await expect(page.getByTestId('tree-position')).toHaveText('3手目 ▲９六歩');
   });
 });
 
 // ---- v0.12.4：入力画面・復習画面も、盤の大きさを画面の高さに合わせる ----
 
-/** 入力画面：盤・先手の持ち駒の行・手順の操作が、作るボタンのバーの上に（スクロールせずに）収まっている */
+/** 入力画面：盤・先手の持ち駒の行が、作るボタンのバーの上に（スクロールせずに）収まっている。手順の操作はバーの中（段階11-2） */
 async function expectInputAboveBar(page: Page, height: number) {
   expect(await page.evaluate(() => window.scrollY)).toBe(0);
   const bar = (await page.getByTestId('start-bar').boundingBox())!;
   expect(bar.y + bar.height).toBeLessThanOrEqual(height + 1);
-  for (const id of ['board', 'hand-black', 'input-nav']) {
+  for (const id of ['board', 'hand-black']) {
     const box = (await page.getByTestId(id).boundingBox())!;
     expect(box.y + box.height, id).toBeLessThanOrEqual(bar.y);
   }
+  const nav = (await page.getByTestId('input-nav').boundingBox())!;
+  expect(nav.y).toBeGreaterThanOrEqual(bar.y);
 }
 
 for (const [width, height] of [
@@ -496,7 +511,7 @@ for (const [width, height] of [
   test.describe(`入力画面・復習画面（${width}×${height}）`, () => {
     test.use({ viewport: { width, height }, hasTouch: true });
 
-    test('入力画面：はじめ・戦型を選んだ後・棋譜を読み込んだ後のどれでも、手順の操作が作るボタンのバーの上', async ({ page }) => {
+    test('入力画面：はじめ・戦型を選んだ後・棋譜を読み込んだ後のどれでも、盤がバーの上・手順の操作はバーの中', async ({ page }) => {
       await page.goto('./#/new');
       await expect(page.getByTestId('isolation')).toHaveAttribute('data-state', 'isolated', { timeout: 30_000 });
       await expectInputAboveBar(page, height);

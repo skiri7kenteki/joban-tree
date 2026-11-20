@@ -12,6 +12,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { Move } from 'tsshogi';
 import { Board } from '../components/Board';
 import { Dialog } from '../components/Dialog';
+import { MoveBar, moveBarHeight } from '../components/MoveBar';
 import { PromotionBox, useMoveInput } from '../components/useMoveInput';
 import { moveText, sfenKey, sideToMove } from '../shogi/position';
 import { clearReview, loadReview, saveReview } from '../storage/review';
@@ -116,6 +117,8 @@ function StudyReviewView({ target, pool, startOf, record: initialRecord, tree, l
   const [saveError, setSaveError] = useState('');
   /** 今の 1 回（段階11-4） */
   const [session, setSession] = useState(() => newSession(settings.value.reviewBatch));
+  /** 答えた後に ‹ › でさかのぼって見ている局面（平手から何手目か。null＝今の局面。段階11-2） */
+  const [view, setView] = useState<number | null>(null);
 
   const positions = useMemo(() => (study ? studyPositions(study.moves) : []), [study]);
   const texts = useMemo(() => (study ? moveTexts(study.moves) : []), [study]);
@@ -131,13 +134,18 @@ function StudyReviewView({ target, pool, startOf, record: initialRecord, tree, l
   const lastMove = study && pos > 0 ? study.moves[pos - 1] : undefined;
   const lastText = pos > 0 ? (texts[pos - 1] ?? '') : '';
   const input = useMoveInput(sfen, onMove, phase.kind === 'ask');
+  // 固定バー：問題を出している間は ‹ › を押せない。答えた後・研究手順の終わりでは、出題を始めた局面までさかのぼれる
+  const canBrowse = phase.kind === 'answered' || phase.kind === 'end';
+  const shown = canBrowse && view !== null ? view : pos;
+  const shownSfen = positions[shown] ?? sfen;
+  const shownLast = study && shown > 0 ? study.moves[shown - 1] : undefined;
   // スマホ縦：盤と問題のカードが画面に収まる盤の幅（同じ問題の間は、一度縮めた盤を戻さない）
   const boardRef = useRef<HTMLDivElement>(null);
   const promptRef = useRef<HTMLDivElement>(null);
   const fitMemo = useRef<{ question: string; width: number | null }>({ question: '', width: null });
   const question = `${study?.id ?? ''}:${pos}`;
   const boardFit = useBoardFit(boardRef, (board) => {
-    const width = measureFitAbove(board, promptRef.current, 0, [board.querySelector<HTMLElement>('.promote-box')]);
+    const width = measureFitAbove(board, promptRef.current, moveBarHeight(), [board.querySelector<HTMLElement>('.promote-box')]);
     const memo = fitMemo.current;
     const kept = memo.question === question && memo.width !== null && width !== null ? Math.min(memo.width, width) : width;
     fitMemo.current = { question, width: kept };
@@ -181,6 +189,7 @@ function StudyReviewView({ target, pool, startOf, record: initialRecord, tree, l
 
   /** 相手の手は研究手順どおりに指し、次の自分の手番（問題）まで進める。研究手順の終わりなら終わり */
   function playOpponent(s: Study, from: number) {
+    setView(null);
     const line = studyPositions(s.moves);
     let p = from;
     while (p < line.length - 1 && sideToMove(line[p]) !== s.mySide) p++;
@@ -253,13 +262,9 @@ function StudyReviewView({ target, pool, startOf, record: initialRecord, tree, l
         />
       ) : (
         <>
-      <p class="review-progress" data-testid="review-progress">
-        {progressText(session, phase.kind === 'ask' && phase.firstTry)}
-      </p>
-
       <div class="tree-layout">
         <div ref={boardRef} {...boardFitProps(boardFit, 'tree-board')}>
-          {sfen && <Board sfen={sfen} lastMove={lastMove} selection={input.selection} onSquare={input.onSquare} onHand={input.onHand} />}
+          {sfen && <Board sfen={shownSfen} lastMove={shownLast} selection={input.selection} onSquare={input.onSquare} onHand={input.onHand} />}
           <PromotionBox input={input} />
         </div>
 
@@ -302,21 +307,30 @@ function StudyReviewView({ target, pool, startOf, record: initialRecord, tree, l
             {phase.kind === 'end' && <StudyEnd study={study} start={start} score={lineScore} single={pool.length <= 1} onNext={startLine} />}
             {saveError && <p class="status-ng">{saveError}</p>}
           </div>
-
-          {study && (
-            <div class="crumbs" data-testid="review-line">
-              <span class="crumb">{start === 0 ? '初期局面' : '出発点'}</span>
-              {texts.slice(start, pos).map((t, i) => (
-                <span key={`${i}-${t}`} class={start + i + 1 === pos ? 'crumb current' : 'crumb'}>
-                  {t}
-                </span>
-              ))}
-            </div>
-          )}
         </div>
       </div>
 
         </>
+      )}
+
+      {/* 盤の下の固定バー（段階11-2）：真ん中は「今日 3／10問」。さかのぼって見ているときは、その局面も */}
+      {phase.kind !== 'result' && (
+        <MoveBar
+          ids={{ bar: 'review-nav', prev: 'review-prev', center: 'review-position', next: 'review-next-move' }}
+          onPrev={() => setView(shown - 1)}
+          onNext={() => setView(shown + 1 >= pos ? null : shown + 1)}
+          canPrev={canBrowse && shown > start}
+          canNext={canBrowse && shown < pos}
+        >
+          <span class="move-bar-main" data-testid="review-progress">
+            {progressText(session, phase.kind === 'ask' && phase.firstTry)}
+          </span>
+          {shown < pos && (
+            <span class="move-bar-sub" data-testid="review-viewing">
+              {shown === 0 ? '初期局面' : `${shown}手目 ${texts[shown - 1] ?? ''}`}を表示中
+            </span>
+          )}
+        </MoveBar>
       )}
 
       <div class="review-footer">

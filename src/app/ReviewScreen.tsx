@@ -6,11 +6,13 @@
 // 研究手順だけを復習する：上の「全部／研究手順だけ」で切り替える（このツリーの開始局面を通る研究手順があるときだけ）。
 // 段階8-1 から研究手順の復習はツリーを使わない別の画面（StudyReviewScreen.tsx、#/review/<id>/study）。
 // 段階11-4：決まった数（設定の reviewBatch、初期値 10）を答えたら 1 回が終わり、結果（ReviewResult）を出す。上の行は「今日 3／10問」、全体の数は結果に小さく。
+// 段階11-2：盤の下の固定バー（MoveBar）。真ん中に「今日 3／10問」。問題を出している間は ‹ › を押せない。答えた後は ‹ › でこの手順をさかのぼって見られる。
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { Move } from 'tsshogi';
 import { Board } from '../components/Board';
 import { Dialog } from '../components/Dialog';
+import { MoveBar, moveBarHeight } from '../components/MoveBar';
 import { PromotionBox, useMoveInput } from '../components/useMoveInput';
 import { formatScore } from '../engine/usi';
 import { moveText } from '../shogi/position';
@@ -86,6 +88,8 @@ function ReviewView({ tree, initialRecord }: { tree: TreeData; initialRecord: Re
   const [saveError, setSaveError] = useState('');
   /** 今の 1 回（段階11-4） */
   const [session, setSession] = useState(() => newSession(settings.value.reviewBatch));
+  /** 答えた後に ‹ › でさかのぼって見ている局面（steps の番号。null＝今の局面。段階11-2） */
+  const [view, setView] = useState<number | null>(null);
 
   const thresholds = settings.value.thresholds;
   const needs = useMemo(() => computeNeeds(tree, record, thresholds), [tree, record, thresholds]);
@@ -109,6 +113,11 @@ function ReviewView({ tree, initialRecord }: { tree: TreeData; initialRecord: Re
   const lastMove = atRoot ? lastPrefixMove(tree) : current.move;
   const lastText = atRoot ? (prefixMoveTexts(tree).at(-1) ?? '') : stepText(steps.length - 1);
   const input = useMoveInput(node.sfen, onMove, phase.kind === 'ask');
+  // 固定バー：問題を出している間（答える前・まちがえた後）は ‹ › を押せない。答えた後・手順の終わりでは、この手順をさかのぼれる
+  const canBrowse = phase.kind === 'answered' || phase.kind === 'end';
+  const shown = canBrowse && view !== null ? view : steps.length - 1;
+  const shownNode = tree.nodes[steps[shown].key];
+  const shownLast = shown === 0 ? lastPrefixMove(tree) : steps[shown].move;
   // スマホ縦：盤と問題のカード（問題の文・答えの操作）が画面に収まる盤の幅（v0.12.4。成る・成らないの小窓は数えない）
   const boardRef = useRef<HTMLDivElement>(null);
   const promptRef = useRef<HTMLDivElement>(null);
@@ -116,7 +125,7 @@ function ReviewView({ tree, initialRecord }: { tree: TreeData; initialRecord: Re
   const fitMemo = useRef<{ question: string; width: number | null }>({ question: '', width: null });
   const question = `${steps.length}:${current.key}`;
   const boardFit = useBoardFit(boardRef, (board) => {
-    const width = measureFitAbove(board, promptRef.current, 0, [board.querySelector<HTMLElement>('.promote-box')]);
+    const width = measureFitAbove(board, promptRef.current, moveBarHeight(), [board.querySelector<HTMLElement>('.promote-box')]);
     const memo = fitMemo.current;
     const kept = memo.question === question && memo.width !== null && width !== null ? Math.min(memo.width, width) : width;
     fitMemo.current = { question, width: kept };
@@ -155,6 +164,7 @@ function ReviewView({ tree, initialRecord }: { tree: TreeData; initialRecord: Re
 
   /** 手順の最後の局面から、次の問題まで進める（相手の手番なら応手を選んで指す） */
   function continueFrom(list: Step[], currentNeeds = needs) {
+    setView(null);
     const last = list[list.length - 1];
     const lastNode = tree.nodes[last.key];
     // 相手の疑問手を咎める手を答えたところで、この手順は終わり（その先は深く掘り下げない）
@@ -243,15 +253,11 @@ function ReviewView({ tree, initialRecord }: { tree: TreeData; initialRecord: Re
         />
       ) : (
         <>
-      <p class="review-progress" data-testid="review-progress">
-        {progressText(session, phase.kind === 'ask' && phase.firstTry)}
-      </p>
-
       <div class="tree-layout">
         <div ref={boardRef} {...boardFitProps(boardFit, 'tree-board')}>
           <Board
-            sfen={node.sfen}
-            lastMove={lastMove}
+            sfen={shownNode.sfen}
+            lastMove={shownLast}
             selection={input.selection}
             onSquare={input.onSquare}
             onHand={input.onHand}
@@ -317,14 +323,6 @@ function ReviewView({ tree, initialRecord }: { tree: TreeData; initialRecord: Re
             {saveError && <p class="status-ng">{saveError}</p>}
           </div>
 
-          <div class="crumbs" data-testid="review-line">
-            <span class="crumb">開始局面</span>
-            {steps.slice(1).map((s, i) => (
-              <span key={`${i}-${s.key}`} class={i + 2 === steps.length ? 'crumb current' : 'crumb'}>
-                {stepText(i + 1)}
-              </span>
-            ))}
-          </div>
         </div>
       </div>
 
@@ -343,6 +341,26 @@ function ReviewView({ tree, initialRecord }: { tree: TreeData; initialRecord: Re
           記録を消す…
         </button>
       </div>
+
+      {/* 盤の下の固定バー（段階11-2）：真ん中は「今日 3／10問」。さかのぼって見ているときは、その局面も */}
+      {phase.kind !== 'result' && (
+        <MoveBar
+          ids={{ bar: 'review-nav', prev: 'review-prev', center: 'review-position', next: 'review-next-move' }}
+          onPrev={() => setView(shown - 1)}
+          onNext={() => setView(shown + 1 >= steps.length - 1 ? null : shown + 1)}
+          canPrev={canBrowse && shown > 0}
+          canNext={canBrowse && shown < steps.length - 1}
+        >
+          <span class="move-bar-main" data-testid="review-progress">
+            {progressText(session, phase.kind === 'ask' && phase.firstTry)}
+          </span>
+          {shown < steps.length - 1 && (
+            <span class="move-bar-sub" data-testid="review-viewing">
+              {shown === 0 ? '開始局面' : stepText(shown)}を表示中
+            </span>
+          )}
+        </MoveBar>
+      )}
 
       {confirmClear && (
         <Dialog title="記録を消す" onClose={() => setConfirmClear(false)} testId="review-clear-dialog">

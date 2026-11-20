@@ -1,6 +1,7 @@
 // 段階8-1：ツリーから独立した研究手順（盤で指して登録・棋譜を貼って登録・研究手順の画面・この局面からツリーを作る・ツリーの★・
 // ツリーで見る・ツリーを使わない復習・書き出しと取り込み・端末の保存場所の移し替え・ツリーの JSON の取り込み）
 import { expect, test, type Page } from '@playwright/test';
+import { inTreeMenu, treeMenu } from './treeMenu';
 import { readFileSync } from 'node:fs';
 import { Position, Record as KifRecord, exportKIF } from 'tsshogi';
 import { STARTPOS_SFEN, applyUsiMove, sfenKey } from '../src/shogi/position';
@@ -151,7 +152,7 @@ test.describe('8-1 登録（エンジンを使わない）', () => {
     // 前後に動かす
     await page.getByTestId('study-prev').click();
     await expect(page.getByTestId('study-position')).toHaveText('2手目 △３四歩');
-    await page.getByTestId('study-crumb').first().click();
+    await page.getByTestId('study-prev').click();
     await expect(page.getByTestId('study-position')).toHaveText('1手目 ▲７六歩');
     await page.getByTestId('study-next').click();
 
@@ -227,28 +228,34 @@ test.describe('8-1 ツリーとのつながり・復習', () => {
     await expect(cand.filter({ hasText: '▲６六歩' }).getByTestId('study-star')).toHaveCount(0);
     await cand.filter({ hasText: '▲２六歩' }).click();
     await expect(page.getByTestId('study-here')).toHaveText('★ 研究A');
-    await expect(page.getByTestId('study-open')).toHaveText('定跡帳で開く');
+    await inTreeMenu(page, async (menu) => {
+      await expect(menu.getByTestId('study-open')).toHaveText('定跡帳で開く');
+    });
     // 手順前後で同じ局面（▲2六歩 △8四歩）でも、研究B（▲2六歩 △3四歩）とは違う手順なので★は付かない
-    await page.getByTestId('crumb-start').click();
+    await page.getByTestId('nav-first').click();
     await cand.filter({ hasText: '▲２六歩' }).click();
     await expect(cand.filter({ hasText: '△８四歩' }).getByTestId('study-star')).toHaveCount(0);
 
     // ツリーから定跡帳に足す（段階10-2。平手からの手順にして、自分の側だけ確かめる。名前は自動）
-    await page.getByTestId('crumb-start').click();
+    await page.getByTestId('nav-first').click();
     await cand.filter({ hasText: '▲７六歩' }).click();
     await cand.filter({ hasText: '△３四歩' }).click();
     await cand.filter({ hasText: '▲６六歩' }).click();
-    await expect(page.getByTestId('study-open')).toHaveText('定跡帳に足す');
-    await page.getByTestId('study-open').click();
+    await inTreeMenu(page, async (menu) => {
+      await expect(menu.getByTestId('study-open')).toHaveText('定跡帳に足す');
+    });
+    await treeMenu(page, 'study-open');
     await expect(page.getByTestId('add-book-moves')).toHaveText('▲７六歩 △３四歩 ▲６六歩');
     await expect(page.getByTestId('add-book-side-white')).toHaveAttribute('aria-checked', 'true');
     await page.getByTestId('add-book-ok').click();
     await expect(page.getByTestId('study-here')).toHaveText('★ ▲７六歩 △３四歩 ▲６六歩');
     await expect(page.getByTestId('tree-note')).toContainText('定跡帳に足しました');
-    await expect(page.getByTestId('study-open')).toHaveText('定跡帳で開く');
+    await inTreeMenu(page, async (menu) => {
+      await expect(menu.getByTestId('study-open')).toHaveText('定跡帳で開く');
+    });
 
     // ★ の窓の「定跡帳で開く」→ 定跡帳の ⋯ の「ツリーで見る」（今の局面）
-    await page.getByTestId('crumb').nth(1).click();
+    await page.getByTestId('nav-back').click();
     await cand.filter({ hasText: '▲２六歩' }).click();
     await page.getByTestId('study-here').click();
     await expect(page.getByTestId('study-view-note')).toHaveText('Aのメモ');
@@ -258,7 +265,7 @@ test.describe('8-1 ツリーとのつながり・復習', () => {
     await page.getByTestId('book-menu').click();
     await page.getByTestId('study-open-tree').click();
     await expect(page).toHaveURL(/#\/tree\/line\/study\/s-a\/2$/);
-    await expect(page.getByTestId('crumb')).toHaveText(['▲７六歩', '△３四歩']);
+    await expect(page.getByTestId('tree-position')).toHaveText('2手目 △３四歩');
 
     // 研究B はツリーで最後までたどれない（▲2六歩 △3四歩 はツリーに無い）。1 手目まで戻せばツリーで見られる。
     // 古い研究手順の画面の URL は、その研究手順の定跡帳へ移る
