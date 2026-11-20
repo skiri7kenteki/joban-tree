@@ -35,7 +35,13 @@ export interface AppSettings {
   /** 「この手を検証」で 1 局面を調べる時間（ミリ秒） */
   verifyMs: number;
   presets: Record<PresetId, PresetValues>;
+  /** 復習の 1 回の問題の数（段階11-4。5／10／20） */
+  reviewBatch: ReviewBatch;
 }
+
+/** 復習の 1 回の問題の数の選択肢（段階11-4、持ち主の判断 2026-11-20。初期値 10） */
+export const REVIEW_BATCH_CHOICES = [5, 10, 20] as const;
+export type ReviewBatch = (typeof REVIEW_BATCH_CHOICES)[number];
 
 export const HASH_CHOICES = [16, 32, 64] as const;
 /** PC 版のハッシュの選択肢（PC はメモリに余裕がある） */
@@ -62,6 +68,7 @@ export function defaultSettings(): AppSettings {
     thresholds: { ...DEFAULT_THRESHOLDS },
     verifyMs: 2000,
     presets,
+    reviewBatch: 10,
   };
 }
 
@@ -105,6 +112,8 @@ export function normalizeSettings(raw: unknown): AppSettings {
     thresholds: { mainMax, goodMax: num(t.goodMax, d.thresholds.goodMax, mainMax, 5000) },
     verifyMs: num(r.verifyMs, d.verifyMs, 200, 60_000),
     presets,
+    // 段階11-4 で足した。前の版の設定には無いので初期値（10）
+    reviewBatch: REVIEW_BATCH_CHOICES.includes(r.reviewBatch as ReviewBatch) ? (r.reviewBatch as ReviewBatch) : d.reviewBatch,
   };
 }
 

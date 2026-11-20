@@ -830,11 +830,19 @@
 }
 
 .review-footer .btn {
+  flex: 0 0 auto;
+  margin-left: auto;
   color: var(--color-danger);
+  white-space: nowrap;
 }
 
 .review-summary {
   margin: 0 0 8px;
+  font-size: var(--font-size-small);
+}
+
+.review-footer .review-summary {
+  margin: 0;
 }
 .review-prompt {
   margin-bottom: 8px;
@@ -1456,4 +1464,73 @@
   border: 2px solid var(--color-accent);
   border-radius: var(--radius-card);
   font-weight: bold;
+}
+
+/* ---- 段階11-4：復習を小分けにする ---- */
+
+/* 今の 1 回の進み具合（「今日 3／10問」） */
+.review-progress {
+  margin: 0 0 var(--space-1);
+  font-weight: bold;
+}
+
+.review-result-score {
+  margin: var(--space-2) 0;
+  font-size: var(--font-size-heading);
+}
+
+.review-result-score strong {
+  margin-right: var(--space-1);
+}
+
+.review-result-head {
+  margin: var(--space-3) 0 var(--space-2);
+  font-size: var(--font-size-body);
+}
+
+.review-mistakes {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.review-mistakes li + li {
+  border-top: 1px solid var(--color-border);
+}
+
+/* まちがえた問題の 1 行：小さな盤＋正しい手・指した手（押すと大きな盤） */
+.review-mistake {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: var(--touch-min);
+  padding: var(--space-2) 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mini-board {
+  flex: 0 0 auto;
+  width: 120px;
+}
+
+.mini-board .board-wrap,
+.review-mistake-board .board-wrap {
+  width: 100%;
+  margin: 0;
+}
+
+.review-mistake-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.review-result-actions {
+  margin-top: var(--space-3);
 }

@@ -6,6 +6,7 @@
 //   - #/study-review/<研究手順の id> … その 1 本だけ（研究手順の画面・トップ画面の ⋯ から。出題は戦型の出発点から）
 //   - #/study-review/group/<グループの key> … そのグループの研究手順（トップ画面のグループの ⋯ から）
 // 記録は研究手順用に 1 つ（ツリーの復習の記録とは別）。
+// 段階11-4：決まった数（設定の reviewBatch、初期値 10）を答えたら 1 回が終わり、結果（ReviewResult）を出す。上の行は「今日 3／10問」、全体の数は結果に小さく。
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { Move } from 'tsshogi';
@@ -16,6 +17,9 @@ import { moveText, sfenKey, sideToMove } from '../shogi/position';
 import { clearReview, loadReview, saveReview } from '../storage/review';
 import { loadTree } from '../storage/trees';
 import { emptyRecord, recordAnswer, type ReviewRecord } from '../review/review';
+import { addItem, newSession, progressText, sessionDone } from '../review/session';
+import { ReviewResult } from './ReviewResult';
+import { settings } from './settings';
 import {
   STUDY_RECORD_ID,
   pickStudy,
@@ -91,7 +95,14 @@ async function choose(target: StudyReviewTarget, studies: Study[], templates: Op
   return { pool, startOf: fromTemplate, tree: null, label: `${pool.length > 0 ? `「${bookLabel(target.key)}」の` : ''}研究手順 ${pool.length} 本・` };
 }
 
-type Phase = { kind: 'ask'; firstTry: boolean } | { kind: 'wrong'; tried: string } | { kind: 'answered'; ok: boolean } | { kind: 'end' } | { kind: 'start' };
+type Phase =
+  | { kind: 'ask'; firstTry: boolean }
+  | { kind: 'wrong'; tried: string }
+  | { kind: 'answered'; ok: boolean }
+  | { kind: 'end' }
+  | { kind: 'start' }
+  /** 1 回の問題を答え終わった（段階11-4） */
+  | { kind: 'result' };
 
 function StudyReviewView({ target, pool, startOf, record: initialRecord, tree, label }: Loaded & { target: StudyReviewTarget }) {
   const [record, setRecord] = useState(initialRecord);
@@ -101,9 +112,10 @@ function StudyReviewView({ target, pool, startOf, record: initialRecord, tree, l
   const [phase, setPhase] = useState<Phase>({ kind: 'start' });
   /** この研究手順で出した問題の数と、1 回目で正解した数 */
   const [lineScore, setLineScore] = useState({ asked: 0, ok: 0 });
-  const [lineCount, setLineCount] = useState(0);
   const [confirmClear, setConfirmClear] = useState(false);
   const [saveError, setSaveError] = useState('');
+  /** 今の 1 回（段階11-4） */
+  const [session, setSession] = useState(() => newSession(settings.value.reviewBatch));
 
   const positions = useMemo(() => (study ? studyPositions(study.moves) : []), [study]);
   const texts = useMemo(() => (study ? moveTexts(study.moves) : []), [study]);
@@ -112,7 +124,12 @@ function StudyReviewView({ target, pool, startOf, record: initialRecord, tree, l
   const answerMove = study && pos < positions.length - 1 ? study.moves[pos] : null;
   const summary = useMemo(() => summarizeStudies(pool, startOf, record), [pool, record]);
   const mySideText = study?.mySide === 'black' ? '☗先手' : '☖後手';
+  /** 全体の数（画面のいちばん下と結果に小さく。段階11-4） */
+  const overall = `${label}問題 ${summary.total}（まだ ${summary.unseen}・前回まちがい ${summary.wrong}・覚えた ${summary.learned}）`;
 
+  // 相手が直前に指した手（出題を始める局面の直前の手も）
+  const lastMove = study && pos > 0 ? study.moves[pos - 1] : undefined;
+  const lastText = pos > 0 ? (texts[pos - 1] ?? '') : '';
   const input = useMoveInput(sfen, onMove, phase.kind === 'ask');
   // スマホ縦：盤と問題のカードが画面に収まる盤の幅（同じ問題の間は、一度縮めた盤を戻さない）
   const boardRef = useRef<HTMLDivElement>(null);
@@ -134,14 +151,25 @@ function StudyReviewView({ target, pool, startOf, record: initialRecord, tree, l
   // 正解したら、少し見せてから次へ
   useEffect(() => {
     if (phase.kind !== 'answered' || !phase.ok || !study) return;
-    const timer = setTimeout(() => playOpponent(study, pos), 700);
+    const timer = setTimeout(next, 700);
     return () => clearTimeout(timer);
-  }, [phase, pos, study]);
+  }, [phase, pos, study, session]);
+
+  /** 答えを見せた後：1 回の問題を答え終わっていれば結果へ、まだなら研究手順の続きへ */
+  function next() {
+    if (sessionDone(session)) setPhase({ kind: 'result' });
+    else if (study) playOpponent(study, pos);
+  }
+
+  /** 「もう 10 問」：新しい 1 回を始める */
+  function more() {
+    setSession(newSession(settings.value.reviewBatch));
+    startLine();
+  }
 
   /** 研究手順を 1 本選んで、出題を始める手から始める */
   function startLine() {
     setLineScore({ asked: 0, ok: 0 });
-    setLineCount((n) => n + 1);
     const next = pickStudy(pool, startOf, record);
     setStudy(next);
     if (!next) {
@@ -160,18 +188,19 @@ function StudyReviewView({ target, pool, startOf, record: initialRecord, tree, l
     setPhase(p < line.length - 1 ? { kind: 'ask', firstTry: true } : { kind: 'end' });
   }
 
-  function remember(ok: boolean) {
+  function remember(ok: boolean, tried: string) {
     if (!answerMove) return;
     const updated = recordAnswer(record, studyRecordKey(sfenKey(sfen), answerMove), ok, Date.now());
     setRecord(updated);
     setLineScore((x) => ({ asked: x.asked + 1, ok: x.ok + (ok ? 1 : 0) }));
+    setSession((x) => addItem(x, { sfen, ...(lastMove ? { lastMove } : {}), answer: answerMove, ok, ...(ok ? {} : { tried }) }));
     saveReview(updated).catch((e: unknown) => setSaveError(`記録を保存できませんでした（${e instanceof Error ? e.message : String(e)}）`));
   }
 
   function onMove(move: Move) {
     if (phase.kind !== 'ask' || !answerMove) return;
     const ok = move.usi === answerMove;
-    if (phase.firstTry) remember(ok);
+    if (phase.firstTry) remember(ok, move.usi);
     if (ok) {
       setPos(pos + 1);
       setPhase({ kind: 'answered', ok: true });
@@ -192,9 +221,6 @@ function StudyReviewView({ target, pool, startOf, record: initialRecord, tree, l
     setRecord(emptyRecord(STUDY_RECORD_ID));
   }
 
-  // 相手が直前に指した手（出題を始める局面の直前の手も）
-  const lastMove = study && pos > 0 ? study.moves[pos - 1] : undefined;
-  const lastText = pos > 0 ? (texts[pos - 1] ?? '') : '';
   const opponentLine = lastText && (phase.kind === 'ask' || phase.kind === 'wrong') && (
     <p class="review-opponent" data-testid="review-opponent">
       相手は <strong>{lastText}</strong>
@@ -218,8 +244,17 @@ function StudyReviewView({ target, pool, startOf, record: initialRecord, tree, l
 
       {target.kind === 'tree' && <ReviewModeTabs treeId={target.treeId} mode="studies" />}
 
-      <p class="muted review-summary" data-testid="review-summary">
-        {label}問題 {summary.total}（まだ {summary.unseen}・前回まちがい {summary.wrong}・覚えた {summary.learned}）
+      {phase.kind === 'result' ? (
+        <ReviewResult
+          session={session}
+          overall={overall}
+          onMore={more}
+          onEnd={() => (tree ? go(`/tree/${tree.id}`) : back())}
+        />
+      ) : (
+        <>
+      <p class="review-progress" data-testid="review-progress">
+        {progressText(session, phase.kind === 'ask' && phase.firstTry)}
       </p>
 
       <div class="tree-layout">
@@ -258,8 +293,8 @@ function StudyReviewView({ target, pool, startOf, record: initialRecord, tree, l
                   {phase.ok ? '正解！' : '正解は'} <strong>{lastText}</strong>
                 </p>
                 {!phase.ok && study && (
-                  <button type="button" class="btn btn-primary" data-testid="review-continue" onClick={() => playOpponent(study, pos)}>
-                    次へ
+                  <button type="button" class="btn btn-primary" data-testid="review-continue" onClick={next}>
+                    {sessionDone(session) ? '結果を見る' : '次へ'}
                   </button>
                 )}
               </>
@@ -281,8 +316,16 @@ function StudyReviewView({ target, pool, startOf, record: initialRecord, tree, l
         </div>
       </div>
 
+        </>
+      )}
+
       <div class="review-footer">
-        <span class="muted">{lineCount} 本目の研究手順</span>
+        {/* 結果の画面では結果の中に出すので、ここには出さない */}
+        {phase.kind !== 'result' && (
+          <span class="muted review-summary" data-testid="review-summary">
+            {overall}
+          </span>
+        )}
         <button type="button" class="btn btn-ghost" data-testid="review-clear" onClick={() => setConfirmClear(true)}>
           記録を消す…
         </button>

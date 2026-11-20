@@ -9,7 +9,7 @@ import type { PresetId } from '../tree/presets';
 import { availablePresets, defaultPcThreads, defaultThreads, pcEngine } from './engineService';
 import { isGenerating } from './generation';
 import { go } from './router';
-import { HASH_CHOICES, PC_HASH_CHOICES, presetLabel, resetSettings, settings, updateSettings, type AppSettings, type PresetValues } from './settings';
+import { HASH_CHOICES, PC_HASH_CHOICES, REVIEW_BATCH_CHOICES, presetLabel, resetSettings, settings, updateSettings, type AppSettings, type PresetValues } from './settings';
 
 export function SettingsScreen() {
   const s = settings.value;
@@ -32,6 +32,29 @@ export function SettingsScreen() {
       </div>
       <p class="muted">変えるとすぐ保存されます（この端末の中だけ）。エンジンの設定は、次に生成するときから使われます。</p>
       {isGenerating() && <p class="notice">生成中です。エンジンの設定は、次の生成から使われます。</p>}
+
+      {/* 段階11-4：復習は決まった数で 1 回が終わる */}
+      <section class="card settings-section">
+        <h2>復習</h2>
+        <div class="form-field">
+          <span>1 回の問題の数</span>
+          <div class="btn-row" role="radiogroup" aria-label="1 回の問題の数">
+            {REVIEW_BATCH_CHOICES.map((n) => (
+              <button
+                type="button"
+                key={n}
+                role="radio"
+                aria-checked={s.reviewBatch === n}
+                data-testid={`review-batch-${n}`}
+                class={s.reviewBatch === n ? 'btn btn-toggle on' : 'btn btn-toggle'}
+                onClick={() => set({ reviewBatch: n })}
+              >
+                {n} 問
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
 
       <section class="card settings-section">
         <h2>エンジン</h2>
