@@ -4,6 +4,15 @@ import type { Readable } from 'node:stream';
 import { STARTPOS_SFEN, applyUsiMove, sfenKey } from '../src/shogi/position';
 import { TREE_APP, TREE_FORMAT_VERSION, type TreeData, type TreeNode } from '../src/tree/types';
 
+/**
+ * 開いている窓を × で閉じる（窓が本当に開くまで待ってから押し、閉じたのを確かめる）。
+ * Esc だと、遅い端末（GitHub の実行環境）で窓が開く前に押してしまい、後から開いた窓が次の操作をふさぐことがあった
+ */
+async function closeDialog(page: Page) {
+  await page.locator('dialog[open]').last().getByRole('button', { name: '閉じる' }).click();
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
+}
+
 async function openNewTree(page: Page) {
   await page.goto('./');
   await expect(page.getByTestId('isolation')).toHaveAttribute('data-state', 'isolated', { timeout: 30_000 });
@@ -215,7 +224,7 @@ test.describe('5-2 自分で戦型を登録する・配る', () => {
     // 何も登録していなければ書き出せない
     await page.getByTestId('template-open').click();
     await expect(page.getByTestId('template-export')).toBeDisabled();
-    await page.keyboard.press('Escape');
+    await closeDialog(page);
     // 平手から ▲７六歩 △３四歩 を盤で指して登録（新しいグループ）
     await page.locator('[data-square="77"]').click();
     await page.locator('[data-square="76"]').click();
@@ -343,7 +352,7 @@ test.describe('5 手直し', () => {
     // 出発点そのものなので、名前の初期値は空。登録するは押せない
     await expect(page.getByTestId('template-name')).toHaveValue('');
     await expect(page.getByTestId('template-save')).toBeDisabled();
-    await page.keyboard.press('Escape');
+    await closeDialog(page);
 
     // 1 手進めれば登録できる → 同じ局面でもう一度登録しようとすると、自分で登録した戦型として案内
     await page.locator('[data-square="86"]').click();

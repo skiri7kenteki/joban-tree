@@ -17,11 +17,16 @@ export function Dialog({
   testId?: string;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  /** 画面から外すとき（自分で閉じる）。そのときの close では onClose を呼ばない */
+  const leaving = useRef(false);
 
   useEffect(() => {
     const d = ref.current;
     if (d && !d.open) d.showModal();
-    return () => d?.close();
+    return () => {
+      leaving.current = true;
+      d?.close();
+    };
   }, []);
 
   return (
@@ -37,6 +42,11 @@ export function Dialog({
       onClick={(e) => {
         // 窓の外側（背景）を押したら閉じる
         if (e.target === ref.current) onClose();
+      }}
+      // ブラウザが cancel を出さずに閉じたとき（Esc を続けて押したときなど）も、画面の状態を閉じたことにする
+      // （閉じたのに開いているつもりのままだと、同じ窓をもう一度開けなくなる）
+      onClose={() => {
+        if (!leaving.current) onClose();
       }}
     >
       <div class="dialog-body">

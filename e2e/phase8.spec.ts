@@ -6,6 +6,15 @@ import { Position, Record as KifRecord, exportKIF } from 'tsshogi';
 import { STARTPOS_SFEN, applyUsiMove, sfenKey } from '../src/shogi/position';
 import { TREE_APP, TREE_FORMAT_VERSION, type Study, type TreeData, type TreeEdge, type TreeNode, type TreeStudy } from '../src/tree/types';
 
+/**
+ * 開いている窓を × で閉じる（窓が本当に開くまで待ってから押し、閉じたのを確かめる）。
+ * Esc だと、遅い端末（GitHub の実行環境）で窓が開く前に押してしまい、後から開いた窓が次の操作をふさぐことがあった
+ */
+async function closeDialog(page: Page) {
+  await page.locator('dialog[open]').last().getByRole('button', { name: '閉じる' }).click();
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
+}
+
 test.use({ viewport: { width: 360, height: 740 }, hasTouch: true });
 
 async function openHome(page: Page) {
@@ -136,7 +145,7 @@ test.describe('8-1 登録（エンジンを使わない）', () => {
     await page.getByTestId('book-menu').click();
     await expect(page.getByTestId('study-make-tree')).toBeVisible();
     await expect(page.getByTestId('study-open-tree')).toHaveCount(0);
-    await page.keyboard.press('Escape');
+    await closeDialog(page);
     // 前後に動かす
     await page.getByTestId('study-prev').click();
     await expect(page.getByTestId('study-position')).toHaveText('2手目 △３四歩');
@@ -193,7 +202,7 @@ test.describe('8-1 登録（エンジンを使わない）', () => {
     await page.getByTestId('kif-paste-input').fill(KIF('香落ち', ['３四歩(33)', '７六歩(77)']));
     await page.getByTestId('kif-paste-read').click();
     await expect(page.getByTestId('kif-paste-message')).toContainText('平手の初期局面から始まる手順だけ');
-    await page.keyboard.press('Escape');
+    await closeDialog(page);
     await expect(page.getByTestId('study-item')).toHaveCount(1);
   });
 });
@@ -257,7 +266,7 @@ test.describe('8-1 ツリーとのつながり・復習', () => {
     await page.getByTestId('book-menu').click();
     await expect(page.getByTestId('study-make-tree')).toBeVisible();
     await expect(page.getByTestId('study-open-tree')).toHaveCount(0);
-    await page.keyboard.press('Escape');
+    await closeDialog(page);
     await page.getByTestId('study-prev').click();
     await page.getByTestId('book-menu').click();
     await expect(page.getByTestId('study-open-tree')).toBeVisible();
@@ -347,7 +356,7 @@ test.describe('8-1 書き出し・取り込み', () => {
     expect(kifText).toContain('*★研究1');
     expect(kifText).toContain('*メモ1');
     expect(kifText).toContain('変化：1手');
-    await page.keyboard.press('Escape');
+    await closeDialog(page);
 
     // 同じ手順で名前の違う研究手順を取り込む → 両方残す
     await importStudies(page, [study('x-1', '研究1（仲間）', ['7g7f', '3c3d'])]);

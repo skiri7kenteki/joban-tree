@@ -2,6 +2,15 @@
 import { expect, test, type Page } from '@playwright/test';
 import type { Study } from '../src/tree/types';
 
+/**
+ * 開いている窓を × で閉じる（窓が本当に開くまで待ってから押し、閉じたのを確かめる）。
+ * Esc だと、遅い端末（GitHub の実行環境）で窓が開く前に押してしまい、後から開いた窓が次の操作をふさぐことがあった
+ */
+async function closeDialog(page: Page) {
+  await page.locator('dialog[open]').last().getByRole('button', { name: '閉じる' }).click();
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
+}
+
 test.use({ viewport: { width: 360, height: 740 }, hasTouch: true });
 
 async function openHome(page: Page) {
@@ -161,7 +170,7 @@ test.describe('10-1 定跡帳で直接指して研究を足す', () => {
     // 読むだけ：指しても足さない
     await page.getByTestId('book-menu').click();
     await page.getByTestId('book-write-off').click();
-    await page.keyboard.press('Escape');
+    await closeDialog(page);
     await expect(page.getByTestId('book-kicker')).toHaveText('定跡帳・読むだけ');
     await play(page, '31', '22');
     await expect(page.getByTestId('study-position')).toContainText('19手目');
@@ -220,7 +229,7 @@ test.describe('10-1 定跡帳で直接指して研究を足す', () => {
     await page.getByTestId('book-start-crumb').click();
     await page.getByTestId('book-menu').click();
     await expect(page.getByTestId('book-end-here')).toBeDisabled();
-    await page.keyboard.press('Escape');
+    await closeDialog(page);
     // 18 手目：研究A・研究B を消して、本線（今の研究手順）を 18 手目で終わる形に
     await page.getByTestId('study-next').click();
     await page.getByTestId('book-menu').click();

@@ -2,6 +2,15 @@
 import { expect, test, type Page } from '@playwright/test';
 import type { Study } from '../src/tree/types';
 
+/**
+ * 開いている窓を × で閉じる（窓が本当に開くまで待ってから押し、閉じたのを確かめる）。
+ * Esc だと、遅い端末（GitHub の実行環境）で窓が開く前に押してしまい、後から開いた窓が次の操作をふさぐことがあった
+ */
+async function closeDialog(page: Page) {
+  await page.locator('dialog[open]').last().getByRole('button', { name: '閉じる' }).click();
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
+}
+
 test.use({ viewport: { width: 360, height: 740 }, hasTouch: true });
 
 async function openHome(page: Page) {
@@ -67,7 +76,7 @@ test.describe('11-4 復習を小分けにする', () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
     await page.getByTestId('review-mistake').click();
     await expect(page.getByTestId('review-mistake-dialog')).toBeVisible();
-    await page.keyboard.press('Escape');
+    await closeDialog(page);
 
     // もう 5 問：新しい 1 回
     await expect(page.getByTestId('review-more')).toHaveText('もう 5 問');
