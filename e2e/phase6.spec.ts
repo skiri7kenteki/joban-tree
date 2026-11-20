@@ -1,6 +1,6 @@
 // 段階6-3：用意済みのツリー（同梱ツリー）を開く
 import { expect, test, type Page } from '@playwright/test';
-import { inTreeMenu, treeMenu } from './treeMenu';
+import { inTreeMenu } from './treeMenu';
 import { readFileSync } from 'node:fs';
 import type { BundledTreeFile } from '../src/tree/bundled';
 import { TREE_FORMAT_VERSION } from '../src/tree/types';
