@@ -103,7 +103,7 @@ export function AddToBookDialog({
         {studyMovesText({ moves: [...moves], mySide: side }, allTemplates())}
       </p>
       <SidePicker side={side} onChange={setSide} testPrefix="add-book" />
-      <p class="muted">名前は自動で付けます。名前とメモは、定跡帳の「★」の行から直せます。</p>
+      <p class="muted">名前は自動で付けます（あとで直せます）。</p>
       {error && (
         <p class="status-ng" role="alert">
           {error}
@@ -179,7 +179,7 @@ export function KifPasteDialog({ onClose }: { onClose: () => void }) {
     <Dialog title="棋譜を貼って 1 本登録" onClose={onClose} testId="kif-paste-dialog">
       {!moves ? (
         <>
-          <p class="muted">KIF・KI2・CSA・USI の棋譜を貼り付けてください（平手の初期局面からの棋譜だけ）。最後の手までを 1 本の研究手順にします。</p>
+          <p class="muted">平手からの棋譜（KIF・KI2・CSA・USI）を貼り付けてください。</p>
           <textarea
             class="kifu-input"
             rows={6}
@@ -207,7 +207,7 @@ export function KifPasteDialog({ onClose }: { onClose: () => void }) {
             {moves.length} 手：{studyMovesText({ moves, mySide: side }, allTemplates())}
           </p>
           <SidePicker side={side} onChange={setSide} testPrefix="kif-paste" />
-          <p class="muted">名前は自動で付けます。名前とメモは、定跡帳の「★」の行から直せます。</p>
+          <p class="muted">名前は自動で付けます（あとで直せます）。</p>
           {existing && (
             <p role="status" data-testid="kif-paste-exists">
               この手順は、研究手順「{existing.name}」としてすでにあります。

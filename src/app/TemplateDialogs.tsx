@@ -208,7 +208,6 @@ export function TemplatePicker({ onPick, onClose }: { onPick: (t: OpeningTemplat
     <Dialog title={chosen ? chosen.group : '戦型から選ぶ'} onClose={onClose} testId="template-picker">
       {!chosen ? (
         <>
-          <p class="muted">戦型の出発点の局面から始めます。選んだ後に、手順を前後したり盤上で指したりもできます。</p>
           <ul class="template-list">
             {groups.map((g) => (
               <li key={g.group}>

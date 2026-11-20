@@ -13,6 +13,7 @@ import type { Move } from 'tsshogi';
 import { Board } from '../components/Board';
 import { Dialog } from '../components/Dialog';
 import { MoveBar, moveBarHeight } from '../components/MoveBar';
+import { OnceHint } from '../components/OnceHint';
 import { PromotionBox, useMoveInput } from '../components/useMoveInput';
 import { formatScore } from '../engine/usi';
 import { moveText } from '../shogi/position';
@@ -271,7 +272,7 @@ function ReviewView({ tree, initialRecord }: { tree: TreeData; initialRecord: Re
             {phase.kind === 'ask' && (
               <>
                 <p>{current.dubious ? 'どう咎めますか？' : `あなた（${mySideText}）の手は？`}</p>
-                <p class="muted">盤の駒をタップ → 行き先をタップで答えます。</p>
+                <OnceHint id="answer-tap">盤の駒をタップ → 行き先をタップで答えます。</OnceHint>
                 {answer?.unverified && <p class="muted">この局面の答えは「未検証」の手です（エンジンで確かめていません）。</p>}
               </>
             )}

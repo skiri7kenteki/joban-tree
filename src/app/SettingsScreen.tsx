@@ -27,7 +27,7 @@ export function SettingsScreen() {
       <div class="screen-header">
         <h1>設定</h1>
       </div>
-      <p class="muted">変えるとすぐ保存されます（この端末の中だけ）。エンジンの設定は、次に生成するときから使われます。</p>
+      <p class="muted">変えるとすぐ保存されます（この端末の中だけ）。</p>
       {isGenerating() && <p class="notice">生成中です。エンジンの設定は、次の生成から使われます。</p>}
 
       {/* 段階11-4：復習は決まった数で 1 回が終わる */}
@@ -73,7 +73,7 @@ export function SettingsScreen() {
             ))}
           </div>
           <span class="muted">
-            11micro は軽くて速い。11mini は少し強いが、1 局面あたりの読みが浅くなります（初回は約{EVALS.mini.approxMB}MB のダウンロード）。
+            mini は強め・読みは浅め（初回 約{EVALS.mini.approxMB}MB）
           </span>
         </div>
 
@@ -116,8 +116,7 @@ export function SettingsScreen() {
       <section class="card settings-section">
         <h2>応手の選び方とラベル</h2>
         <p class="muted" data-testid="label-help">
-          相手の応手には、最善手との差でラベルを付けます。「本線」は最善手とほぼ同じ評価の手、「有力」は少し損だが十分ある手、
-          「疑問手」は咎められる（悪い点を突いて自分が有利にできる）手です。疑問手は自分のチャンスなので、オレンジで目立たせています。
+          最善手との差で「本線」「有力」「疑問手」（咎められる手。オレンジ）に分けます。
         </p>
         <NumberField
           label="採用する応手：最善手から何点以内（W）"
@@ -203,7 +202,7 @@ export function SettingsScreen() {
       {/* 一覧画面から移した（段階4-2） */}
       <section class="card settings-section">
         <h2>エンジンの速度測定</h2>
-        <p class="muted">この端末でエンジンが 1 秒あたり何局面調べられるかを測ります（スレッド数ごと）。</p>
+        <p class="muted">1 秒あたり何局面調べられるかを測ります。</p>
         <a class="btn" href={`${import.meta.env.BASE_URL}bench.html`} data-testid="open-bench">
           速度測定のページを開く
         </a>
@@ -258,7 +257,7 @@ function PcEngineFields({ info, s, set }: { info: PcInfo; s: AppSettings; set: (
             </option>
           ))}
         </select>
-        <span class="muted">多いほど速くなりますが、そのあいだ PC のほかの作業が重くなります。</span>
+        <span class="muted">多いほど速いが、PC のほかの作業が重くなります。</span>
       </label>
       <label class="form-field">
         <span>PC のハッシュ（エンジンが使うメモリ）</span>

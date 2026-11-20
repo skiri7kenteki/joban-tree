@@ -18,6 +18,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { Board } from '../components/Board';
 import { Dialog } from '../components/Dialog';
+import { OnceHint } from '../components/OnceHint';
 import { KifuPanel, KifuSheet, useWideLayout } from '../components/KifuList';
 import { MoveBar, moveBarHeight } from '../components/MoveBar';
 import { treeKifu } from '../tree/treeKifu';
@@ -526,7 +527,7 @@ function TreeView({ tree, studies, studyId, ply }: { tree: TreeData; studies: re
 
       {/* 見出しの ⋯（段階11-2）：前は候補手の下に並べていた操作 */}
       {dialog === 'menu' && (
-        <Dialog title={tree.name} onClose={() => setDialog(null)} testId="tree-menu-dialog">
+        <Dialog title={tree.name} onClose={() => setDialog(null)} testId="tree-menu-dialog" sheet>
           <p class="menu-section-title">この局面</p>
           <div class="dialog-actions dialog-actions-column">
             <button type="button" class="btn" data-testid="expand-here" onClick={() => setDialog('expand')} disabled={busy || node.terminal}>
@@ -564,7 +565,7 @@ function TreeView({ tree, studies, studyId, ply }: { tree: TreeData; studies: re
 
       {dialog === 'expand' && (
         <Dialog title="ここから展開" onClose={() => setDialog(null)} testId="expand-dialog">
-          <p>この局面から先の、まだ調べていない枝を広げます。今あるツリーに枝を足します。</p>
+          <p>この局面から先の、まだ調べていない枝を広げます。</p>
           <div class="dialog-actions dialog-actions-column">
             {availablePresets().map((id) => (
               <button type="button" key={id} class="btn btn-primary" data-testid={`expand-${id}`} onClick={() => expand(id)}>
@@ -576,7 +577,7 @@ function TreeView({ tree, studies, studyId, ply }: { tree: TreeData; studies: re
       )}
 
       {menuEdge && !opp && (
-        <Dialog title={moveText(node.sfen, menuEdge.move, incoming?.move)} onClose={() => setMenuEdge(null)} testId="move-menu">
+        <Dialog title={moveText(node.sfen, menuEdge.move, incoming?.move)} onClose={() => setMenuEdge(null)} testId="move-menu" sheet>
           <div class="dialog-actions dialog-actions-column">
             <button
               type="button"
@@ -600,7 +601,7 @@ function TreeView({ tree, studies, studyId, ply }: { tree: TreeData; studies: re
               消す
             </button>
           </div>
-          <p class="muted">本線（いちばん上の手）が、復習の正解・書き出しの本譜・「ここから展開」でたどる手になります。</p>
+          <OnceHint id="tree-main">本線（いちばん上の手）が、復習の正解・書き出しの本譜・「ここから展開」でたどる手になります。</OnceHint>
           {busy && <p class="muted">生成中は変えられません。止めてから操作してください。</p>}
         </Dialog>
       )}
@@ -642,10 +643,9 @@ function TreeView({ tree, studies, studyId, ply }: { tree: TreeData; studies: re
       )}
 
       {menuEdge && opp && (
-        <Dialog title={moveText(node.sfen, menuEdge.move, incoming?.move)} onClose={() => setMenuEdge(null)} testId="move-menu">
-          <p>
-            人があまり指さない手などを除外すると、この局面を調べ直して（約{Math.round(tree.settings.movetimeMs / 100) / 10}秒）代わりの候補を補います。
-            除外した手は、調べ直しても「ここから展開」しても採用しません。リストの下の「除外した手」から戻せます。
+        <Dialog title={moveText(node.sfen, menuEdge.move, incoming?.move)} onClose={() => setMenuEdge(null)} testId="move-menu" sheet>
+          <p class="muted">
+            除外すると、この局面を調べ直して（約{Math.round(tree.settings.movetimeMs / 100) / 10}秒）代わりの候補を補います。「除外した手」から戻せます。
           </p>
           <div class="dialog-actions dialog-actions-column">
             <button type="button" class="btn btn-primary" data-testid="exclude-move" disabled={busy} onClick={() => void exclude(menuEdge)}>
@@ -708,21 +708,18 @@ function TreeView({ tree, studies, studyId, ply }: { tree: TreeData; studies: re
       )}
 
       {dialog === 'export' && (
-        <Dialog title="書き出し・共有" onClose={() => setDialog(null)} testId="export-dialog">
+        <Dialog title="書き出し・共有" onClose={() => setDialog(null)} testId="export-dialog" sheet>
           <div class="dialog-actions dialog-actions-column">
             <button type="button" class="btn" data-testid="export-tree-kif" onClick={() => void exportAs('tree-kif')}>
-              分岐付き KIF（ツリー全体）
+              KIFで渡す（ツリー全体・分岐付き）
             </button>
             <button type="button" class="btn" data-testid="export-path-kif" onClick={() => void exportAs('path-kif')}>
-              この局面までの手順の KIF
+              KIFで渡す（この局面まで）
             </button>
             <button type="button" class="btn" data-testid="export-json" onClick={() => void exportAs('json')}>
-              JSON（このアプリ用。仲間に渡す・バックアップ）
+              JSONで渡す
             </button>
           </div>
-          <p class="muted">
-            iPad では共有メニューの「"ファイル"に保存」で保存できます。共有メニューが出ない端末では、ファイルをダウンロードします。
-          </p>
         </Dialog>
       )}
     </>

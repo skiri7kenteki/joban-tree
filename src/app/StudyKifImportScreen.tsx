@@ -96,7 +96,7 @@ export function StudyKifImportScreen() {
       {!candidates && (
         <div class="card kifu-box">
           <p class="muted">
-            ShogiHome などで作った研究用の KIF（変化付き）を貼り付けるか、ファイルを選んでください。本譜とそれぞれの変化が、1 本ずつの研究手順になります。
+            変化付きの KIF を貼り付けるか、ファイルを選んでください。本譜と変化が 1 本ずつの研究手順になります。
           </p>
           <textarea
             class="kifu-input"

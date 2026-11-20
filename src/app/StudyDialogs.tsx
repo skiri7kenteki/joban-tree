@@ -52,7 +52,6 @@ export function StudyEditDialog({
 
   return (
     <Dialog title={study ? '研究手順を直す' : '研究手順として保存'} onClose={onClose} testId="study-dialog">
-      {study && !hideSide && <p class="muted">この手順は、もう研究手順として保存してあります。名前・メモ・自分の側を直せます。</p>}
       <p class="study-moves muted" data-testid="study-moves">
         {movesText}
       </p>
@@ -220,14 +219,14 @@ export function StudyExportDialog({
         ))}
       </div>
       <p class="muted" data-testid="study-export-count">
-        {chosen.length} 本を選んでいます。JSON はこのアプリで取り込むため、KIF はほかのソフトで見るため（変化付きの 1 つの KIF。名前とメモはコメント）です。
+        {chosen.length} 本を選んでいます。
       </p>
       <div class="dialog-actions">
         <button type="button" class="btn btn-primary" data-testid="study-export-json" disabled={chosen.length === 0} onClick={() => void exportAs('json')}>
-          JSON
+          JSONで渡す
         </button>
         <button type="button" class="btn" data-testid="study-export-kif" disabled={chosen.length === 0} onClick={() => void exportAs('kif')}>
-          KIF
+          KIFで渡す
         </button>
       </div>
       {note && (

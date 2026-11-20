@@ -1,4 +1,4 @@
-// 段階11：画面の刷新（11-4 復習を小分けにする・11-1 画面の下のタブ・11-5 棋譜欄・11-2 盤の下の固定バー）
+// 段階11：画面の刷新（11-4 復習を小分けにする・11-1 画面の下のタブ・11-5 棋譜欄・11-2 盤の下の固定バー・11-3 メニューと説明文）
 import { expect, test, type Page } from '@playwright/test';
 import { STARTPOS_SFEN, applyUsiMove, sfenKey } from '../src/shogi/position';
 import { TREE_APP, TREE_FORMAT_VERSION, type Study, type TreeData, type TreeNode } from '../src/tree/types';
@@ -458,5 +458,98 @@ test.describe('11-2 盤の下の固定バー', () => {
     await page.getByTestId('input-last').click();
     await expect(page.getByTestId('input-position')).toHaveText('4手目 △８四歩');
     expect(await overflowing(page)).toEqual([]);
+  });
+});
+
+/** 窓が画面の下から出ていること（下端が画面の下端） */
+async function expectSheet(page: Page, testId: string, height: number) {
+  const box = (await page.getByTestId(testId).boundingBox())!;
+  expect(Math.round(box.y + box.height)).toBe(height);
+}
+
+test.describe('11-3 ⋯ のメニューと説明文', () => {
+  test('定跡帳：★ の行の右に［復習］。⋯ は画面の下から出て「この研究手順」「この局面」「定跡帳」で分かれ、ボタンは 1 行', async ({ page }) => {
+    await openHome(page);
+    await importStudy(page, LINE);
+    // 一覧の行の ⋯ も画面の下から。文字は短く
+    await page.getByTestId('study-menu').click();
+    await expectSheet(page, 'study-menu-dialog', 740);
+    await expect(page.getByTestId('study-menu-json')).toHaveText('JSONで渡す');
+    await closeDialog(page);
+
+    await page.getByTestId('study-item').click();
+    await expect(page.getByTestId('study-title')).toHaveText('横歩の手前');
+    // 初めての 1 回だけ：盤で指すと足される
+    await expect(page.getByTestId('hint-book-write')).toBeVisible();
+    // ［復習］は ★ の行の中（行は増えない）
+    const head = (await page.getByTestId('book-head').boundingBox())!;
+    const review = (await page.getByTestId('book-head-review').boundingBox())!;
+    expect(Math.abs(review.y + review.height / 2 - (head.y + head.height / 2))).toBeLessThan(2);
+    expect(review.x).toBeGreaterThanOrEqual(head.x + head.width);
+    expect(review.x + review.width).toBeLessThanOrEqual(360);
+
+    await page.getByTestId('book-menu').click();
+    await expectSheet(page, 'book-menu-dialog', 740);
+    const menu = page.getByTestId('book-menu-dialog');
+    await expect(menu.locator('.menu-section-title')).toHaveText(['この研究手順（★ 横歩の手前）', 'この局面', '定跡帳']);
+    await expect(menu.getByTestId('study-share-json')).toHaveText('JSONで渡す');
+    await expect(menu.getByTestId('book-share-kif')).toHaveText('KIFで渡す（1本）');
+    for (const b of await menu.locator('.dialog-actions-column .btn').all()) {
+      expect((await b.boundingBox())!.height).toBeLessThan(50);
+    }
+    await closeDialog(page);
+
+    // ［復習］でこの研究手順の復習へ。答え方の説明も初めての 1 回だけ
+    await page.getByTestId('book-head-review').click();
+    await expect(page).toHaveURL(/#\/study-review\/s-line$/);
+    await expect(page.getByTestId('hint-answer-tap')).toBeVisible();
+    // 定跡帳に戻ると、もう説明は出ない
+    await page.goBack();
+    await expect(page.getByTestId('study-title')).toHaveText('横歩の手前');
+    await expect(page.getByTestId('hint-book-write')).toHaveCount(0);
+    expect(await overflowing(page)).toEqual([]);
+  });
+
+  test('ツリー：手の ⋯・見出しの ⋯・書き出しは画面の下から。本線の説明は初めての 1 回だけ', async ({ page }) => {
+    await openHome(page);
+    const tree = lineTree('m1', ['7g7f'], ['3c3d', '2g2f']);
+    // 開始局面（自分＝後手の手番）に、もう 1 つ手を足す（自分の手が 2 つあると ⋯ が出る）
+    const root = tree.nodes[tree.rootKey];
+    const sfen2 = applyUsiMove(root.sfen, '8c8d')!.sfen;
+    tree.nodes[sfenKey(sfen2)] = { key: sfenKey(sfen2), sfen: sfen2, round: 0, edges: [] } as TreeNode;
+    root.edges.push({ move: '8c8d', to: sfenKey(sfen2), score: { kind: 'cp', value: 0 } } as never);
+    await page.getByTestId('tab-trees').click();
+    await page.getByTestId('import-file').setInputFiles({ name: 't.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(tree)) });
+    await page.getByTestId('tree-item').click();
+    await expect(page.getByTestId('candidate')).toHaveCount(2);
+
+    await page.getByTestId('candidate-menu').first().click();
+    await expectSheet(page, 'move-menu', 740);
+    await expect(page.getByTestId('hint-tree-main')).toBeVisible();
+    await closeDialog(page);
+    await page.getByTestId('candidate-menu').first().click();
+    await expect(page.getByTestId('make-main')).toBeVisible();
+    await expect(page.getByTestId('hint-tree-main')).toHaveCount(0);
+    await closeDialog(page);
+
+    await page.getByTestId('tree-menu').click();
+    await expectSheet(page, 'tree-menu-dialog', 740);
+    await page.getByTestId('tree-menu-dialog').getByTestId('export-open').click();
+    await expectSheet(page, 'export-dialog', 740);
+    await expect(page.getByTestId('export-json')).toHaveText('JSONで渡す');
+    await closeDialog(page);
+    expect(await overflowing(page)).toEqual([]);
+  });
+
+  test('新しいツリー：「盤の駒をタップ…」は初めての 1 回だけ。手番の長い説明は出さない', async ({ page }) => {
+    await openHome(page);
+    await page.getByTestId('tab-trees').click();
+    await page.getByTestId('new-tree').click();
+    await expect(page.getByTestId('hint-board-tap')).toBeVisible();
+    await expect(page.getByText('この局面は自分の手番です')).toHaveCount(0);
+    await page.goBack();
+    await page.getByTestId('new-tree').click();
+    await expect(page.getByTestId('side-black')).toBeVisible();
+    await expect(page.getByTestId('hint-board-tap')).toHaveCount(0);
   });
 });

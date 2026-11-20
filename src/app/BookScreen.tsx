@@ -8,11 +8,13 @@
 //   この局面の操作（ツリーを作る・ツリーで見る）、定跡帳の操作（KIF で書き出す・書き込む 入／切）
 // - ★ の行を押すと、今の研究手順の名前・メモを直す
 // - 段階11-2：‹ › の行と手順の行（パンくず）をやめ、盤の下の固定バー（MoveBar）に。手数を押すと手順の一覧
+// - 段階11-3：⋯ は画面の下から（小見出し「この研究手順」「この局面」「定跡帳」・短い文字）。★ の行の右端に［復習］
 // 研究手順の画面（StudyScreen）と編集モードは段階10-2 で片付けた（古い URL は src/app/LegacyRedirect.tsx でここへ移す）。
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { Board } from '../components/Board';
 import { Dialog } from '../components/Dialog';
+import { OnceHint } from '../components/OnceHint';
 import { PromotionBox, useMoveInput } from '../components/useMoveInput';
 import { STARTPOS_SFEN, moveText, type Side } from '../shogi/position';
 import { studyPositions } from '../review/studyReview';
@@ -471,18 +473,23 @@ function BookViewScreen({
         </button>
       </div>
 
-      {/* 今たどっている研究手順の名前とメモの最初の 1 行（押すと名前・メモを直す） */}
+      {/* 今たどっている研究手順の名前とメモの最初の 1 行（押すと名前・メモを直す）。右端に［復習］（段階11-3） */}
       <div class="study-head">
         {current ? (
-          <button type="button" class="study-title study-title-line book-head-btn" data-testid="book-head" onClick={() => setDialog({ kind: 'fields' })}>
-            <span class="study-star" aria-hidden="true">
-              ★
-            </span>
-            <strong data-testid="study-title">{current.name}</strong>
-            <span class="muted study-meta-inline" data-testid="study-meta">
-              {firstLine(current.note) || 'メモなし'}
-            </span>
-          </button>
+          <>
+            <button type="button" class="study-title study-title-line book-head-btn" data-testid="book-head" onClick={() => setDialog({ kind: 'fields' })}>
+              <span class="study-star" aria-hidden="true">
+                ★
+              </span>
+              <strong data-testid="study-title">{current.name}</strong>
+              <span class="muted study-meta-inline" data-testid="study-meta">
+                {firstLine(current.note) || 'メモなし'}
+              </span>
+            </button>
+            <button type="button" class="btn study-head-review" data-testid="book-head-review" onClick={() => go(`/study-review/${current.id}`)}>
+              復習
+            </button>
+          </>
         ) : (
           <p class="study-title study-title-line muted" data-testid="book-head-empty">
             {pool.length === 0 ? '研究手順はまだありません。盤で指すと研究手順ができます' : 'ここは研究の木の外です。指すと研究手順ができます'}
@@ -519,6 +526,7 @@ function BookViewScreen({
               まとめて復習（{pool.length} 本）
             </button>
           </div>
+          {write && pool.length > 0 && <OnceHint id="book-write">盤で指すと、その場で研究手順に足されます（名前は自動。あとで直せます）。</OnceHint>}
           {note && (
             <p class="muted" role="status" data-testid="study-screen-status">
               {note}
@@ -576,31 +584,31 @@ function BookViewScreen({
       )}
 
       {dialog?.kind === 'menu' && (
-        <Dialog title={`定跡帳：${label}`} onClose={() => setDialog(null)} testId="book-menu-dialog">
+        <Dialog title={`定跡帳：${label}`} onClose={() => setDialog(null)} testId="book-menu-dialog" sheet>
           {current && (
             <>
-              <p class="menu-section-title">★ {current.name}</p>
+              <p class="menu-section-title">この研究手順（★ {current.name}）</p>
               <div class="dialog-actions dialog-actions-column">
                 <button type="button" class="btn" data-testid="book-edit-fields" onClick={() => setDialog({ kind: 'fields' })}>
-                  名前・メモを直す
+                  名前・メモ
                 </button>
                 <button type="button" class="btn" data-testid="book-study-review" onClick={() => go(`/study-review/${current.id}`)}>
-                  この研究手順を復習
+                  復習
                 </button>
                 <button type="button" class="btn" data-testid="study-copy-kif" onClick={() => void copyKif()}>
-                  KIF をコピー
+                  KIFをコピー
                 </button>
                 <button type="button" class="btn" data-testid="study-share-json" onClick={() => void share('json')}>
-                  ファイルで渡す（JSON・このアプリ用）
+                  JSONで渡す
                 </button>
                 <button type="button" class="btn" data-testid="study-share-kif" onClick={() => void share('kif')}>
-                  ファイルで渡す（KIF・ほかのソフト用）
+                  KIFで渡す
                 </button>
                 <button type="button" class="btn" data-testid="book-end-here" disabled={!endPlan} onClick={() => setDialog({ kind: 'end' })}>
-                  ここで終わりにする…
+                  ここで終わり…
                 </button>
                 <button type="button" class="btn btn-danger" data-testid="book-delete-study" onClick={() => setDialog({ kind: 'delete' })}>
-                  この研究手順を消す…
+                  消す…
                 </button>
               </div>
             </>
@@ -608,7 +616,7 @@ function BookViewScreen({
           <p class="menu-section-title">この局面</p>
           <div class="dialog-actions dialog-actions-column">
             <button type="button" class="btn" data-testid="study-make-tree" onClick={makeTree}>
-              この局面からツリーを作る
+              ツリーを作る
             </button>
             {treesHere.length > 0 && (
               <button
@@ -625,7 +633,7 @@ function BookViewScreen({
           <div class="dialog-actions dialog-actions-column">
             {pool.length > 0 && (
               <button type="button" class="btn" data-testid="book-share-kif" onClick={() => void shareBook()}>
-                KIF で書き出す（変化付き・{pool.length} 本）
+                KIFで渡す（{pool.length}本）
               </button>
             )}
           </div>
@@ -691,7 +699,7 @@ function BookViewScreen({
 
       {dialog?.kind === 'delete' && current && (
         <Dialog title="この研究手順を消しますか？" onClose={() => setDialog(null)} testId="book-delete-dialog">
-          <p>研究手順「{current.name}」を消します（メモも消えます）。消した後も、この画面の「↶ 取り消す」で戻せます。</p>
+          <p>研究手順「{current.name}」を消します（メモも消えます）。取り消せます。</p>
           <div class="dialog-actions">
             <button type="button" class="btn btn-danger" data-testid="book-delete-ok" disabled={busy} onClick={() => void doDelete()}>
               消す
@@ -727,7 +735,7 @@ function CutText({ plan }: { plan: CutPlan }) {
         研究手順 {removed} 本を消します
         {plan.kept ? `。「${plan.kept.name}」は、この局面で終わる研究手順として残します（メモもそのまま）` : ''}。
       </p>
-      <p class="muted">消した後も、この画面の「↶ 取り消す」で戻せます。</p>
+      <p class="muted">取り消せます。</p>
     </>
   );
 }

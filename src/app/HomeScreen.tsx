@@ -301,7 +301,7 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
         <>
           {studies && studyCount === 0 && (
             <p class="muted" data-testid="studies-empty">
-              研究手順はまだありません。「＋ 研究手順を登録」から戦型（または平手）を選ぶと定跡帳が開き、盤で指すとその場で研究手順になります（エンジンは使いません）。棋譜を貼る・ツリーの閲覧画面の「定跡帳に足す」でも登録できます。
+              研究手順はまだありません。「＋ 研究手順を登録」で平手か戦型を選び、盤で指すと研究手順になります。
             </p>
           )}
           {searching && studyCount > 0 && studyGroups.length === 0 && (
@@ -333,14 +333,12 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
             </button>
             <input ref={fileRef} type="file" accept=".json,application/json" hidden data-testid="import-file" onChange={(e) => void onFile(e)} />
           </div>
-          <p class="muted">仲間から受け取ったツリー（このアプリで書き出した JSON）を開けます。</p>
         </>
       )}
       <input ref={studyFileRef} type="file" accept=".json,application/json" hidden data-testid="study-import-file" onChange={(e) => void onStudyFile(e)} />
 
       {registerMenu && (
-        <Dialog title="研究手順を登録" onClose={() => setRegisterMenu(false)} testId="study-register-menu">
-          <p class="muted">定跡帳が開きます。盤で指すと、その場で研究手順に足されます（名前は自動。あとで直せます）。</p>
+        <Dialog title="研究手順を登録" onClose={() => setRegisterMenu(false)} testId="study-register-menu" sheet>
           <div class="dialog-actions dialog-actions-column">
             <button
               type="button"
@@ -379,15 +377,12 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
               棋譜を貼って 1 本登録
             </button>
             <button type="button" class="btn" data-testid="study-register-kif" onClick={() => go('/study-import')}>
-              変化付き KIF からまとめて取り込む
+              変化付きKIFからまとめて
             </button>
             <button type="button" class="btn" data-testid="study-register-json" onClick={() => studyFileRef.current?.click()}>
-              JSON を取り込む
+              JSONを取り込む
             </button>
           </div>
-          <p class="muted">
-            登録にエンジンは使いません。変化付き KIF は、本譜とそれぞれの変化が 1 本ずつの研究手順になります（ShogiHome などで作った KIF）。JSON は、このアプリの研究手順の「書き出し」で作ったファイルです。
-          </p>
         </Dialog>
       )}
 
@@ -400,13 +395,13 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
       {newStudy?.kind === 'start' && <NewStudyDialog template={newStudy.template} onClose={() => setNewStudy(null)} />}
 
       {menuGroup && (
-        <Dialog title={menuGroup.label} onClose={() => setMenuGroup(null)} testId="study-group-menu">
+        <Dialog title={menuGroup.label} onClose={() => setMenuGroup(null)} testId="study-group-menu" sheet>
           <div class="dialog-actions dialog-actions-column">
             <button type="button" class="btn btn-primary" data-testid="study-group-book" onClick={() => go(bookPath(bookKeyOfGroup(menuGroup.key)))}>
               定跡帳として見る
             </button>
             <button type="button" class="btn" data-testid="study-group-review" onClick={() => go(groupReviewPath(menuGroup.key))}>
-              このグループの研究手順を復習（{menuGroup.items.length} 本）
+              復習（{menuGroup.items.length}本）
             </button>
             <button
               type="button"
@@ -418,7 +413,7 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
                 setExporting({ initial: ids });
               }}
             >
-              このグループを書き出す
+              書き出す…
             </button>
           </div>
         </Dialog>
@@ -638,19 +633,19 @@ function StudyMenu({ study, onClose, onDone }: { study: Study; onClose: () => vo
     );
   }
   return (
-    <Dialog title={`★ ${study.name}`} onClose={onClose} testId="study-menu-dialog">
+    <Dialog title={`★ ${study.name}`} onClose={onClose} testId="study-menu-dialog" sheet>
       <div class="dialog-actions dialog-actions-column">
         <button type="button" class="btn btn-primary" data-testid="study-menu-review" onClick={() => go(`/study-review/${study.id}`)}>
-          この研究手順を復習
+          復習
         </button>
         <button type="button" class="btn" data-testid="study-menu-edit" onClick={() => setEditing(true)}>
-          名前・メモを直す
+          名前・メモ
         </button>
         <button type="button" class="btn" data-testid="study-menu-json" onClick={() => void share('json')}>
-          ファイルで渡す（JSON・このアプリ用）
+          JSONで渡す
         </button>
         <button type="button" class="btn" data-testid="study-menu-kif" onClick={() => void share('kif')}>
-          ファイルで渡す（KIF・ほかのソフト用）
+          KIFで渡す
         </button>
       </div>
       <div class="dialog-actions">
@@ -768,7 +763,7 @@ function TreeMenu({
   }
 
   return (
-    <Dialog title="ツリーの操作" onClose={onClose} testId="tree-menu-dialog">
+    <Dialog title="ツリーの操作" onClose={onClose} testId="tree-menu-dialog" sheet>
       <label class="form-field">
         <span>名前</span>
         <input type="text" value={name} maxLength={80} data-testid="rename-input" onInput={(e) => setName((e.target as HTMLInputElement).value)} />
@@ -780,10 +775,9 @@ function TreeMenu({
       </div>
       <div class="dialog-actions">
         <button type="button" class="btn" data-testid="share-json" onClick={() => void share()}>
-          ファイルで渡す（JSON）
+          JSONで渡す
         </button>
       </div>
-      <p class="muted">受け取った人は、このアプリの「ファイルから取り込む」で開けます。</p>
       <div class="dialog-actions">
         {!confirmDelete ? (
           <button type="button" class="btn btn-danger" data-testid="delete-tree" disabled={generating} onClick={() => setConfirmDelete(true)}>

@@ -20,6 +20,7 @@ import { Board } from '../components/Board';
 import { PromotionBox, useMoveInput } from '../components/useMoveInput';
 import { KifuPanel, KifuSheet, useWideLayout, type KifuRow } from '../components/KifuList';
 import { MoveBar } from '../components/MoveBar';
+import { OnceHint } from '../components/OnceHint';
 import { parseKifu, type LinePosition } from '../shogi/kifu';
 import { STARTPOS_SFEN, moveText, otherSide, sfenKey, sideToMove, type Side } from '../shogi/position';
 import { listTrees, saveTree, newTreeId, type TreeSummary } from '../storage/trees';
@@ -343,7 +344,7 @@ export function InputScreen() {
               {message}
             </p>
           ) : (
-            <p class="muted">盤の駒をタップ → 行き先をタップで指せます。</p>
+            <OnceHint id="board-tap">盤の駒をタップ → 行き先をタップで指せます。</OnceHint>
           )}
           <Board sfen={current.sfen} lastMove={current.usi} selection={input.selection} onSquare={input.onSquare} onHand={input.onHand} />
 
@@ -395,15 +396,10 @@ export function InputScreen() {
                 </button>
               ))}
             </div>
-            <p class="muted">
-              {mySide === turn
-                ? 'この局面は自分の手番です。まず自分の最善手を調べてから、相手の応手を広げます。'
-                : 'この局面は相手の手番です。相手の応手と、それへの自分の対応を広げます。'}
-            </p>
             {isGenerating() && <p class="muted">ほかのツリーを生成中です。終わるか止めてから作ってください。</p>}
             {pcEngine.value && (
               <p class="notice" data-testid="pc-engine-note">
-                PC のエンジンで作ります（{effectivePcThreads(pcEngine.value)} スレッド）。できたツリーは「JSON で渡す」で iPad やスマホに渡せます。
+                PC のエンジンで作ります（{effectivePcThreads(pcEngine.value)} スレッド）。
               </p>
             )}
           </div>

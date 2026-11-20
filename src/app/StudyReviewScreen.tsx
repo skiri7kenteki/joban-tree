@@ -13,6 +13,7 @@ import type { Move } from 'tsshogi';
 import { Board } from '../components/Board';
 import { Dialog } from '../components/Dialog';
 import { MoveBar, moveBarHeight } from '../components/MoveBar';
+import { OnceHint } from '../components/OnceHint';
 import { PromotionBox, useMoveInput } from '../components/useMoveInput';
 import { moveText, sfenKey, sideToMove } from '../shogi/position';
 import { clearReview, loadReview, saveReview } from '../storage/review';
@@ -274,7 +275,7 @@ function StudyReviewView({ target, pool, startOf, record: initialRecord, tree, l
             {phase.kind === 'ask' && (
               <>
                 <p>あなた（{mySideText}）の手は？</p>
-                <p class="muted">盤の駒をタップ → 行き先をタップで答えます。</p>
+                <OnceHint id="answer-tap">盤の駒をタップ → 行き先をタップで答えます。</OnceHint>
               </>
             )}
             {phase.kind === 'wrong' && (
