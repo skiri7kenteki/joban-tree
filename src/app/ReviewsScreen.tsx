@@ -15,6 +15,7 @@ import { studyStartIndex } from '../tree/studies';
 import { go, groupReviewPath } from './router';
 import { settings } from './settings';
 import { ensureStudies, library } from './studies';
+import { Words } from '../components/Words';
 import { allTemplates, myTemplates, refreshMyTemplates } from './TemplateDialogs';
 
 export function ReviewsScreen() {
@@ -103,7 +104,9 @@ function ReviewEntry({ title, count, meta, testId, onStart }: { title: string; c
       <button type="button" class="tree-item review-entry" data-testid={testId} onClick={onStart}>
         <span class="review-entry-text">
           <span class="tree-item-title">
-            <span class="tree-item-name">{title}</span>
+            <span class="tree-item-name">
+              <Words text={title} />
+            </span>
             {count && <span class="tree-item-meta num">{count}</span>}
           </span>
           <span class="tree-item-meta" data-testid="reviews-overview">

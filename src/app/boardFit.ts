@@ -63,7 +63,8 @@ export function measureBoardFit(board: HTMLElement, side: HTMLElement, reserve =
   const svgTop = svgRect.top + window.scrollY;
   // 盤の下：先手の持ち駒の行、盤と下の列の間。「別の手を調べる」の案内などは数えない（盤の大きさが変わらないように）
   const belowSvg = wrapRect.bottom - svgRect.bottom;
-  const gap = side.getBoundingClientRect().top - wrapRect.bottom;
+  // 段階13：盤と下の列の間は、下の列（生成りの地）の上の余白（padding）にした。その分も数える
+  const gap = side.getBoundingClientRect().top - wrapRect.bottom + (parseFloat(getComputedStyle(side).paddingTop) || 0);
   /** 候補手のカードの上端から y（画面上の位置）までを画面に収める盤の幅 */
   const widthFor = (y: number) => {
     const availH = window.innerHeight - reserve - svgTop - belowSvg - gap - (y - cardRect.top) - BOTTOM_MARGIN;

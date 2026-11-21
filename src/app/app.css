@@ -20,14 +20,12 @@
   color: var(--paper-danger);
 }
 
-/* 選んでいるもの：金（段階12） */
+/* 選んでいるもの：平らな金（段階13） */
 .btn-toggle.on {
-  background: var(--gold-fill);
-  background-color: var(--gold);
-  border-color: var(--gold-dark);
+  background: var(--gold);
+  border-color: var(--gold);
   color: var(--gold-fill-text);
   font-weight: 600;
-  box-shadow: var(--shadow-gold);
 }
 
 .notice {
@@ -55,12 +53,34 @@
   min-width: 0;
 }
 
-/* 段階12：見出しの行のボタン（‹ 一覧・復習・⋯・書き出し）は、藍の上に金の細い枠 */
-.screen-header > .btn:not(.btn-ghost) {
+/* 見出しの行のボタン（復習・⋯）は、藍の上に生成りの細い枠と生成りの文字（段階13。金はやめた） */
+.screen-header > .btn:not(.btn-ghost):not(.btn-primary) {
   background: transparent;
-  border-color: var(--gold-line);
-  color: var(--gold-light);
-  box-shadow: none;
+  border-color: var(--ink-button-line);
+  color: var(--ink-text);
+}
+
+/* 「‹ 一覧」などの戻るボタンは生成りの文字 */
+.screen-header > .btn-ghost {
+  color: var(--ink-text);
+}
+
+/* 盤の画面の戻るボタン：スマホは「‹」だけ（見出しの幅を広げる。段階13、持ち主の判断 2026-11-21）。
+   「一覧」などの文字は画面に出さないが、読み上げとボタンの名前には残す。iPad 横は「‹ 一覧」 */
+.btn-back {
+  min-width: var(--touch-min);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.btn-back .back-text {
+  font-size: var(--font-size-body);
+}
+
+@media not ((min-width: 768px) and (orientation: landscape)) {
+  .btn-back .back-text {
+    font-size: 0;
+  }
 }
 
 .tree-title {
@@ -440,8 +460,8 @@
   z-index: 1;
   margin: var(--space-3) calc(-1 * var(--space-4)) calc(-1 * var(--space-4));
   padding: var(--space-2) var(--space-4) calc(var(--space-2) + env(safe-area-inset-bottom));
-  border-top: 1px solid var(--gold-line);
-  background: var(--color-bg-deep);
+  border-top: 1px solid var(--ink-line);
+  background: var(--ink-deep);
 }
 
 /* 段階6-3：用意済みのツリーを開く（作るボタンより目立たせる） */
@@ -657,8 +677,8 @@
   width: min(92vw, 440px);
   max-height: 85dvh;
   padding: 0;
-  border: 1px solid var(--gold-line);
-  border-radius: var(--radius-card);
+  border: 0;
+  border-radius: 14px;
   background: var(--color-surface);
   color: var(--color-text);
   box-shadow: var(--shadow-raise);
@@ -1357,9 +1377,9 @@
   width: max-content;
   max-width: calc(100vw - 2 * var(--space-3));
   padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
-  border: 1px solid var(--gold-line);
+  border: 0;
   border-radius: var(--radius-card);
-  background: var(--color-surface);
+  background: var(--ink-deep);
   color: var(--color-text);
   box-shadow: var(--shadow-raise);
 }
@@ -1498,8 +1518,8 @@
   right: 0;
   bottom: 0;
   z-index: 40;
-  background: var(--color-bg-deep);
-  border-top: 1px solid var(--gold-line);
+  background: var(--ink-deep);
+  border-top: 1px solid var(--ink-line);
   padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
@@ -1528,13 +1548,13 @@
   cursor: pointer;
 }
 
-/* 選んでいるタブは金の文字と、下の金の線（段階12） */
+/* 選んでいるタブは金の文字と、下の金の線（段階12。選んでいる状態なので金のまま） */
 .tabbar-tab {
   position: relative;
 }
 
 .tabbar-tab.on {
-  color: var(--gold);
+  color: var(--gold-light);
   font-weight: 700;
 }
 
@@ -1700,7 +1720,6 @@
   margin: auto auto 0;
   border-radius: var(--radius-card) var(--radius-card) 0 0;
   border: 0;
-  border-top: 2px solid var(--gold);
   padding-bottom: env(safe-area-inset-bottom);
 }
 
@@ -1751,10 +1770,10 @@
   width: var(--touch-min);
   height: var(--touch-min);
   padding: 0;
-  border: 1px solid var(--gold-line);
+  border: 1px solid var(--ink-button-line);
   border-radius: var(--radius-button);
   background: transparent;
-  color: var(--gold);
+  color: var(--ink-text);
   font: inherit;
   font-size: var(--font-size-heading);
   font-weight: bold;
@@ -1810,8 +1829,8 @@ div.move-bar-center {
   bottom: 0;
   z-index: 30;
   padding: 0 calc(var(--space-2) + env(safe-area-inset-right)) env(safe-area-inset-bottom) calc(var(--space-2) + env(safe-area-inset-left));
-  border-top: 1px solid var(--gold-line);
-  background: var(--color-bg-deep);
+  border-top: 1px solid var(--ink-line);
+  background: var(--ink-deep);
 }
 
 .move-bar-fixed .move-bar-inner {
@@ -1837,39 +1856,8 @@ div.move-bar-center {
 
 /* ---- 段階12-3：定跡帳（一覧と盤の画面） ---- */
 
-/* 「芽」の紋：金の細い丸の中に、アイコンの芽を線で（置いた場所の金：藍の上は金、カードの中は暗い金） */
-.sprout-mark {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  border: 1px solid var(--gold-line);
-  border-radius: 50%;
-  color: var(--color-accent);
-}
-
-.sprout-mark svg {
-  display: block;
-}
-
-.sprout-line,
-.sprout-leaf {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.4;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.sprout-bud {
-  fill: currentColor;
-}
-
-/* グループの見出し：芽の紋・明朝体の名前・金の本数、下に金の細い線 */
+/* グループの見出し：明朝体の名前と本数（段階13：芽の紋はやめた。見出しの下の線はグループのカードの中の区切り） */
 .tree-group-head {
-  border-bottom: 1px solid var(--color-border);
   border-radius: 0;
 }
 
@@ -1883,7 +1871,8 @@ div.move-bar-center {
   color: var(--color-accent);
 }
 
-/* 一覧の 1 行は 1 枚のカード（行と ⋯ を別々の箱にしない）。⋯ は細い縦線で区切る */
+/* 一覧の 1 行は 1 枚のカード（行と ⋯ を別々の箱にしない）。⋯ は細い縦線で区切る。
+   グループの中（段階13）は、グループで 1 枚のカードにして行を細い線で区切る（下の .tree-group） */
 .tree-row {
   gap: 0;
   border: 1px solid var(--paper-border);
@@ -1929,7 +1918,7 @@ div.move-bar-center {
   max-width: 100%;
 }
 
-/* 覚えた割合の輪：灰の輪に暗い金の弧、真ん中に % */
+/* 覚えた割合の輪：薄い灰の輪に緑の弧、真ん中に %（段階13。前は暗い金） */
 .learn-ring {
   position: relative;
   flex: none;
@@ -1945,13 +1934,13 @@ div.move-bar-center {
 
 .learn-ring-track {
   fill: none;
-  stroke: var(--paper-border);
+  stroke: var(--color-track);
   stroke-width: 3.5;
 }
 
 .learn-ring-arc {
   fill: none;
-  stroke: var(--gold-dark);
+  stroke: var(--color-progress);
   stroke-width: 3.5;
   stroke-linecap: round;
 }
@@ -1960,10 +1949,10 @@ div.move-bar-center {
   position: relative;
   font-size: 10px;
   font-weight: 700;
-  color: var(--paper-text);
+  color: var(--color-text);
 }
 
-/* 定跡帳のタブのいちばん上の集計（3 つを縦の細い線で区切る） */
+/* 定跡帳のタブのいちばん上の集計（3 つを縦の細い線で区切る）。段階13：見出しの藍の帯の続き */
 .book-summary {
   display: grid;
   grid-template-columns: 1fr 1.5fr 1fr;
@@ -1981,7 +1970,7 @@ div.move-bar-center {
 }
 
 .book-summary-cell + .book-summary-cell {
-  border-left: 1px solid var(--paper-border);
+  border-left: 1px solid var(--color-border);
 }
 
 .book-summary-learned {
@@ -2022,22 +2011,11 @@ div.move-bar-center {
   font-weight: 600;
 }
 
-/* 「この局面からの研究」：見出しの左に芽の紋（行の高さは変えない） */
+/* 「この局面からの研究」の見出し */
 .book-list .book-list-head {
   justify-content: flex-start;
   align-items: center;
   gap: var(--space-2);
-}
-
-/* 見出しの行の高さを変えない（盤の大きさは、この一覧の 3 行目までを画面に収めて決まるため）大きさ */
-.book-list-head .sprout-mark {
-  width: 18px;
-  height: 18px;
-}
-
-.book-list-head .sprout-mark svg {
-  width: 13px;
-  height: 13px;
 }
 
 .book-list-head strong {
@@ -2045,12 +2023,14 @@ div.move-bar-center {
   font-weight: 600;
 }
 
-/* その手を通る研究手順の割合の棒 */
+/* その手を通る研究手順の割合の棒（段階13：名前の下に細く。名前の幅を広げるため） */
 .book-bar {
-  flex: 0 0 36px;
-  height: 4px;
+  grid-area: bar;
+  align-self: start;
+  width: min(100%, 120px);
+  height: 3px;
   border-radius: 2px;
-  background: var(--paper-border);
+  background: var(--color-track);
   overflow: hidden;
 }
 
@@ -2058,7 +2038,7 @@ div.move-bar-center {
   display: block;
   height: 100%;
   border-radius: 2px;
-  background: var(--gold);
+  background: var(--color-progress);
 }
 
 /* ---- 段階12-4：残りの画面をそろえる ---- */
@@ -2084,7 +2064,7 @@ div.move-bar-center {
   border-bottom: 1px solid var(--color-border);
 }
 
-/* 復習のタブ・ツリーの一覧の見出し（藍の上）：下に金の細い線 */
+/* 復習のタブ・ツリーの一覧の見出し：下に細い線 */
 .reviews-heading {
   padding-bottom: var(--space-1);
   border-bottom: 1px solid var(--color-border);
@@ -2112,4 +2092,165 @@ div.move-bar-center {
 .review-opponent strong {
   font-family: var(--font-serif);
   font-weight: 600;
+}
+
+/* ---- 段階13：C 案を洗練（藍の帯と生成りの地。飾りを減らす） ---- */
+
+/* 一覧の画面：見出しの帯は藍。画面の端まで塗る（box-shadow で広げて、下には出さない。場所は取らない） */
+.list-header {
+  margin-bottom: 0;
+  padding-bottom: var(--space-3);
+  background: var(--ink);
+  box-shadow: 0 0 0 100vmax var(--ink);
+  clip-path: inset(-100vmax -100vmax 0 -100vmax);
+}
+
+.list-header h1 {
+  color: var(--ink-text);
+}
+
+/* 定跡帳のタブの集計は見出しの帯の続き（藍の上に生成りの文字、細い線で区切る） */
+.book-summary {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-1) 0 var(--space-4);
+  border: 0;
+  border-radius: 0;
+  background: var(--ink);
+  box-shadow: 0 0 0 100vmax var(--ink);
+  clip-path: inset(0 -100vmax);
+  color: var(--color-text);
+}
+
+.book-summary .learn-ring-track {
+  stroke: var(--color-track-ink);
+}
+
+.book-summary .learn-ring-arc {
+  stroke: var(--color-progress-ink);
+}
+
+/* 一覧の画面：見出しの帯のすぐ下の大事なボタンとの間をあける */
+.list-header + .btn-row,
+.book-summary + .btn-row {
+  margin-top: var(--space-3);
+}
+
+/* グループで 1 枚のカード：見出しの行と、研究手順・ツリーの行を細い線で区切る */
+.tree-group {
+  margin-bottom: var(--space-3);
+  border: 1px solid var(--paper-border);
+  border-radius: var(--radius-card);
+  background: var(--paper);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.tree-group-row {
+  padding: 0 var(--space-1) 0 var(--space-2);
+}
+
+.tree-group .tree-list {
+  gap: 0;
+  border-top: 1px solid var(--paper-border);
+}
+
+.tree-group .tree-row {
+  border: 0;
+  border-top: 1px solid var(--paper-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.tree-group .tree-row:first-child {
+  border-top: 0;
+}
+
+.tree-group-menu {
+  color: var(--color-text-muted);
+}
+
+/* 名前は手と手の間（空白）で折り返す（「△５二／玉」のように手の途中で切らない。src/components/Words.tsx）。
+   入りきらないほど長い語だけ、語の途中で折り返す */
+.word {
+  display: inline-block;
+  max-width: 100%;
+}
+
+/* 盤の画面の見出し：長い名前（「横歩取り △3三角（後手番）…」）は 2 行まで小さめに。高さはボタンと同じ 44px に収める */
+.app:not(.has-tabs) .screen-header h1.tree-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: 17px;
+  line-height: 1.22;
+  white-space: normal;
+  text-overflow: clip;
+}
+
+.app:not(.has-tabs) .screen-header .book-kicker {
+  display: inline;
+  margin-right: 0.4em;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+
+.app:not(.has-tabs) .screen-header .book-label {
+  display: inline;
+  white-space: normal;
+}
+
+/* 盤の画面の盤の下（一覧・問題のカード）：生成りの地（画面の端と下まで塗る）。
+   盤と一覧の間のすき間は、一覧の上の余白に移す（盤の大きさは変わらない） */
+.app:not(.has-tabs) .tree-side,
+.input-controls {
+  background: var(--ground);
+  box-shadow: 0 0 0 100vmax var(--ground);
+  clip-path: inset(0 -100vmax -100vmax -100vmax);
+  color: var(--color-text);
+}
+
+@media not ((min-width: 768px) and (orientation: landscape)) {
+  .app:not(.has-tabs) .tree-layout {
+    gap: 0;
+  }
+
+  .app:not(.has-tabs) .tree-side {
+    padding-top: var(--space-2);
+  }
+}
+
+/* 広い画面（iPad 横）：盤の右の列から右と下を生成りに */
+@media (min-width: 768px) and (orientation: landscape) {
+  .app:not(.has-tabs) .tree-side {
+    padding: var(--space-2) 0 0 var(--space-3);
+    clip-path: inset(0 -100vmax -100vmax 0);
+  }
+}
+
+/* 定跡帳の「この局面からの研究」の行：手・名前（本数）、名前の下に細い棒。名前の幅を広げる */
+.book-row .candidate-line {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    'move names count'
+    '. bar .';
+  column-gap: var(--space-2);
+  row-gap: 2px;
+  align-items: center;
+}
+
+.book-row .candidate-move {
+  grid-area: move;
+  min-width: 5.2em;
+}
+
+.book-row .book-names {
+  grid-area: names;
+}
+
+.book-row .book-count {
+  grid-area: count;
 }

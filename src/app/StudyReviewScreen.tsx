@@ -241,12 +241,12 @@ function StudyReviewView({ target, pool, startOf, record: initialRecord, tree, l
     <>
       <div class="screen-header">
         {tree ? (
-          <button type="button" class="btn btn-ghost" onClick={() => go(`/tree/${tree.id}`)}>
-            ‹ ツリー
+          <button type="button" class="btn btn-ghost btn-back" onClick={() => go(`/tree/${tree.id}`)}>
+            ‹<span class="back-text"> ツリー</span>
           </button>
         ) : (
-          <button type="button" class="btn btn-ghost" data-testid="study-review-back" onClick={() => back()}>
-            ‹ 戻る
+          <button type="button" class="btn btn-ghost btn-back" data-testid="study-review-back" onClick={() => back()}>
+            ‹<span class="back-text"> 戻る</span>
           </button>
         )}
         <h1 class="tree-title">{tree ? `復習：${tree.name}` : '復習：研究手順'}</h1>

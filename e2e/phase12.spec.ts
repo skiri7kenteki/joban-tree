@@ -138,8 +138,8 @@ async function lowContrast(page: Page): Promise<string[]> {
   });
 }
 
-test.describe('12-1 色・文字・部品の土台', () => {
-  test('藍の地・生成りのカード・金の主なボタン・明朝体の見出し。下のタブと盤の下の操作バーは濃い藍に金', async ({ page }) => {
+test.describe('12-1 色・文字・部品の土台（段階13 で洗練）', () => {
+  test('一覧は生成りの地に藍の見出しの帯、グループは 1 枚のカード、主なボタンは平らな金。盤の画面は藍の地で盤の下は生成り。下のタブと操作バーは濃い藍', async ({ page }) => {
     await openHome(page);
     await page.getByTestId('study-import-file').setInputFiles({
       name: 's.json',
@@ -148,20 +148,33 @@ test.describe('12-1 色・文字・部品の土台', () => {
     });
     await expect(page.getByTestId('study-item')).toHaveCount(2);
     const style = (sel: string, prop: string) => page.locator(sel).first().evaluate((e, p) => getComputedStyle(e).getPropertyValue(p), prop);
-    expect(await style('body', 'background-color')).toBe('rgb(28, 39, 64)');
-    // 一覧の行は 1 枚の生成りのカード（段階12-3 から地は行全体の .tree-row）
-    expect(await style('.tree-row', 'background-color')).toBe('rgb(248, 243, 231)');
+    // 一覧の画面：本文の地は明るい生成り、見出しの帯と集計は藍
+    expect(await style('.app', 'background-color')).toBe('rgb(243, 238, 227)');
+    expect(await style('.list-header', 'background-color')).toBe('rgb(28, 39, 64)');
+    expect(await style('.list-header h1', 'color')).toBe('rgb(243, 236, 220)');
+    // グループは 1 枚のアイボリーのカード（行はカードの中で細い線で区切る。行に影は付けない）
+    expect(await style('.tree-group', 'background-color')).toBe('rgb(255, 253, 248)');
+    expect(await style('.tree-group .tree-row', 'box-shadow')).toBe('none');
+    // 主なボタンは平らな金（グラデーション・影なし）
     expect(await style('[data-testid="study-register"]', 'background-color')).toBe('rgb(201, 165, 76)');
+    expect(await style('[data-testid="study-register"]', 'background-image')).toBe('none');
+    expect(await style('[data-testid="study-register"]', 'box-shadow')).toBe('none');
     expect(await style('h1', 'font-family')).toContain('Joban Mincho');
-    expect(await style('.tabbar', 'background-color')).toBe('rgb(20, 28, 48)');
-    expect(await style('.tabbar-tab.on', 'color')).toBe('rgb(201, 165, 76)');
+    expect(await style('.tabbar', 'background-color')).toBe('rgb(21, 29, 49)');
+    expect(await style('.tabbar-tab.on', 'color')).toBe('rgb(226, 199, 125)');
+    // 生成りの地には青海波を敷かない
+    expect(await page.locator('.app').evaluate((e) => getComputedStyle(e, '::before').backgroundImage)).toBe('none');
     // 明朝体はアプリに入っている（端末に無くても出る）
     expect(await page.evaluate(() => document.fonts.check('600 21px "Joban Mincho"', '定跡帳'))).toBe(true);
 
     await page.getByTestId('study-item').first().click();
     await expect(page.getByTestId('study-position')).toBeVisible();
-    expect(await style('.move-bar-fixed', 'background-color')).toBe('rgb(20, 28, 48)');
-    expect(await style('.move-bar-btn', 'color')).toBe('rgb(201, 165, 76)');
+    // 盤の画面：藍の地（上に青海波をごく薄く）、盤の下の一覧は生成りの地
+    expect(await style('.app', 'background-color')).toBe('rgb(28, 39, 64)');
+    expect(await page.locator('.app').evaluate((e) => getComputedStyle(e, '::before').backgroundImage)).toContain("stroke-opacity='0.05'");
+    expect(await style('.tree-side', 'background-color')).toBe('rgb(243, 238, 227)');
+    expect(await style('.move-bar-fixed', 'background-color')).toBe('rgb(21, 29, 49)');
+    expect(await style('.move-bar-btn', 'color')).toBe('rgb(243, 236, 220)');
   });
 
   test('全画面で、文字と地の色の差が足りる（本文 4.5:1、大きな文字 3:1）', async ({ page }) => {
@@ -238,7 +251,8 @@ test.describe('12-2 盤と駒', () => {
     await expect(board).toBeVisible();
     const css = (sel: string, prop: string) => page.locator(sel).first().evaluate((e, p) => getComputedStyle(e).getPropertyValue(p), prop);
     expect(await css('svg.board', 'background-image')).toContain('wood');
-    expect(await css('svg.board', 'box-shadow')).toContain('rgb(201, 165, 76)');
+    // 盤のまわりは金の細い線 1 本（段階13）
+    expect(await css('svg.board', 'box-shadow')).toContain('rgba(201, 165, 76, 0.55) 0px 0px 0px 1px');
     expect(await css('.piece-text', 'font-family')).toContain('Joban Koma');
     expect(await css('.board-coord', 'font-family')).toContain('Joban Mincho');
     // 影は駒と同じ数（初期配置は 40 枚）。CSS の filter は使わない
@@ -284,7 +298,7 @@ async function seedStudyRecord(page: Page) {
 }
 
 test.describe('12-3 定跡帳', () => {
-  test('一覧の上の集計（研究手順の数・覚えた問題・前回まちがい）、行ごとの覚えた割合の輪、グループの見出しの芽の紋', async ({ page }) => {
+  test('一覧の上の集計（研究手順の数・覚えた問題・前回まちがい）、行ごとの覚えた割合の輪（段階13 で芽の紋はやめた）', async ({ page }) => {
     await openHome(page);
     await page.getByTestId('study-import-file').setInputFiles({
       name: 's.json',
@@ -303,7 +317,7 @@ test.describe('12-3 定跡帳', () => {
     await expect(rings).toHaveCount(2);
     await expect(rings.nth(0)).toHaveAttribute('aria-label', '覚えた問題 3／6（50%）');
     await expect(rings.nth(1)).toHaveAttribute('aria-label', '覚えた問題 3／5（60%）');
-    await expect(page.getByTestId('tree-group-head').locator('.sprout-mark')).toHaveCount(1);
+    await expect(page.locator('.sprout-mark')).toHaveCount(0);
     // 研究手順の行は 1 枚のカード（行と ⋯ が同じ箱）
     const row = await page.locator('.tree-row').first().boundingBox();
     const menu = await page.getByTestId('study-menu').first().boundingBox();
@@ -311,7 +325,7 @@ test.describe('12-3 定跡帳', () => {
     expect(Math.round(menu!.height)).toBeGreaterThanOrEqual(44);
   });
 
-  test('定跡帳の盤の画面：［復習］は金、「この局面からの研究」に芽の紋と、その手を通る研究手順の割合の棒', async ({ page }) => {
+  test('定跡帳の盤の画面：［復習］は金、「この局面からの研究」に、その手を通る研究手順の割合の棒（名前の下）', async ({ page }) => {
     await openHome(page);
     await page.getByTestId('study-import-file').setInputFiles({
       name: 's.json',
@@ -324,12 +338,14 @@ test.describe('12-3 定跡帳', () => {
     for (let i = 0; i < 3; i++) await page.getByTestId('study-prev').click();
     await expect(page.getByTestId('study-book-branch')).toHaveCount(2);
     expect(await page.getByTestId('book-head-review').evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgb(201, 165, 76)');
-    await expect(page.getByTestId('study-book-list').locator('.sprout-mark')).toHaveCount(1);
     const bars = page.getByTestId('study-book-bar');
     await expect(bars).toHaveCount(2);
     for (const i of [0, 1]) {
       const [bar, fill] = await Promise.all([bars.nth(i).boundingBox(), bars.nth(i).locator('.book-bar-fill').boundingBox()]);
       expect(Math.round((fill!.width / bar!.width) * 100)).toBe(50);
+      // 棒は名前の下（段階13。名前の幅を広げるため）
+      const names = (await page.getByTestId('study-book-branch').nth(i).locator('.book-names').boundingBox())!;
+      expect(bar!.y).toBeGreaterThanOrEqual(names.y + names.height - 1);
     }
   });
 });
@@ -358,6 +374,8 @@ test.describe('12-4 残りの画面', () => {
       mimeType: 'application/json',
       buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies: [STUDIES[0]] })),
     });
+    // 取り込みの保存が終わってから復習を開く（終わる前に開くと問題が 0 になることがあった）
+    await expect(page.getByTestId('study-item')).toHaveCount(1);
     await page.goto('./#/study-review/s-line');
     const progress = page.getByTestId('review-progress');
     await expect(progress).toHaveText('今日 1／5問');
@@ -387,7 +405,7 @@ test.describe('12-4 残りの画面', () => {
     await expect(progress).toHaveText('今日 5／5問');
     await play('25', '24');
     await expect(page.getByTestId('review-result-score')).toBeVisible();
-    expect(await page.getByTestId('review-result').evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgb(248, 243, 231)');
+    expect(await page.getByTestId('review-result').evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgb(255, 253, 248)');
     expect(await lowContrast(page)).toEqual([]);
   });
 
@@ -399,6 +417,7 @@ test.describe('12-4 残りの画面', () => {
       mimeType: 'application/json',
       buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies: [STUDIES[0]] })),
     });
+    await expect(page.getByTestId('study-item')).toHaveCount(1);
     await page.goto('./#/study-review/s-line');
     await expect(page.getByTestId('review-progress')).toBeVisible();
     await page.locator('[data-square="77"]').click();

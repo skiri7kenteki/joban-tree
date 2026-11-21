@@ -236,8 +236,8 @@ function ReviewView({ tree, initialRecord }: { tree: TreeData; initialRecord: Re
   return (
     <>
       <div class="screen-header">
-        <button type="button" class="btn btn-ghost" onClick={() => go(`/tree/${tree.id}`)}>
-          ‹ ツリー
+        <button type="button" class="btn btn-ghost btn-back" onClick={() => go(`/tree/${tree.id}`)}>
+          ‹<span class="back-text"> ツリー</span>
         </button>
         <h1 class="tree-title">復習：{tree.name}</h1>
       </div>

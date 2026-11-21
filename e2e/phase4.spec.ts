@@ -98,7 +98,8 @@ async function expectOneLineButtons(page: Page) {
     const lines = await button.evaluate((el) => {
       const range = document.createRange();
       range.selectNodeContents(el);
-      return new Set([...range.getClientRects()].map((r) => Math.round(r.top))).size;
+      // 段階13：スマホの「‹」の横の読み上げ用の文字（画面では大きさ 0）は数えない
+      return new Set([...range.getClientRects()].filter((r) => r.width > 1).map((r) => Math.round(r.top))).size;
     });
     expect(lines).toBe(1);
   }

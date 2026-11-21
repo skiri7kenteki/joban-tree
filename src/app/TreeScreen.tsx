@@ -356,8 +356,8 @@ function TreeView({ tree, studies, studyId, ply }: { tree: TreeData; studies: re
   return (
     <>
       <div class="screen-header">
-        <button type="button" class="btn btn-ghost" onClick={() => go('/trees')}>
-          ‹ 一覧
+        <button type="button" class="btn btn-ghost btn-back" onClick={() => go('/trees')}>
+          ‹<span class="back-text"> 一覧</span>
         </button>
         {/* 見出しは 2 段：小さく「ツリー」、その下に名前（長ければ …） */}
         <h1 class="tree-title book-title" data-testid="tree-title">

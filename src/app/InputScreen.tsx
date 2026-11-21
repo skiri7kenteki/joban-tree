@@ -284,8 +284,8 @@ export function InputScreen() {
   return (
     <>
       <div class="screen-header">
-        <button type="button" class="btn btn-ghost" onClick={() => go('/trees')}>
-          ‹ 一覧
+        <button type="button" class="btn btn-ghost btn-back" onClick={() => go('/trees')}>
+          ‹<span class="back-text"> 一覧</span>
         </button>
         <h1>新しいツリー</h1>
       </div>

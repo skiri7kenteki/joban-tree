@@ -33,7 +33,7 @@ import {
 import type { Side } from '../shogi/position';
 import { listName, type OpeningTemplate } from '../tree/templates';
 import { firstLine, liftTreeStudies, studyMovesText, studyStartIndex } from '../tree/studies';
-import { LearnRing, SproutMark } from '../components/Marks';
+import { LearnRing } from '../components/Marks';
 import { loadReview } from '../storage/review';
 import { STUDY_RECORD_ID, reviewStart, summarizeStudies } from '../review/studyReview';
 import type { ReviewRecord, ReviewSummary } from '../review/review';
@@ -51,6 +51,7 @@ import { fixStoredStudies } from './studyFix';
 export const registerRequest = signal(false);
 import { StudyEditDialog, StudyExportDialog, shareStudies } from './StudyDialogs';
 import { ensureStudies, homeNotice, importLiftedStudies, library, removeStudy, saveStudies, updateStudyFields } from './studies';
+import { Words } from '../components/Words';
 
 export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'trees'; isolationMessage: string | null }) {
   const [trees, setTrees] = useState<TreeSummary[] | null>(null);
@@ -323,10 +324,11 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
 
       {registerMenu && (
         <Dialog title="研究手順を登録" onClose={() => setRegisterMenu(false)} testId="study-register-menu" sheet>
+          {/* 段階13：金のボタンは 1 画面に 1 つほど。ここは選ぶだけの窓なので、どれも普通のボタン */}
           <div class="dialog-actions dialog-actions-column">
             <button
               type="button"
-              class="btn btn-primary"
+              class="btn"
               data-testid="study-register-hirate"
               onClick={() => {
                 setRegisterMenu(false);
@@ -337,7 +339,7 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
             </button>
             <button
               type="button"
-              class="btn btn-primary"
+              class="btn"
               data-testid="study-register-template"
               onClick={() => {
                 setRegisterMenu(false);
@@ -533,7 +535,6 @@ function GroupSection<T>({
           <span class="tree-group-caret" aria-hidden="true">
             {open ? '▼' : '▶'}
           </span>
-          <SproutMark />
           <span class="tree-group-label">{g.label}</span>
           <span class="tree-group-count num" data-testid="tree-group-count">
             {g.items.length}
@@ -598,7 +599,7 @@ function StudyRow({ study, bookKey, summary, onMenu }: { study: Study; bookKey: 
             <span class="study-star" aria-hidden="true">
               ★
             </span>
-            {study.name}
+            <Words text={study.name} />
           </span>
         </span>
         {note && (
@@ -713,7 +714,9 @@ function TreeRow({
     <li class="tree-row">
       <button type="button" class="tree-item" data-testid={testId} onClick={() => go(`/tree/${t.id}`)}>
         <span class="tree-item-title">
-          <span class="tree-item-name">{t.name}</span>
+          <span class="tree-item-name">
+            <Words text={t.name} />
+          </span>
           {t.source?.kind === 'bundled' && (
             <span class="chip chip-small chip-bundled" data-testid="bundled-chip">
               用意済み

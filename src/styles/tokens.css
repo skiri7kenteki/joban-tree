@@ -1,6 +1,8 @@
 /* 見た目の変数（DESIGN.md の表と同じ値）。色はここ以外に直接書かない
-   段階12（v0.30.0〜）：C 案「対局室」。全画面を藍の地にして、本文は生成りのカード（紙）の中に置く。
-   --color-text などは「藍の地の上」の値。カードの中（base.css の「紙」の部品）では --paper-* に入れ替わる */
+   段階13（v0.35.0〜）：C 案「対局室」を洗練。本文の地は明るい生成り、カードは白に近いアイボリー。
+   藍は「藍の帯」（一覧の見出しの帯・下のタブ・盤の下の操作バー・盤の画面の盤のまわり）だけ。
+   --color-text などは「生成りの地の上」の値。藍の帯の中（base.css の「藍」の並び）では --ink-* に入れ替わる。
+   金は「選んでいる状態・いちばん大事なボタン・控えめな区切り」だけ（DESIGN.md の「金を使ってよい所」） */
 
 /* 見出し・盤の数字の明朝体（Noto Serif JP の太さ 600 を JIS 第 1 水準まで削ったもの。scripts/make-font.py、
    ライセンスは public/fonts/OFL-NotoSerifJP.txt）。無い文字は端末の明朝体で出る */
@@ -20,57 +22,77 @@
 }
 
 :root {
-  /* 藍の地の上 */
-  --color-bg: #1c2740;
-  --color-bg-deep: #141c30;
-  --color-bg-glow: #2a3a66;
-  --color-text: #f3ecdc;
-  --color-text-muted: #b5bccd;
-  --color-border: rgba(201, 165, 76, 0.38);
-  --color-accent: #c9a54c;
-  --color-accent-text: #1c2740;
-  --color-danger: #f2a093;
-  --color-ok: #9bd6a9;
+  /* 生成りの地の上（一覧の本文・盤の画面の下の一覧） */
+  --ground: #f3eee3;
+  --color-bg: var(--ground);
+  --color-text: #1d2333;
+  --color-text-muted: #595e6d;
+  --color-border: #e2dbcc;
+  --color-accent: #7a5c1a;
+  --color-accent-text: #fffdf8;
+  --color-danger: #b3311f;
+  --color-ok: #1e6b37;
 
-  /* 生成りのカード（紙）の中 */
-  --paper: #f8f3e7;
-  --paper-sunken: #efe6d2;
-  --paper-selected: #ecdcae;
+  /* 藍の帯の中 */
+  --ink: #1c2740;
+  --ink-deep: #151d31;
+  --ink-text: #f3ecdc;
+  --ink-muted: #b3bacb;
+  --ink-line: rgba(243, 236, 220, 0.16);
+  --ink-button-line: rgba(243, 236, 220, 0.3);
+  --ink-accent: #e2c77d;
+  --ink-danger: #f2a093;
+  --ink-ok: #9bd6a9;
+  --color-bg-deep: var(--ink-deep);
+
+  /* カード（白に近いアイボリー）の中 */
+  --paper: #fffdf8;
+  --paper-sunken: #f6f1e6;
+  --paper-selected: #f2e6c4;
   --paper-text: #1d2333;
-  --paper-muted: #5c6070;
-  --paper-border: #d9ccad;
+  --paper-muted: #595e6d;
+  --paper-border: #e2dbcc;
   --paper-accent: #7a5c1a;
-  --paper-accent-text: #f8f3e7;
+  --paper-accent-text: #fffdf8;
   --paper-danger: #b3311f;
   --paper-ok: #1e6b37;
   --color-surface: var(--paper);
+  /* 普通のボタンの縁（薄い灰） */
+  --line-strong: #d4ccbb;
 
-  /* 金（明るい金は藍の上だけ。生成りの上の金の文字は --paper-accent） */
+  /* 金（明るい金は藍の上だけ。生成りの上の金の文字は --paper-accent）。塗りは平らな金 1 色（段階13） */
   --gold: #c9a54c;
   --gold-light: #e2c77d;
   --gold-dark: #8f6f24;
-  --gold-line: rgba(201, 165, 76, 0.6);
-  --gold-fill: linear-gradient(180deg, #e6ca7c 0%, #c9a54c 55%, #b38e37 100%);
+  --gold-line: rgba(201, 165, 76, 0.5);
+  --gold-fill: var(--gold);
   --gold-fill-text: #1c2740;
 
-  /* 和の模様（段階12-3）：青海波。画面のいちばん上に薄く敷き、下へ消えていく（base.css の body::before） */
-  --pattern-seigaiha: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='24' viewBox='0 0 48 24'%3E%3Cg stroke='%23c9a54c' stroke-opacity='0.16' fill='none'%3E%3Ccircle cx='0' cy='0' r='23' fill='%23233159'/%3E%3Ccircle cx='0' cy='0' r='23'/%3E%3Ccircle cx='0' cy='0' r='17'/%3E%3Ccircle cx='0' cy='0' r='11'/%3E%3Ccircle cx='0' cy='0' r='5'/%3E%3Ccircle cx='48' cy='0' r='23' fill='%23233159'/%3E%3Ccircle cx='48' cy='0' r='23'/%3E%3Ccircle cx='48' cy='0' r='17'/%3E%3Ccircle cx='48' cy='0' r='11'/%3E%3Ccircle cx='48' cy='0' r='5'/%3E%3Ccircle cx='24' cy='12' r='23' fill='%23233159'/%3E%3Ccircle cx='24' cy='12' r='23'/%3E%3Ccircle cx='24' cy='12' r='17'/%3E%3Ccircle cx='24' cy='12' r='11'/%3E%3Ccircle cx='24' cy='12' r='5'/%3E%3Ccircle cx='0' cy='24' r='23' fill='%23233159'/%3E%3Ccircle cx='0' cy='24' r='23'/%3E%3Ccircle cx='0' cy='24' r='17'/%3E%3Ccircle cx='0' cy='24' r='11'/%3E%3Ccircle cx='0' cy='24' r='5'/%3E%3Ccircle cx='48' cy='24' r='23' fill='%23233159'/%3E%3Ccircle cx='48' cy='24' r='23'/%3E%3Ccircle cx='48' cy='24' r='17'/%3E%3Ccircle cx='48' cy='24' r='11'/%3E%3Ccircle cx='48' cy='24' r='5'/%3E%3C/g%3E%3C/svg%3E");
+  /* 覚えた割合（輪・棒）：落ち着いた緑。藍の上は明るい緑 */
+  --color-progress: #2f7a55;
+  --color-progress-ink: #8fd0a8;
+  --color-track: #e6dfd0;
+  --color-track-ink: rgba(243, 236, 220, 0.18);
+
+  /* 和の模様（段階12-3）：青海波。段階13 から藍の部分だけに、ごく薄く（線の濃さ 0.05。円の塗りは藍と同じ色） */
+  --pattern-seigaiha: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='24' viewBox='0 0 48 24'%3E%3Cg stroke='%23e2c77d' stroke-opacity='0.05' fill='none'%3E%3Ccircle cx='0' cy='0' r='23' fill='%231c2740'/%3E%3Ccircle cx='0' cy='0' r='23'/%3E%3Ccircle cx='0' cy='0' r='17'/%3E%3Ccircle cx='0' cy='0' r='11'/%3E%3Ccircle cx='0' cy='0' r='5'/%3E%3Ccircle cx='48' cy='0' r='23' fill='%231c2740'/%3E%3Ccircle cx='48' cy='0' r='23'/%3E%3Ccircle cx='48' cy='0' r='17'/%3E%3Ccircle cx='48' cy='0' r='11'/%3E%3Ccircle cx='48' cy='0' r='5'/%3E%3Ccircle cx='24' cy='12' r='23' fill='%231c2740'/%3E%3Ccircle cx='24' cy='12' r='23'/%3E%3Ccircle cx='24' cy='12' r='17'/%3E%3Ccircle cx='24' cy='12' r='11'/%3E%3Ccircle cx='24' cy='12' r='5'/%3E%3Ccircle cx='0' cy='24' r='23' fill='%231c2740'/%3E%3Ccircle cx='0' cy='24' r='23'/%3E%3Ccircle cx='0' cy='24' r='17'/%3E%3Ccircle cx='0' cy='24' r='11'/%3E%3Ccircle cx='0' cy='24' r='5'/%3E%3Ccircle cx='48' cy='24' r='23' fill='%231c2740'/%3E%3Ccircle cx='48' cy='24' r='23'/%3E%3Ccircle cx='48' cy='24' r='17'/%3E%3Ccircle cx='48' cy='24' r='11'/%3E%3Ccircle cx='48' cy='24' r='5'/%3E%3C/g%3E%3C/svg%3E");
 
   /* 模様を下へ消していくための形（mask。色ではなく濃さとして使う） */
   --fade-down: linear-gradient(to bottom, #000 0%, transparent 100%);
 
-  /* 影（カードは少し浮かせる。窓・知らせはもう少し） */
-  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.55) inset, 0 2px 6px rgba(5, 8, 20, 0.28);
-  --shadow-button: 0 1px 2px rgba(5, 8, 20, 0.22);
-  --shadow-gold: 0 1px 0 rgba(255, 255, 255, 0.45) inset, 0 3px 8px rgba(5, 8, 20, 0.35);
-  --shadow-raise: 0 6px 24px rgba(5, 8, 20, 0.45);
+  /* 影（段階13：ごく薄く。ボタンは影なし。窓・知らせだけ少し浮かせる） */
+  --shadow-card: 0 1px 2px rgba(28, 39, 64, 0.06);
+  --shadow-button: none;
+  --shadow-gold: none;
+  --shadow-raise: 0 10px 30px rgba(15, 20, 35, 0.28);
 
   /* 盤と駒（段階12-2）。盤の地は木目の画像（board.css）なので塗らない */
   --color-board: transparent;
   --color-board-line: rgba(58, 38, 10, 0.78);
   --color-board-frame: #3d2a0e;
   --color-board-coord: #4a3414;
-  --shadow-board: 0 0 0 2px #c9a54c, 0 0 0 3px #3d2a0e, 0 10px 22px rgba(5, 8, 20, 0.55);
+  /* 盤のまわりは金の細い線 1 本と柔らかい影（段階13。前は金 2px＋濃い茶の二重の縁） */
+  --shadow-board: 0 0 0 1px rgba(201, 165, 76, 0.55), 0 8px 20px rgba(5, 8, 20, 0.45);
   --color-piece-top: #fbe9bf;
   --color-piece: #efce8e;
   --color-piece-bottom: #dcb06a;
@@ -85,12 +107,13 @@
   /* 駒台（持ち駒の列） */
   --stand-shade: linear-gradient(180deg, rgba(70, 40, 12, 0.72), rgba(48, 27, 8, 0.82));
   --stand-base: #3b240c;
-  --stand-tag: rgba(20, 28, 48, 0.85);
+  --stand-tag: rgba(20, 28, 48, 0.8);
+  --stand-line: rgba(201, 165, 76, 0.3);
   --stand-text: #f3ecdc;
   --stand-muted: #d8c8a4;
   --stand-selected: rgba(226, 199, 125, 0.5);
   --stand-count-shadow: 0 0 2px #1c1206, 0 0 2px #1c1206;
-  --shadow-stand: 0 1px 0 rgba(255, 230, 180, 0.18) inset, 0 2px 6px rgba(5, 8, 20, 0.4);
+  --shadow-stand: 0 2px 6px rgba(5, 8, 20, 0.3);
   --color-last-move: rgba(176, 58, 28, 0.3);
   --color-last-move-from: rgba(176, 58, 28, 0.12);
   --color-selected: rgba(28, 39, 64, 0.42);
@@ -127,7 +150,7 @@
   --space-6: 24px;
 
   --radius-button: 8px;
-  --radius-card: 10px;
+  --radius-card: 12px;
   --radius-chip: 999px;
 
   --touch-min: 44px;

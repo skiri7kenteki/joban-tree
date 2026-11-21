@@ -16,7 +16,6 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { Board } from '../components/Board';
 import { Dialog } from '../components/Dialog';
 import { OnceHint } from '../components/OnceHint';
-import { SproutMark } from '../components/Marks';
 import { PromotionBox, useMoveInput } from '../components/useMoveInput';
 import { STARTPOS_SFEN, moveText, type Side } from '../shogi/position';
 import { studyPositions } from '../review/studyReview';
@@ -461,8 +460,8 @@ function BookViewScreen({
   return (
     <>
       <div class="screen-header">
-        <button type="button" class="btn btn-ghost" onClick={() => go('/')}>
-          ‹ 一覧
+        <button type="button" class="btn btn-ghost btn-back" onClick={() => go('/')}>
+          ‹<span class="back-text"> 一覧</span>
         </button>
         <h1 class="tree-title book-title" data-testid="book-title">
           <span class="book-kicker" data-testid="book-kicker">
@@ -778,7 +777,6 @@ function BookBranches({
   return (
     <div class="card candidates book-list" ref={listRef} data-testid="study-book-list">
       <div class="candidates-head book-list-head">
-        <SproutMark />
         <strong data-testid="study-book-head">この局面からの研究（{count} 本）</strong>
       </div>
       <ul class="candidate-list">
