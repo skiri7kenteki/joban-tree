@@ -208,7 +208,7 @@ function statusLine(state: BakeState): string {
 
 async function main(): Promise<void> {
   console.log('');
-  console.log(`序盤ツリー：同梱ツリーを作る${trial ? '（試し）' : ''}`);
+  console.log(`将棋定跡帳：同梱ツリーを作る${trial ? '（試し）' : ''}`);
   console.log(`  戦型：${template.name}（${template.mySide === 'black' ? '先手' : '後手'}が自分）`);
   console.log(
     `  設定：${settings.maxRounds} 往復・相手の応手は最大 ${settings.multiPV}・W ${settings.windowCp}・相手の局面 ${settings.movetimeMs / 1000} 秒・自分の局面 ${(settings.replyMs ?? 0) / 1000} 秒`,

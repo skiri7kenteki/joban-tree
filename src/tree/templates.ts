@@ -75,7 +75,7 @@ export type TemplateParseResult = { ok: true; templates: OpeningTemplate[] } | {
 /** 戦型のファイル（JSON を読んだもの）を確かめる。1 つでもおかしければ全体を読まない */
 export function checkTemplateFile(raw: unknown): TemplateParseResult {
   if (!isObject(raw) || raw.app !== TREE_APP || raw.kind !== TEMPLATE_KIND) {
-    return { ok: false, message: '序盤ツリーの戦型のファイルではありません。' };
+    return { ok: false, message: '将棋定跡帳の戦型のファイルではありません。' };
   }
   if (typeof raw.version !== 'number' || raw.version > TEMPLATE_FORMAT_VERSION) {
     return { ok: false, message: 'アプリより新しい形式のファイルです。アプリを最新にしてから読み込んでください。' };

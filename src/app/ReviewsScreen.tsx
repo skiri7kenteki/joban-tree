@@ -36,7 +36,7 @@ export function ReviewsScreen() {
   const loading = !trees || !records || !studies;
   const templates = allTemplates();
   const studyRecord = records?.find((r) => r.treeId === STUDY_RECORD_ID);
-  const groups = studies ? groupStudies(studies, templates, '') : [];
+  const groups = studies ? groupStudies(studies, templates) : [];
 
   return (
     <>

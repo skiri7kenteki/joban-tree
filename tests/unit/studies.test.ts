@@ -108,7 +108,7 @@ describe('戦型（7-1 と同じ決まり）', () => {
     expect(studyTemplate({ moves: ['2g2f'] }, TEMPLATES)).toBeNull();
   });
 
-  it('一覧のグループ：戦型のグループ × 自分の側。グループの中は直した日の新しい順。その他はいちばん下。名前・メモで絞り込む', () => {
+  it('一覧のグループ：戦型のグループ × 自分の側。グループの中は直した日の新しい順。その他はいちばん下', () => {
     const list = [
       study('a', [...KAKU.moves, '3d3f'], { updatedAt: 10, note: '狙いは△8四飛' }),
       study('b', [...AONO.moves, '3d3f'], { updatedAt: 30 }),
@@ -116,15 +116,13 @@ describe('戦型（7-1 と同じ決まり）', () => {
       study('d', ['2g2f', '8c8d'], { updatedAt: 5 }),
       study('e', ['5g5f', '3c3d'], { updatedAt: 1, mySide: 'black' }),
     ];
-    const groups = groupStudies(list, TEMPLATES, '');
+    const groups = groupStudies(list, TEMPLATES);
     expect(groups.map((g) => [g.key, g.label, g.items.map((s) => s.id)])).toEqual([
       ['study:横歩取り|white', '横歩取り（後手番）', ['b', 'a']],
       ['study:横歩取り|black', '横歩取り（先手番）', ['c']],
       ['study:中飛車|black', '中飛車（先手番）', ['e']],
       ['study:other|white', 'その他（後手番）', ['d']],
     ]);
-    expect(groupStudies(list, TEMPLATES, '８四飛').flatMap((g) => g.items.map((s) => s.id))).toEqual(['a']);
-    expect(groupStudies(list, TEMPLATES, 'zzz')).toEqual([]);
   });
 });
 

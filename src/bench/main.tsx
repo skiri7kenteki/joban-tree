@@ -206,7 +206,7 @@ function Bench() {
 
   const summary = () =>
     [
-      `序盤ツリー v${APP_VERSION}（エンジン ${ENGINE_ID}）`,
+      `将棋定跡帳 v${APP_VERSION}（エンジン ${ENGINE_ID}）`,
       `端末: ${navigator.userAgent}`,
       `CPU数: ${navigator.hardwareConcurrency ?? '?'}／isolated: ${self.crossOriginIsolated}／ハッシュ: ${hashMB}MB`,
       timings

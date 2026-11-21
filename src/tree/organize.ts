@@ -1,4 +1,4 @@
-// トップ画面の整理（段階7-1）：ツリーを「戦型のグループ × 自分の側」でまとめる・名前で絞り込む・最近開いたもの。
+// トップ画面の整理（段階7-1）：ツリーを「戦型のグループ × 自分の側」でまとめる・最近開いたもの。（名前で絞り込む欄は v0.29.0 でやめた）
 // 画面から切り離した関数だけにして、テストで確かめる。
 //
 // どの戦型のツリーか（templateOf）：
@@ -88,23 +88,6 @@ export function groupTrees<T extends OrganizeItem>(items: readonly T[], template
   return out;
 }
 
-/** 絞り込みのために文字をそろえる（全角・半角、大文字・小文字を区別しない。「３六飛」でも「3六飛」でも当たる） */
-export function normalizeForSearch(text: string): string {
-  return text.normalize('NFKC').toLowerCase().replace(/\s+/g, ' ').trim();
-}
-
-/** 名前（など）に、絞り込みの文字が含まれるか。空なら当てはまる */
-export function matchesQuery(texts: readonly string[], query: string): boolean {
-  const q = normalizeForSearch(query);
-  if (q === '') return true;
-  return texts.some((t) => normalizeForSearch(t).includes(q));
-}
-
-/** 名前で絞り込む（空なら全部）。段階8-1〜 ツリーの名前だけに当てる（研究手順はツリーの外に移したので） */
-export function filterByName<T extends Pick<OrganizeItem, 'name'>>(items: readonly T[], query: string): T[] {
-  return items.filter((t) => matchesQuery([t.name], query));
-}
-
 /** グループ分けに使う、研究手順の形 */
 export interface StudyItem {
   id: string;
@@ -121,12 +104,10 @@ export const STUDY_GROUP_PREFIX = 'study:';
 
 /**
  * 研究手順の一覧（段階8-1〜 ツリーから独立した研究手順）：ツリーと同じ決まり（戦型のグループ × 自分の側）でまとめる。
- * 戦型は、記録した戦型が今もあればそれ、無ければ手順がいちばん長く一致する戦型。グループの中は直した日の新しい順。
- * 絞り込みは名前とメモに当てる
+ * 戦型は、記録した戦型が今もあればそれ、無ければ手順がいちばん長く一致する戦型。グループの中は直した日の新しい順
  */
-export function groupStudies<S extends StudyItem>(studies: readonly S[], templates: readonly OpeningTemplate[], query: string): TreeGroup<S>[] {
+export function groupStudies<S extends StudyItem>(studies: readonly S[], templates: readonly OpeningTemplate[]): TreeGroup<S>[] {
   const items = studies
-    .filter((s) => matchesQuery([s.name, s.note], query))
     .map((s) => ({
       study: s,
       id: s.id,
@@ -204,7 +185,7 @@ export function bookPool<S extends StudyItem>(key: string, studies: readonly S[]
     const side = bookSide(key);
     return studies.filter((s) => s.mySide === side).sort((a, b) => b.updatedAt - a.updatedAt);
   }
-  return groupStudies(studies, templates, '').find((g) => g.key === key)?.items ?? [];
+  return groupStudies(studies, templates).find((g) => g.key === key)?.items ?? [];
 }
 
 /** その研究手順を、定跡帳 key に入れてよいか（グループから外れる手は足さない。平手からの定跡帳は側が同じなら何でも） */

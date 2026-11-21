@@ -1,4 +1,4 @@
-// 段階7-1：トップ画面の整理（どの戦型のツリーか・グループ分けと並び順・絞り込み・最近開いた）
+// 段階7-1：トップ画面の整理（どの戦型のツリーか・グループ分けと並び順・最近開いた）
 import { describe, expect, it } from 'vitest';
 import { STARTPOS_SFEN } from '../../src/shogi/position';
 import { parseTreeJson, treeToJson } from '../../src/tree/backup';
@@ -7,10 +7,7 @@ import { createTree } from '../../src/tree/generator';
 import {
   OTHER_GROUP,
   addRecent,
-  filterByName,
   groupTrees,
-  matchesQuery,
-  normalizeForSearch,
   recentItems,
   templateOf,
   type OrganizeItem,
@@ -105,25 +102,6 @@ describe('グループ分けと並び順（groupTrees）', () => {
     expect(groups).toHaveLength(1);
     expect(groups[0].items.map((t) => t.name)).toEqual(['用意済み', '新しい', '中くらい', '古い']);
     expect(groupTrees([], TEMPLATES)).toEqual([]);
-  });
-});
-
-describe('絞り込み', () => {
-  it('名前の一部で絞り込む。全角・半角、大文字・小文字を区別しない。空なら全部', () => {
-    const items = [item('', { name: '青野流 → △７六飛まで' }), item('', { name: '▲3六飛 △8四飛' }), item('', { name: 'Yokofu Test' })];
-    expect(filterByName(items, '7六飛').map((t) => t.name)).toEqual(['青野流 → △７六飛まで']);
-    expect(filterByName(items, '３六').map((t) => t.name)).toEqual(['▲3六飛 △8四飛']);
-    expect(filterByName(items, 'yokofu').map((t) => t.name)).toEqual(['Yokofu Test']);
-    expect(filterByName(items, '  ')).toHaveLength(3);
-    expect(filterByName(items, '相掛かり')).toEqual([]);
-    expect(normalizeForSearch('ＡＢＣ　１２')).toBe('abc 12');
-    expect(matchesQuery(['名前', 'メモの中の言葉'], 'メモ')).toBe(true);
-  });
-
-  it('絞り込んだ後もグループに分けられる（当てはまるツリーだけのグループ）', () => {
-    const items = [item(YOKOFU, { name: '青野流' }), item('5g5f', { name: '中飛車' })];
-    const groups = groupTrees(filterByName(items, '青野'), TEMPLATES);
-    expect(groups.map((g) => g.label)).toEqual(['横歩取り（後手番）']);
   });
 });
 

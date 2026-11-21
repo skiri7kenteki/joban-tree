@@ -11,7 +11,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { Dialog } from '../components/Dialog';
 import type { Side } from '../shogi/position';
 import { deleteMyTemplate, listMyTemplates, putMyTemplates, type StoredTemplate } from '../storage/templates';
-import { fileNameOf } from '../tree/backup';
+import { dateStamp, fileNameOf } from '../tree/backup';
 import {
   BUNDLED_TEMPLATES,
   checkTemplateFields,
@@ -86,7 +86,7 @@ export function TemplatePicker({ onPick, onClose }: { onPick: (t: OpeningTemplat
     setMessage('');
     if (mine.length === 0) return;
     // 共有ボタンを押した直後に共有メニューを出す（iPad の Safari 対策で、ここより前に await を挟まない）
-    const outcome = await shareFile(fileNameOf('序盤ツリーの戦型', 'json'), templatesToJson(mine), 'application/json');
+    const outcome = await shareFile(fileNameOf(`戦型-${dateStamp()}`, 'json'), templatesToJson(mine), 'application/json');
     setMessage(OUTCOME_TEXT[outcome]);
   }
 

@@ -1,5 +1,5 @@
 // トップ画面：新しいツリーを作るボタン、保存してあるツリーの一覧（名前の変更・共有・削除）、ファイルからの取り込み。
-// 段階7-1：ツリーを「戦型のグループ × 自分の側」でまとめる（開閉でき、状態は端末に覚える）。名前で絞り込む。最近開いた 3 件。
+// 段階7-1：ツリーを「戦型のグループ × 自分の側」でまとめる（開閉でき、状態は端末に覚える）。最近開いた 3 件。
 // 段階7-2：「ツリー｜研究手順」の切り替え。
 // 段階8-1：研究手順はツリーから独立したデータ（src/tree/studies.ts）。研究手順のタブ：
 //   - 「＋ 研究手順を登録」（盤で指す・棋譜を貼る／変化付き KIF からまとめて取り込む（段階8-2）／JSON を取り込む）、「書き出し」（選んで JSON・KIF）
@@ -10,6 +10,7 @@
 //   - 端末の保存場所を新しい版にしたときの移し替えの結果を、一度だけ知らせる
 // 段階11-1：画面の下のタブに分けた。list='studies' が定跡帳のタブ（#/。いちばん目立つのは「＋ 研究手順を登録」）、
 //   list='trees' がツリーのタブ（#/trees。「＋ 新しいツリーを作る」・最近開いた・ツリーの取り込み）。画面の上の「ツリー｜研究手順」の切り替えはやめた
+// v0.29.0：名前・メモで絞り込む欄はやめた（持ち主の依頼 2026-11-21。使わなかったため）
 
 import { signal } from '@preact/signals';
 import { useEffect, useRef, useState } from 'preact/hooks';
@@ -21,11 +22,9 @@ import { latestBundled } from '../tree/bundledCatalog';
 import {
   RECENT_MIN_TREES,
   bookKeyOfGroup,
-  filterByName,
   groupStudies,
   groupTrees,
   hirateBookKey,
-  normalizeForSearch,
   recentItems,
   type TreeGroup,
 } from '../tree/organize';
@@ -89,8 +88,6 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
   const [studyConflict, setStudyConflict] = useState<StudyImportPlan | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const studyFileRef = useRef<HTMLInputElement>(null);
-  /** 名前で絞り込む文字 */
-  const [query, setQuery] = useState('');
   // 生成が進んだら一覧（局面の数）も新しくする
   const version = treeVersion.value;
   // 自分で登録した戦型も、グループ分けに使う（読み込んだら描き直す）
@@ -113,15 +110,13 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
   }, [version, reload]);
 
   const running = isGenerating() ? generation.value!.treeId : null;
-  const searching = normalizeForSearch(query) !== '';
   const tab = list;
   const templates = allTemplates();
-  const groups = trees ? groupTrees(filterByName(trees, query), templates) : [];
-  const studyGroups = studies ? groupStudies(studies, templates, query) : [];
-  const allStudyGroups = studies ? groupStudies(studies, templates, '') : [];
+  const groups = trees ? groupTrees(trees, templates) : [];
+  const studyGroups = studies ? groupStudies(studies, templates) : [];
   const studyCount = studies?.length ?? 0;
-  // 最近開いた：ツリーが 4 つ以上あり、絞り込んでいないときだけ
-  const recent = trees && !searching && trees.length >= RECENT_MIN_TREES ? recentItems(trees, recentOpened.value) : [];
+  // 最近開いた：ツリーが 4 つ以上あるときだけ
+  const recent = trees && trees.length >= RECENT_MIN_TREES ? recentItems(trees, recentOpened.value) : [];
   const collapsed = collapsedGroups.value;
   const rowProps = (t: TreeSummary) => ({ tree: t, running: running === t.id, onMenu: () => void openMenu(t.id) });
 
@@ -243,22 +238,6 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
         )}
       </div>
 
-      {trees && (
-        <>
-          {(tab === 'trees' ? trees.length > 0 : studyCount > 0) && (
-            <input
-              type="search"
-              class="home-filter"
-              placeholder={tab === 'trees' ? '名前で絞り込む…' : '名前・メモで絞り込む…'}
-              aria-label={tab === 'trees' ? '名前で絞り込む' : '名前・メモで絞り込む'}
-              data-testid="tree-filter"
-              value={query}
-              onInput={(e) => setQuery((e.target as HTMLInputElement).value)}
-            />
-          )}
-        </>
-      )}
-
       {error && <p class="status-ng">{error}</p>}
       {message && (
         <p class="muted" role="status" data-testid="home-message">
@@ -282,13 +261,8 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
           )}
 
           {trees.length > 0 && <h2>保存したツリー</h2>}
-          {searching && groups.length === 0 && (
-            <p class="muted" data-testid="filter-empty">
-              「{query.trim()}」に当てはまるツリーはありません。
-            </p>
-          )}
           {groups.map((g) => (
-            <GroupSection key={g.key} group={g} open={searching || !collapsed.includes(g.key)} searching={searching}>
+            <GroupSection key={g.key} group={g} open={!collapsed.includes(g.key)}>
               {g.items.map((t) => (
                 <TreeRow key={t.id} {...rowProps(t)} testId="tree-item" />
               ))}
@@ -304,18 +278,12 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
               研究手順はまだありません。「＋ 研究手順を登録」で平手か戦型を選び、盤で指すと研究手順になります。
             </p>
           )}
-          {searching && studyCount > 0 && studyGroups.length === 0 && (
-            <p class="muted" data-testid="filter-empty">
-              「{query.trim()}」に当てはまる研究手順はありません。
-            </p>
-          )}
           {studyGroups.map((g) => (
             <GroupSection
               key={g.key}
               group={g}
-              open={searching || !collapsed.includes(g.key)}
-              searching={searching}
-              onMenu={searching ? undefined : () => setMenuGroup(allStudyGroups.find((x) => x.key === g.key) ?? g)}
+              open={!collapsed.includes(g.key)}
+              onMenu={() => setMenuGroup(g)}
             >
               {g.items.map((s) => (
                 <StudyRow key={s.id} study={s} bookKey={bookKeyOfGroup(g.key)} onMenu={() => setMenuStudy(s)} />
@@ -419,7 +387,7 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
         </Dialog>
       )}
 
-      {exporting && <StudyExportDialog groups={allStudyGroups} initial={exporting.initial} onClose={() => setExporting(null)} />}
+      {exporting && <StudyExportDialog groups={studyGroups} initial={exporting.initial} onClose={() => setExporting(null)} />}
 
       {menuStudy && (
         <StudyMenu
@@ -528,13 +496,11 @@ function migrationText(note: { moved: number; leftover: number; failed?: boolean
 function GroupSection<T>({
   group: g,
   open,
-  searching,
   onMenu,
   children,
 }: {
   group: TreeGroup<T>;
   open: boolean;
-  searching: boolean;
   onMenu?: () => void;
   children: preact.ComponentChildren;
 }) {
@@ -546,7 +512,6 @@ function GroupSection<T>({
           class="tree-group-head"
           aria-expanded={open}
           data-testid="tree-group-head"
-          disabled={searching}
           onClick={() => toggleGroup(g.key)}
         >
           <span class="tree-group-caret" aria-hidden="true">

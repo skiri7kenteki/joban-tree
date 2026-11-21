@@ -7,7 +7,7 @@
 import { useState } from 'preact/hooks';
 import { Dialog } from '../components/Dialog';
 import type { Side } from '../shogi/position';
-import { fileNameOf } from '../tree/backup';
+import { dateStamp, fileNameOf } from '../tree/backup';
 import { checkStudyFields, type Study } from '../tree/studies';
 import { studiesToJson, studiesToKif } from '../tree/studyFile';
 import type { TreeGroup } from '../tree/organize';
@@ -160,7 +160,7 @@ export function StudyViewDialog({
 
 /** 研究手順を JSON・KIF のファイルで共有する（中身は待たずに作る） */
 export function shareStudies(list: readonly Study[], kind: 'json' | 'kif'): Promise<ShareOutcome> {
-  const base = list.length === 1 ? list[0].name : `研究手順-${today()}`;
+  const base = list.length === 1 ? list[0].name : `研究手順-${dateStamp()}`;
   return kind === 'json'
     ? shareFile(fileNameOf(base, 'json'), studiesToJson(list), 'application/json')
     : shareFile(fileNameOf(base, 'kifu'), studiesToKif(list), 'text/plain');
@@ -236,12 +236,6 @@ export function StudyExportDialog({
       )}
     </Dialog>
   );
-}
-
-function today(): string {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
 }
 
 function formatDate(ms: number): string {

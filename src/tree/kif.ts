@@ -19,7 +19,7 @@ function baseRecord(tree: TreeData): Record {
   record.metadata.setStandardMetadata(RecordMetadataKey.TITLE, tree.name);
   for (const usi of tree.prefix.moves) appendUsi(record, usi);
   const side = tree.mySide === 'black' ? '先手' : '後手';
-  record.current.comment = joinComment(record.current.comment, `序盤ツリーの開始局面（自分は${side}。評価値は自分から見た値）`);
+  record.current.comment = joinComment(record.current.comment, `将棋定跡帳の開始局面（自分は${side}。評価値は自分から見た値）`);
   return record;
 }
 

@@ -30,7 +30,7 @@ export function parseTreeJson(text: string): ParseResult {
     return { ok: false, message: 'JSON として読めませんでした。このアプリで書き出したファイルを選んでください。' };
   }
   if (!isObject(raw) || raw.app !== TREE_APP) {
-    return { ok: false, message: '序盤ツリーのファイルではありません。' };
+    return { ok: false, message: '将棋定跡帳のファイルではありません。' };
   }
   if (!isNumber(raw.version) || raw.version > TREE_FORMAT_VERSION) {
     return { ok: false, message: 'アプリより新しい形式のファイルです。アプリを最新にしてから読み込んでください。' };
@@ -82,6 +82,12 @@ function checkV1(t: Record<string, unknown>): string | null {
   }
   if (!(t.rootKey in t.nodes)) return '開始局面';
   return null;
+}
+
+/** 今日の日付（ファイル名用、20261121 の形） */
+export function dateStamp(d = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
 }
 
 /** ファイル名に使えない文字を除く */

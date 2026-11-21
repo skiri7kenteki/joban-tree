@@ -68,7 +68,7 @@ describe('KIF の書き出し', () => {
     record.goto(0);
     while (record.goForward()) moves.push((record.current.move as { usi: string }).usi);
     expect(moves).toEqual(['7g7f', '3c3d', '2g2f']);
-    expect(kif).toContain('序盤ツリーの開始局面（自分は後手');
+    expect(kif).toContain('将棋定跡帳の開始局面（自分は後手');
   });
 });
 

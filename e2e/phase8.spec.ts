@@ -385,15 +385,6 @@ test.describe('8-1 書き出し・取り込み', () => {
     await expect(page.getByTestId('home-message')).toContainText('同じ手順の 1 本は取り込みませんでした');
     await expect(page.getByTestId('study-item')).toHaveCount(3);
   });
-
-  test('ツリーのタブの絞り込み欄の説明は「名前で絞り込む…」（切れない）', async ({ page }) => {
-    await openHome(page);
-    await importTrees(page, [lineTree('f', '絞り込みのツリー')]);
-    await page.getByTestId('tab-trees').click();
-    await expect(page.getByTestId('tree-filter')).toHaveAttribute('placeholder', '名前で絞り込む…');
-    await importStudies(page, [study('s-1', '研究1', ['7g7f'])]);
-    await expect(page.getByTestId('tree-filter')).toHaveAttribute('placeholder', '名前・メモで絞り込む…');
-  });
 });
 
 test.describe('8-1 移し替え（段階7の研究手順 → 独立した研究手順）', () => {

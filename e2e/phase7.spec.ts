@@ -120,40 +120,6 @@ test.describe('7-1 トップ画面（スマホ縦 360×740）', () => {
     await expect(page.getByTestId('recent')).toHaveCount(0);
   });
 
-  test('名前で絞り込む：全部のグループを開いて、当てはまるツリーだけ。全角・半角を区別しない', async ({ page }) => {
-    await openHome(page);
-    await importAll(page, TREES);
-    await openAndBack(page, '中飛車');
-    await openAndBack(page, '青野流');
-    await openAndBack(page, '初手から');
-    await openAndBack(page, '先手で横歩取り');
-    // 1 つ閉じておく
-    await group(page, 'その他').getByTestId('tree-group-head').click();
-    await expect(page.getByTestId('tree-item')).toHaveCount(3);
-
-    await page.getByTestId('tree-filter').fill('横歩');
-    await expect(page.getByTestId('recent')).toHaveCount(0);
-    await expect(page.getByTestId('tree-group-head')).toHaveText([/横歩取り（後手番）\s*1/, /横歩取り（先手番）\s*1/]);
-    await expect(page.getByTestId('tree-item')).toHaveText([/横歩取りの基本/, /先手で横歩取り/]);
-
-    // 閉じたグループも、絞り込み中は開く（半角の 7 で全角の ７ に当たる）
-    await page.getByTestId('tree-filter').fill('7六');
-    await expect(page.getByTestId('tree-item')).toHaveText([/青野流/]);
-    await page.getByTestId('tree-filter').fill('中飛');
-    await expect(page.getByTestId('tree-group-head')).toHaveText([/その他\s*1/]);
-    await expect(page.getByTestId('tree-group-head')).toHaveAttribute('aria-expanded', 'true');
-    await expect(page.getByTestId('tree-item')).toHaveText([/中飛車/]);
-
-    await page.getByTestId('tree-filter').fill('相掛かり');
-    await expect(page.getByTestId('tree-item')).toHaveCount(0);
-    await expect(page.getByTestId('filter-empty')).toContainText('「相掛かり」に当てはまるツリーはありません');
-
-    // 消すと元どおり（閉じたグループは閉じたまま、最近開いたも出る）
-    await page.getByTestId('tree-filter').fill('');
-    await expect(page.getByTestId('recent-item')).toHaveCount(3);
-    await expect(page.getByTestId('tree-item')).toHaveCount(3);
-  });
-
   test('新しく作ったツリーは、選んだ戦型のグループに入る（作った戦型を記録する）', async ({ page }) => {
     await openHome(page);
     await page.getByTestId('new-tree').click();

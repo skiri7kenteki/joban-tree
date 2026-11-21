@@ -63,7 +63,7 @@ test('JSON を取り込み、名前を変えて、削除できる（同じツリ
 
   // ほかのファイルは読まない
   await page.getByTestId('import-file').setInputFiles({ name: 'x.json', mimeType: 'application/json', buffer: Buffer.from('{"a":1}') });
-  await expect(page.getByTestId('home-message')).toContainText('序盤ツリーのファイルではありません');
+  await expect(page.getByTestId('home-message')).toContainText('将棋定跡帳のファイルではありません');
 
   // 名前の変更
   const item = page.getByTestId('tree-item').filter({ has: page.locator('.tree-item-name', { hasText: /^テスト用ツリー$/ }) });

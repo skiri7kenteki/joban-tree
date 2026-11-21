@@ -227,7 +227,7 @@ describe('定跡帳の key（グループ・平手から）', () => {
   const s3 = study('s3', ['7g7f'], { mySide: 'black', updatedAt: 7, templateId: undefined });
 
   it('「その他」は自分の側で分ける。そこから開く定跡帳は「平手から」（その側の研究手順すべて）', () => {
-    const groups = groupStudies([s1, s2, s3], TEMPLATES, '');
+    const groups = groupStudies([s1, s2, s3], TEMPLATES);
     expect(groups.map((g) => [g.key, g.label])).toEqual([
       ['study:横歩取り|white', '横歩取り（後手番）'],
       ['study:other|white', 'その他（後手番）'],

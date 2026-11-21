@@ -1,4 +1,4 @@
-// 序盤ツリーの「PC で作る」ためのサーバー（start.bat から起動する）。Node.js の標準機能だけで動く。
+// 将棋定跡帳（旧名 序盤ツリー）の「PC で作る」ためのサーバー（start.bat から起動する）。Node.js の標準機能だけで動く。
 //
 // 役目は 2 つ：
 // 1. アプリの画面を GitHub Pages から取ってきて、http://localhost:<PORT>/joban-tree/ で見せる（中継）
@@ -233,7 +233,7 @@ const server = http.createServer(async (req, res) => {
 
 server.on('error', (error) => {
   if (error.code === 'EADDRINUSE') {
-    console.error(`ポート ${PORT} はすでに使われています。序盤ツリーのサーバーがもう動いていないか確かめてください（黒い画面が別に開いていませんか）。`);
+    console.error(`ポート ${PORT} はすでに使われています。将棋定跡帳のサーバーがもう動いていないか確かめてください（黒い画面が別に開いていませんか）。`);
   } else {
     console.error('サーバーを起動できません：', error.message);
   }
@@ -242,7 +242,7 @@ server.on('error', (error) => {
 
 server.listen(PORT, '127.0.0.1', () => {
   console.log('');
-  console.log('序盤ツリー（PC 版）のサーバーが動いています。');
+  console.log('将棋定跡帳（PC 版）のサーバーが動いています。');
   console.log(`  ブラウザで開く：${APP_URL}`);
   console.log('  終わるときは、この黒い画面を閉じてください。');
   console.log(`  エンジンの置き場所：${DATA_DIR}`);

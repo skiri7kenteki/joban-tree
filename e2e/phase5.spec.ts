@@ -237,7 +237,7 @@ test.describe('5-2 自分で戦型を登録する・配る', () => {
     const download = page.waitForEvent('download');
     await page.getByTestId('template-export').click();
     const file = await download;
-    expect(file.suggestedFilename()).toBe('序盤ツリーの戦型.json');
+    expect(file.suggestedFilename()).toMatch(/^戦型-\d{8}\.json$/);
     const data = JSON.parse(await streamText(await file.createReadStream()));
     expect(data).toMatchObject({ app: 'joban-tree', kind: 'opening-templates', version: 1 });
     expect(data.templates).toHaveLength(1);
