@@ -5,6 +5,8 @@
   margin: 0 auto;
 }
 
+/* 段階12-2：盤は木目の画像（scripts/make-wood.py で作った約 6KB の 1 枚）を敷き、外に金の縁と影。
+   縁と影は box-shadow なので場所を取らない（盤の大きさは変わらない） */
 .board {
   display: block;
   width: 100%;
@@ -12,10 +14,20 @@
   user-select: none;
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
+  background: url('../assets/board/wood.webp') center / 100% 100% no-repeat;
+  border-radius: 3px;
+  box-shadow: var(--shadow-board);
 }
 
 .board-bg {
   fill: var(--color-board);
+}
+
+/* 9×9 の外枠は罫線より少し太く */
+.board-frame {
+  fill: none;
+  stroke: var(--color-board-frame);
+  stroke-width: 1.6;
 }
 
 .sq {
@@ -30,8 +42,11 @@
   fill: var(--color-last-move-from);
 }
 
+/* 選んだマス：藍を重ねて、内側に金の線（段階12-2。最終手の朱と見分ける） */
 .sq-selected {
   fill: var(--color-selected);
+  stroke: var(--gold);
+  stroke-width: 2.5;
 }
 
 .board-lines line {
@@ -43,9 +58,12 @@
   fill: var(--color-board-line);
 }
 
+/* 筋・段の数字：木目の上に焦げ茶の明朝体 */
 .board-coord {
-  fill: var(--color-text-muted);
-  font-size: 12px;
+  fill: var(--color-board-coord);
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 13px;
   text-anchor: middle;
 }
 
@@ -53,15 +71,31 @@
   cursor: pointer;
 }
 
+/* 駒：面は上から下への濃淡（Board.tsx の linearGradient。無ければ単色）、縁は濃い黄土、右下に影の形 */
 .piece-body {
-  fill: var(--color-piece);
+  fill: url(#piece-grad) var(--color-piece);
   stroke: var(--color-piece-edge);
-  stroke-width: 1;
+  stroke-width: 0.9;
 }
 
+.piece-grad-top {
+  stop-color: var(--color-piece-top);
+}
+
+.piece-grad-bottom {
+  stop-color: var(--color-piece-bottom);
+}
+
+.piece-shadow {
+  fill: var(--color-piece-shadow);
+}
+
+/* 駒の文字は明朝体で大きく（段階12-2。前はゴシック体 22px） */
 .piece-text {
   fill: var(--color-piece-text);
-  font-size: 22px;
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 25px;
   text-anchor: middle;
 }
 
@@ -99,10 +133,14 @@
   padding: 0 var(--space-1);
   border: 1px solid var(--color-piece-edge);
   border-radius: 4px;
-  background: var(--color-piece);
+  background: linear-gradient(180deg, var(--color-piece-top), var(--color-piece-bottom));
+  background-color: var(--color-piece);
   color: var(--color-piece-text);
   font: inherit;
+  font-family: var(--font-serif);
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
+  box-shadow: 1px 1.5px 0 var(--color-piece-shadow);
 }
 
 /* タップで打てる持ち駒（段階7-1）：見た目は閲覧画面と同じ小さな札。押せる範囲は札のまわりを含めて高さ 32px
@@ -121,9 +159,10 @@ button.hand-tap {
   cursor: pointer;
 }
 
+/* 選んだ持ち駒：明るい金の札に金の縁（藍の地の上でも分かる。段階12-2） */
 button.hand-tap.selected .hand-piece {
-  background: var(--color-selected);
-  outline: 2px solid var(--color-accent);
+  background: var(--gold-light);
+  outline: 2px solid var(--gold);
 }
 
 /* スマホ縦向き：盤を画面の幅いっぱいに（左右の余白を最小に） */

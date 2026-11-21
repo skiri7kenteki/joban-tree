@@ -227,3 +227,29 @@ test.describe('12-1 色・文字・部品の土台', () => {
     expect(found).toEqual([]);
   });
 });
+
+test.describe('12-2 盤と駒', () => {
+  test('盤は木目と金の縁、駒は明朝体で影付き。選んだマスは藍に金の線。盤の大きさは前（v0.29.0）より小さくない', async ({ page }) => {
+    await openHome(page);
+    await page.goto('./#/trees');
+    await page.getByTestId('new-tree').click();
+    const board = page.getByTestId('board');
+    await expect(board).toBeVisible();
+    const css = (sel: string, prop: string) => page.locator(sel).first().evaluate((e, p) => getComputedStyle(e).getPropertyValue(p), prop);
+    expect(await css('svg.board', 'background-image')).toContain('wood');
+    expect(await css('svg.board', 'box-shadow')).toContain('rgb(201, 165, 76)');
+    expect(await css('.piece-text', 'font-family')).toContain('Joban Mincho');
+    expect(await css('.board-coord', 'font-family')).toContain('Joban Mincho');
+    // 影は駒と同じ数（初期配置は 40 枚）。CSS の filter は使わない
+    await expect(page.locator('.piece-body')).toHaveCount(40);
+    await expect(page.locator('.piece-shadow')).toHaveCount(40);
+    expect(await css('.piece-body', 'filter')).toBe('none');
+    // 360×740 の新しいツリーの盤の幅は v0.29.0 で 352px
+    expect(Math.round((await board.boundingBox())!.width)).toBeGreaterThanOrEqual(352);
+
+    await page.locator('[data-square="77"]').click();
+    const sel = page.locator('[data-square="77"] rect');
+    await expect(sel).toHaveClass('sq-selected');
+    expect(await sel.evaluate((e) => getComputedStyle(e).stroke)).toBe('rgb(201, 165, 76)');
+  });
+});

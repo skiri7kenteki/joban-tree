@@ -3,6 +3,8 @@
 // - 後手の駒は 180 度回転させる
 // - 最終手のマスを薄く塗る（動かした元のマスはもっと薄く）。タップで指すとき用に、選んだマスも塗る
 // - タップで指さない盤（閲覧画面）は、持ち駒の列を薄くして縦の幅を詰める
+// - 段階12-2：盤は木目の画像（board.css。src/assets/board/wood.webp）と金の縁。駒は明朝体、面に上から下への濃淡（1 つの定義を全部の駒で使う）、
+//   右下に少しずらした影の形（CSS の filter は使わない。駒が多くても軽い）
 
 import { Color, PieceType, Position, Square, parseUSIMove, pieceTypeToStringForBoard } from 'tsshogi';
 import type { Side } from '../shogi/position';
@@ -21,6 +23,12 @@ const VIEW_W = MARGIN_LEFT + BOARD_W + MARGIN_RIGHT;
 const VIEW_H = MARGIN_TOP + BOARD_H + 4;
 
 const RANK_KANJI = ['一', '二', '三', '四', '五', '六', '七', '八', '九'];
+
+/** 駒の面の濃淡の定義の id（盤が画面に複数あっても中身は同じなので、どれを指してもよい） */
+const PIECE_GRADIENT = 'piece-grad';
+/** 駒の影のずれ（SVG の単位） */
+const SHADOW_DX = 1.2;
+const SHADOW_DY = 1.8;
 
 /** 持ち駒を並べる順 */
 const HAND_ORDER: PieceType[] = [
@@ -132,9 +140,17 @@ export function Board({ sfen, lastMove, selection, onSquare, onHand }: BoardProp
     <div class="board-wrap">
       <HandRow position={position} side="white" selection={turn === 'white' ? (selection ?? null) : null} onHand={onHand} compact={compact} />
       <svg class="board" viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} role="img" aria-label="将棋盤" data-testid="board" data-sfen={sfen}>
+        <defs>
+          {/* 駒の面の濃淡（色は board.css の stop-color） */}
+          <linearGradient id={PIECE_GRADIENT} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" class="piece-grad-top" />
+            <stop offset="1" class="piece-grad-bottom" />
+          </linearGradient>
+        </defs>
         <rect x={MARGIN_LEFT} y={MARGIN_TOP} width={BOARD_W} height={BOARD_H} class="board-bg" />
         {squares}
         <g class="board-lines">{lines}</g>
+        <rect x={MARGIN_LEFT} y={MARGIN_TOP} width={BOARD_W} height={BOARD_H} class="board-frame" />
         {stars}
         {labels}
       </svg>
@@ -155,12 +171,17 @@ function PieceShape({ cx, cy, type, upsideDown }: { cx: number; cy: number; type
   ]
     .map((p) => p.join(','))
     .join(' ');
+  const rotate = upsideDown ? `rotate(180 ${cx} ${cy})` : '';
   return (
-    <g transform={upsideDown ? `rotate(180 ${cx} ${cy})` : undefined} class="piece">
-      <polygon points={points} class="piece-body" />
-      <text x={cx} y={cy + 3} class={PROMOTED.has(type) ? 'piece-text promoted' : 'piece-text'} dominant-baseline="central">
-        {pieceTypeToStringForBoard(type)}
-      </text>
+    <g class="piece">
+      {/* 影：駒の形を右下に少しずらす（後手の駒も影は右下） */}
+      <polygon points={points} class="piece-shadow" transform={`translate(${SHADOW_DX} ${SHADOW_DY}) ${rotate}`.trim()} />
+      <g transform={rotate || undefined}>
+        <polygon points={points} class="piece-body" />
+        <text x={cx} y={cy + 3} class={PROMOTED.has(type) ? 'piece-text promoted' : 'piece-text'} dominant-baseline="central">
+          {pieceTypeToStringForBoard(type)}
+        </text>
+      </g>
     </g>
   );
 }

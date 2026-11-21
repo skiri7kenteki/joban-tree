@@ -454,6 +454,7 @@ src/isolation.ts            service worker の登録と cross-origin isolated �
 src/sw.ts                   service worker
 src/styles/                 CSS（tokens.css に色などの変数・明朝体の読み込み。base.css に「紙」＝生成りのカードの部品の並び）
 src/assets/fonts/           見出しの明朝体（段階12-1。scripts/make-font.py で作る）
+src/assets/board/           盤の木目（段階12-2。scripts/make-wood.py で作る）
 docs/design/                見た目の見本（段階12 の C 案）
 public/manifest.webmanifest ホーム画面用の設定（アイコンは public/*.png。scripts/make-icons.mjs で icon.svg から作る）
 public/eval/                評価関数（nn.bin・progress.bin・ライセンス。リポジトリに含める）

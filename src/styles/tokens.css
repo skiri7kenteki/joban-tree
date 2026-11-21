@@ -52,15 +52,22 @@
   --shadow-gold: 0 1px 0 rgba(255, 255, 255, 0.45) inset, 0 3px 8px rgba(5, 8, 20, 0.35);
   --shadow-raise: 0 6px 24px rgba(5, 8, 20, 0.45);
 
-  --color-board: #e8c98a;
-  --color-board-line: #5a4320;
-  --color-piece: #f7e7bf;
-  --color-piece-edge: #8a6a33;
-  --color-piece-text: #1a1a1a;
-  --color-piece-promoted: #c0261b;
-  --color-last-move: rgba(214, 96, 40, 0.28);
-  --color-last-move-from: rgba(214, 96, 40, 0.12);
-  --color-selected: rgba(201, 165, 76, 0.45);
+  /* 盤と駒（段階12-2）。盤の地は木目の画像（board.css）なので塗らない */
+  --color-board: transparent;
+  --color-board-line: rgba(58, 38, 10, 0.78);
+  --color-board-frame: #3d2a0e;
+  --color-board-coord: #4a3414;
+  --shadow-board: 0 0 0 2px #c9a54c, 0 0 0 3px #3d2a0e, 0 10px 22px rgba(5, 8, 20, 0.55);
+  --color-piece-top: #fcf3da;
+  --color-piece: #f4e1b2;
+  --color-piece-bottom: #e6c98c;
+  --color-piece-edge: #9c7838;
+  --color-piece-shadow: rgba(40, 22, 0, 0.42);
+  --color-piece-text: #161616;
+  --color-piece-promoted: #b3231a;
+  --color-last-move: rgba(176, 58, 28, 0.3);
+  --color-last-move-from: rgba(176, 58, 28, 0.12);
+  --color-selected: rgba(28, 39, 64, 0.42);
   --color-backdrop: rgba(5, 8, 20, 0.6);
 
   --color-eval-good: #1f5fae;

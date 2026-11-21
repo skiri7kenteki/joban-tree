@@ -234,8 +234,10 @@ test.describe('スマホ縦（390×844）', () => {
 
   test('盤上に候補手の矢印・丸印は描かない（持ち主の判断 2026-11-14）', async ({ page }) => {
     await openTree(page, OPENING);
-    // 盤の上の図形は、駒 40 枚の五角形と星 4 つだけ
-    await expect(page.locator('[data-testid="board"] polygon')).toHaveCount(40);
+    // 盤の上の図形は、駒 40 枚の五角形（段階12-2 から面と影の 2 つずつ）と星 4 つだけ
+    await expect(page.locator('[data-testid="board"] polygon.piece-body')).toHaveCount(40);
+    await expect(page.locator('[data-testid="board"] polygon.piece-shadow')).toHaveCount(40);
+    await expect(page.locator('[data-testid="board"] polygon')).toHaveCount(80);
     await expect(page.locator('[data-testid="board"] circle')).toHaveCount(4);
   });
 });
