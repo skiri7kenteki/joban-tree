@@ -74,16 +74,19 @@
   --color-last-move: rgba(176, 58, 28, 0.3);
   --color-last-move-from: rgba(176, 58, 28, 0.12);
   --color-selected: rgba(28, 39, 64, 0.42);
+  /* 正解の演出の光（段階12-4） */
+  --color-flash: rgba(226, 199, 125, 0.4);
   --color-backdrop: rgba(5, 8, 20, 0.6);
 
   --color-eval-good: #1f5fae;
   --color-eval-bad: #b3311f;
   --color-eval-even: #1d2333;
 
-  --chip-main-bg: #e6e1d4;
-  --chip-main-text: #333333;
-  --chip-good-bg: #dceafe;
-  --chip-good-text: #1d4f91;
+  /* ラベル（段階12-4）：本線＝藍、有力＝金、疑問手＝朱寄りのオレンジ（咎められる手なので目立たせる） */
+  --chip-main-bg: #dfe3ee;
+  --chip-main-text: #1c2740;
+  --chip-good-bg: #f0e3bd;
+  --chip-good-text: #6b4f12;
   --chip-dubious-bg: #b9520c;
   --chip-dubious-text: #ffffff;
   --color-unverified: #7c8089;

@@ -333,3 +333,77 @@ test.describe('12-3 定跡帳', () => {
     }
   });
 });
+
+test.describe('12-4 残りの画面', () => {
+  test('ツリーのラベルは本線＝藍・有力＝金・疑問手＝オレンジ、文字と地の差も足りる', async ({ page }) => {
+    await openHome(page);
+    await page.goto('./#/trees');
+    await page.getByTestId('import-file').setInputFiles({ name: 't.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(sampleTree())) });
+    await page.getByTestId('tree-item').click();
+    await expect(page.getByTestId('candidate')).toHaveCount(4);
+    const color = (sel: string) => page.locator(sel).first().evaluate((e) => getComputedStyle(e).color);
+    expect(await color('.chip-main')).toBe('rgb(28, 39, 64)');
+    expect(await color('.chip-good')).toBe('rgb(107, 79, 18)');
+    expect(await page.locator('.chip-dubious').first().evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgb(185, 82, 12)');
+    expect(await lowContrast(page)).toEqual([]);
+  });
+
+  test('復習で正解すると、指したマスに金の光が一瞬出る。結果は生成りのカード（文字と地の差も足りる）', async ({ page }) => {
+    await openHome(page);
+    await page.getByTestId('tab-settings').click();
+    await page.getByTestId('review-batch-5').click();
+    await page.goto('./');
+    await page.getByTestId('study-import-file').setInputFiles({
+      name: 's.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies: [STUDIES[0]] })),
+    });
+    await page.goto('./#/study-review/s-line');
+    const progress = page.getByTestId('review-progress');
+    await expect(progress).toHaveText('今日 1／5問');
+    const play = async (from: string, to: string) => {
+      await page.locator(`[data-square="${from}"]`).click();
+      await page.locator(`[data-square="${to}"]`).click();
+    };
+    await play('77', '76');
+    // 光は指したマス（7六）に出て、0.6 秒で消える
+    const flash = page.getByTestId('answer-flash');
+    await expect(flash).toHaveCount(1);
+    const [sq, fl] = await Promise.all([page.locator('[data-square="76"] rect').boundingBox(), flash.boundingBox()]);
+    expect(Math.abs(sq!.x + sq!.width / 2 - (fl!.x + fl!.width / 2))).toBeLessThan(3);
+    await expect(progress).toHaveText('今日 2／5問');
+    await expect(flash).toHaveCount(0);
+    // まちがえたときは出ない
+    await play('17', '16');
+    await expect(page.getByTestId('review-wrong')).toBeVisible();
+    await expect(flash).toHaveCount(0);
+    await page.getByTestId('review-show').click();
+    await expect(flash).toHaveCount(0);
+    await page.getByTestId('review-continue').click();
+    await expect(progress).toHaveText('今日 3／5問');
+    await play('26', '25');
+    await expect(progress).toHaveText('今日 4／5問');
+    await play('69', '78');
+    await expect(progress).toHaveText('今日 5／5問');
+    await play('25', '24');
+    await expect(page.getByTestId('review-result-score')).toBeVisible();
+    expect(await page.getByTestId('review-result').evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgb(248, 243, 231)');
+    expect(await lowContrast(page)).toEqual([]);
+  });
+
+  test('動きを減らす設定の端末では、正解の光を出さない', async ({ page }) => {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await openHome(page);
+    await page.getByTestId('study-import-file').setInputFiles({
+      name: 's.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies: [STUDIES[0]] })),
+    });
+    await page.goto('./#/study-review/s-line');
+    await expect(page.getByTestId('review-progress')).toBeVisible();
+    await page.locator('[data-square="77"]').click();
+    await page.locator('[data-square="76"]').click();
+    await expect(page.getByTestId('answer-flash')).toHaveCount(1);
+    expect(await page.getByTestId('answer-flash').evaluate((e) => getComputedStyle(e).display)).toBe('none');
+  });
+});

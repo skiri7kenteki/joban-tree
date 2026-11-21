@@ -262,6 +262,7 @@ function ReviewView({ tree, initialRecord }: { tree: TreeData; initialRecord: Re
             selection={input.selection}
             onSquare={input.onSquare}
             onHand={input.onHand}
+            flash={phase.kind === 'answered' && phase.ok && view === null}
           />
           <PromotionBox input={input} />
         </div>

@@ -5,6 +5,7 @@
 // - タップで指さない盤（閲覧画面）は、持ち駒の列を薄くして縦の幅を詰める
 // - 段階12-2：盤は木目の画像（board.css。src/assets/board/wood.webp）と金の縁。駒は明朝体、面に上から下への濃淡（1 つの定義を全部の駒で使う）、
 //   右下に少しずらした影の形（CSS の filter は使わない。駒が多くても軽い）
+// - 段階12-4：flash（復習で正解したとき）なら、最終手の行き先のマスに金の光の輪を一瞬出す（動きを減らす設定の端末では出さない。board.css）
 
 import { Color, PieceType, Position, Square, parseUSIMove, pieceTypeToStringForBoard } from 'tsshogi';
 import type { Side } from '../shogi/position';
@@ -62,9 +63,11 @@ interface BoardProps {
   onSquare?: (file: number, rank: number) => void;
   /** 持ち駒をタップしたとき */
   onHand?: (side: Side, pieceType: PieceType) => void;
+  /** 正解の演出：最終手の行き先のマスに金の光の輪を一瞬出す（段階12-4） */
+  flash?: boolean;
 }
 
-export function Board({ sfen, lastMove, selection, onSquare, onHand }: BoardProps) {
+export function Board({ sfen, lastMove, selection, onSquare, onHand, flash }: BoardProps) {
   const position = Position.newBySFEN(sfen);
   if (!position) return <p class="muted">局面を表示できません</p>;
   // 持ち駒を選んでいるときは、手番の側の列だけ選択の色を付ける
@@ -153,6 +156,17 @@ export function Board({ sfen, lastMove, selection, onSquare, onHand }: BoardProp
         <rect x={MARGIN_LEFT} y={MARGIN_TOP} width={BOARD_W} height={BOARD_H} class="board-frame" />
         {stars}
         {labels}
+        {flash && last && (
+          <rect
+            key={`flash-${lastMove}`}
+            {...toXY(last.to.file, last.to.rank)}
+            width={CELL_W}
+            height={CELL_H}
+            rx={4}
+            class="sq-flash"
+            data-testid="answer-flash"
+          />
+        )}
       </svg>
       <HandRow position={position} side="black" selection={turn === 'black' ? (selection ?? null) : null} onHand={onHand} compact={compact} />
     </div>

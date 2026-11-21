@@ -265,7 +265,16 @@ function StudyReviewView({ target, pool, startOf, record: initialRecord, tree, l
         <>
       <div class="tree-layout">
         <div ref={boardRef} {...boardFitProps(boardFit, 'tree-board')}>
-          {sfen && <Board sfen={shownSfen} lastMove={shownLast} selection={input.selection} onSquare={input.onSquare} onHand={input.onHand} />}
+          {sfen && (
+            <Board
+              sfen={shownSfen}
+              lastMove={shownLast}
+              selection={input.selection}
+              onSquare={input.onSquare}
+              onHand={input.onHand}
+              flash={phase.kind === 'answered' && phase.ok && view === null}
+            />
+          )}
           <PromotionBox input={input} />
         </div>
 

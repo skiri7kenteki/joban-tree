@@ -2026,3 +2026,56 @@ div.move-bar-center {
   border-radius: 2px;
   background: var(--gold);
 }
+
+/* ---- 段階12-4：残りの画面をそろえる ---- */
+
+/* 候補手のカードの見出しは明朝体（行の高さは変えない） */
+.candidates-head > strong {
+  font-family: var(--font-serif);
+  font-weight: 600;
+}
+
+/* ⋯ のメニューの小見出し：暗い金の明朝体に細い線 */
+.menu-section-title {
+  padding-bottom: 2px;
+  border-bottom: 1px solid var(--color-border);
+  color: var(--color-accent);
+  font-family: var(--font-serif);
+  font-weight: 600;
+}
+
+/* 設定のカードの見出しの下に細い線 */
+.settings-section h2 {
+  padding-bottom: var(--space-1);
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* 復習のタブ・ツリーの一覧の見出し（藍の上）：下に金の細い線 */
+.reviews-heading {
+  padding-bottom: var(--space-1);
+  border-bottom: 1px solid var(--color-border);
+}
+
+/* 復習の結果は生成りのカードに（藍の地にじかに並べない） */
+.review-result {
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-card);
+}
+
+.review-result-score strong {
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--color-accent);
+}
+
+/* 復習の問題のカード：相手の手は明朝体 */
+.review-opponent strong {
+  font-family: var(--font-serif);
+  font-weight: 600;
+}

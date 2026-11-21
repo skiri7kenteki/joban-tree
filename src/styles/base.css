@@ -62,6 +62,7 @@ textarea,
 .review-entry,
 .template-item,
 .template-menu,
+.review-result,
 .gen-panel {
   --color-text: var(--paper-text);
   --color-text-muted: var(--paper-muted);
