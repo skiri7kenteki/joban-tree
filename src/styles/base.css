@@ -23,6 +23,28 @@ body {
   line-height: 1.5;
 }
 
+/* 段階12-3：画面のいちばん上に青海波を薄く敷いて、下へ消えていく（押せない飾り。中身はその上） */
+body {
+  position: relative;
+}
+
+body::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 180px;
+  background: var(--pattern-seigaiha) top center / 48px 24px repeat;
+  -webkit-mask-image: var(--fade-down);
+  mask-image: var(--fade-down);
+  pointer-events: none;
+}
+
+#root {
+  position: relative;
+}
+
 /* 段階12：生成りのカード（紙）。中では色の変数を紙の値に入れ替える（文字は墨、補助は灰、金は暗い金）。
    本文はこの中に置き、藍の地の上には見出しと短い知らせだけを置く */
 .card,

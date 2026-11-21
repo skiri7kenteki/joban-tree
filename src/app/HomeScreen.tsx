@@ -11,6 +11,8 @@
 // 段階11-1：画面の下のタブに分けた。list='studies' が定跡帳のタブ（#/。いちばん目立つのは「＋ 研究手順を登録」）、
 //   list='trees' がツリーのタブ（#/trees。「＋ 新しいツリーを作る」・最近開いた・ツリーの取り込み）。画面の上の「ツリー｜研究手順」の切り替えはやめた
 // v0.29.0：名前・メモで絞り込む欄はやめた（持ち主の依頼 2026-11-21。使わなかったため）
+// 段階12-3：定跡帳のタブのいちばん上に集計（研究手順の数・覚えた問題の輪・前回まちがい）、研究手順の行の右に覚えた割合の輪、
+//   グループの見出しの左に「芽」の紋。数えるのは今の復習の記録から（読むだけ。データの形は変えない）
 
 import { signal } from '@preact/signals';
 import { useEffect, useRef, useState } from 'preact/hooks';
@@ -30,7 +32,11 @@ import {
 } from '../tree/organize';
 import type { Side } from '../shogi/position';
 import { listName, type OpeningTemplate } from '../tree/templates';
-import { firstLine, liftTreeStudies, studyMovesText } from '../tree/studies';
+import { firstLine, liftTreeStudies, studyMovesText, studyStartIndex } from '../tree/studies';
+import { LearnRing, SproutMark } from '../components/Marks';
+import { loadReview } from '../storage/review';
+import { STUDY_RECORD_ID, reviewStart, summarizeStudies } from '../review/studyReview';
+import type { ReviewRecord, ReviewSummary } from '../review/review';
 import { parseStudiesJson, planStudyImport, resolveStudyImport, type StudyConflictChoice, type StudyImportPlan } from '../tree/studyFile';
 import type { Study, TreeData } from '../tree/types';
 import { generation, isGenerating, openTree, treeVersion } from './generation';
@@ -93,10 +99,16 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
   // 自分で登録した戦型も、グループ分けに使う（読み込んだら描き直す）
   void myTemplates.value;
   const studies = library.value;
+  /** 研究手順の復習の記録（段階12-3：一覧の上の集計と、行ごとの覚えた割合の輪に使う。読むだけ） */
+  const [studyRecord, setStudyRecord] = useState<ReviewRecord | null>(null);
   useEffect(() => {
     if (!myTemplates.value) void refreshMyTemplates().catch(() => undefined);
     ensureStudies().catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
   }, []);
+  useEffect(() => {
+    if (list !== 'studies') return;
+    loadReview(STUDY_RECORD_ID).then(setStudyRecord, () => setStudyRecord(null));
+  }, [list]);
 
   useEffect(() => {
     listTrees()
@@ -115,6 +127,9 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
   const groups = trees ? groupTrees(trees, templates) : [];
   const studyGroups = studies ? groupStudies(studies, templates) : [];
   const studyCount = studies?.length ?? 0;
+  /** 研究手順の復習の出題を始める手（復習の画面・復習のタブと同じ数え方） */
+  const startOf = (s: Study) => reviewStart(s, studyStartIndex(s, templates));
+  const summaryOf = (items: readonly Study[]) => (studyRecord ? summarizeStudies(items, startOf, studyRecord) : null);
   // 最近開いた：ツリーが 4 つ以上あるときだけ
   const recent = trees && trees.length >= RECENT_MIN_TREES ? recentItems(trees, recentOpened.value) : [];
   const collapsed = collapsedGroups.value;
@@ -226,6 +241,7 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
         )}
       </div>
       {isolationMessage && <p class="notice notice-danger">{isolationMessage}</p>}
+      {tab === 'studies' && studies && studyCount > 0 && <StudySummary count={studyCount} summary={summaryOf(studies)} />}
       <div class="btn-row">
         {tab === 'studies' ? (
           <button type="button" class="btn btn-primary btn-wide" data-testid="study-register" onClick={() => setRegisterMenu(true)}>
@@ -286,7 +302,7 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
               onMenu={() => setMenuGroup(g)}
             >
               {g.items.map((s) => (
-                <StudyRow key={s.id} study={s} bookKey={bookKeyOfGroup(g.key)} onMenu={() => setMenuStudy(s)} />
+                <StudyRow key={s.id} study={s} bookKey={bookKeyOfGroup(g.key)} summary={summaryOf([s])} onMenu={() => setMenuStudy(s)} />
               ))}
             </GroupSection>
           ))}
@@ -517,6 +533,7 @@ function GroupSection<T>({
           <span class="tree-group-caret" aria-hidden="true">
             {open ? '▼' : '▶'}
           </span>
+          <SproutMark />
           <span class="tree-group-label">{g.label}</span>
           <span class="tree-group-count num" data-testid="tree-group-count">
             {g.items.length}
@@ -533,12 +550,48 @@ function GroupSection<T>({
   );
 }
 
-/** 研究手順の 1 行（★名前・メモの最初の 1 行・手数・日付）。タップで研究手順の画面 */
-function StudyRow({ study, bookKey, onMenu }: { study: Study; bookKey: string; onMenu: () => void }) {
+/**
+ * 定跡帳のタブのいちばん上の集計（段階12-3）：研究手順の数・覚えた問題（輪と「覚えた数／問題の数」）・前回まちがい。
+ * 数え方は復習と同じ（覚えた＝2 回続けて正解、前回まちがい＝最後に出したとき 1 回目で正解しなかった。同じ局面・同じ正解は 1 問）
+ */
+function StudySummary({ count, summary }: { count: number; summary: ReviewSummary | null }) {
+  return (
+    <div class="card book-summary" data-testid="book-summary">
+      <div class="book-summary-cell">
+        <span class="book-summary-label">研究手順</span>
+        <span class="book-summary-value num" data-testid="book-summary-studies">
+          {count}
+          <small> 本</small>
+        </span>
+      </div>
+      <div class="book-summary-cell book-summary-learned">
+        <LearnRing learned={summary?.learned ?? 0} total={summary?.total ?? 0} size={40} testId="book-summary-ring" />
+        <span class="book-summary-text">
+          <span class="book-summary-label">覚えた問題</span>
+          <span class="book-summary-value num" data-testid="book-summary-learned">
+            {summary ? summary.learned : '–'}
+            <small> / {summary ? summary.total : '–'}</small>
+          </span>
+        </span>
+      </div>
+      <div class="book-summary-cell">
+        <span class="book-summary-label">前回まちがい</span>
+        <span class="book-summary-value num" data-testid="book-summary-wrong">
+          {summary ? summary.wrong : '–'}
+          <small> 問</small>
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/** 研究手順の 1 行（★名前・メモの最初の 1 行・手数・日付、右に覚えた割合の輪）。タップで定跡帳 */
+function StudyRow({ study, bookKey, summary, onMenu }: { study: Study; bookKey: string; summary: ReviewSummary | null; onMenu: () => void }) {
   const note = firstLine(study.note);
   return (
     <li class="tree-row">
-      <button type="button" class="tree-item" data-testid="study-item" onClick={() => go(bookPath(bookKey, study.id, study.moves.length))}>
+      <button type="button" class="tree-item study-row-item" data-testid="study-item" onClick={() => go(bookPath(bookKey, study.id, study.moves.length))}>
+        <span class="study-row-text">
         <span class="tree-item-title">
           {/* ★ は名前の中に入れる（長い名前が折り返しても、★ だけの行にならないように） */}
           <span class="tree-item-name">
@@ -556,6 +609,8 @@ function StudyRow({ study, bookKey, onMenu }: { study: Study; bookKey: string; o
         <span class="tree-item-meta num">
           {study.moves.length} 手・{formatShortDate(study.updatedAt)}
         </span>
+        </span>
+        {summary && <LearnRing learned={summary.learned} total={summary.total} testId="study-ring" />}
       </button>
       <button type="button" class="btn tree-menu-btn" aria-label={`「${study.name}」の操作`} data-testid="study-menu" onClick={onMenu}>
         ⋯

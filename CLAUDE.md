@@ -367,6 +367,9 @@
     「見た」は `recent.ts` の `takeHint`（localStorage `joban-tree.hints-seen`）。今あるのは board-tap（新しいツリー）・answer-tap（復習）・book-write（定跡帳）・tree-main（ツリーの自分の手の ⋯）。
     新しい説明を足すときも、この決まりに合わせる（長い説明を画面に常に出さない）
 
+- **定跡帳の集計と輪（段階12-3、v0.32.0〜）**：定跡帳のタブのいちばん上に「研究手順 n 本・覚えた問題（輪と n / m）・前回まちがい n 問」、研究手順の行の右に覚えた割合の輪、
+  定跡帳の盤の画面の「この局面からの研究」の行に、その手を通る研究手順の割合の棒。数え方は復習と同じ `summarizeStudies`（覚えた＝2 回続けて正解）。記録を読むだけ
+
 ## PC 版（精密ツリー、段階3）
 - 持ち主の判断（2026-11-14）：**PC の画面から作る**。`pc/start.bat` → `pc/server.mjs`（Node.js の標準機能だけ）→ ブラウザで `http://localhost:18765/joban-tree/`
 - サーバーの役目：
@@ -428,6 +431,7 @@ src/components/TabBar.tsx   画面の下のタブ（段階11-1）
 src/components/KifuList.tsx 手順の一覧＝棋譜欄（段階11-5。ツリーの中身は src/tree/treeKifu.ts）
 src/components/MoveBar.tsx  盤の下の固定バー（段階11-2）
 src/components/OnceHint.tsx 初めての 1 回だけ出す説明（段階11-3）
+src/components/Marks.tsx    芽の紋・覚えた割合の輪（段階12-3）
 src/shogi/                  局面・指し手の小さな関数（tsshogi を包む）、棋譜の貼り付けの読み取り
 src/tree/                   ツリーのデータの形・生成ロジック（モックでテスト）・ラベル・プリセット・KIF 書き出し・JSON の読み書き・戦型テンプレート・同梱ツリーの形と点検（bundled.ts）
 src/data/templates/         同梱の戦型テンプレート（JSON。段階5）

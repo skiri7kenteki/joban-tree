@@ -149,7 +149,8 @@ test.describe('12-1 色・文字・部品の土台', () => {
     await expect(page.getByTestId('study-item')).toHaveCount(2);
     const style = (sel: string, prop: string) => page.locator(sel).first().evaluate((e, p) => getComputedStyle(e).getPropertyValue(p), prop);
     expect(await style('body', 'background-color')).toBe('rgb(28, 39, 64)');
-    expect(await style('[data-testid="study-item"]', 'background-color')).toBe('rgb(248, 243, 231)');
+    // 一覧の行は 1 枚の生成りのカード（段階12-3 から地は行全体の .tree-row）
+    expect(await style('.tree-row', 'background-color')).toBe('rgb(248, 243, 231)');
     expect(await style('[data-testid="study-register"]', 'background-color')).toBe('rgb(201, 165, 76)');
     expect(await style('h1', 'font-family')).toContain('Joban Mincho');
     expect(await style('.tabbar', 'background-color')).toBe('rgb(20, 28, 48)');
@@ -251,5 +252,84 @@ test.describe('12-2 盤と駒', () => {
     const sel = page.locator('[data-square="77"] rect');
     await expect(sel).toHaveClass('sq-selected');
     expect(await sel.evaluate((e) => getComputedStyle(e).stroke)).toBe('rgb(201, 165, 76)');
+  });
+});
+
+/** 研究手順の復習の記録を端末の保存場所に書く（s-line の問題のうち、はじめの 3 問を覚えた・4 問目を前回まちがい） */
+async function seedStudyRecord(page: Page) {
+  const keys: string[] = [];
+  let sfen = STARTPOS_SFEN;
+  for (const m of STUDIES[0].moves) {
+    // 問題＝自分（先手）の手番の局面。キーは「局面のキー>正解の手」（src/review/studyReview.ts と同じ）
+    if (sfen.split(' ')[1] === 'b') keys.push(`${sfenKey(sfen)}>${m}`);
+    sfen = applyUsiMove(sfen, m)!.sfen;
+  }
+  const nodes: Record<string, unknown> = {};
+  for (const k of keys.slice(0, 3)) nodes[k] = { seen: 2, correct: 2, streak: 2, lastOk: true, lastAt: 1 };
+  nodes[keys[3]] = { seen: 1, correct: 0, streak: 0, lastOk: false, lastAt: 1 };
+  await page.evaluate(
+    (rec) =>
+      new Promise<void>((resolve, reject) => {
+        const open = indexedDB.open('joban-tree');
+        open.onsuccess = () => {
+          const tx = open.result.transaction('review', 'readwrite');
+          tx.objectStore('review').put(rec);
+          tx.oncomplete = () => resolve();
+          tx.onerror = () => reject(tx.error);
+        };
+        open.onerror = () => reject(open.error);
+      }),
+    { treeId: 'studies', nodes },
+  );
+}
+
+test.describe('12-3 定跡帳', () => {
+  test('一覧の上の集計（研究手順の数・覚えた問題・前回まちがい）、行ごとの覚えた割合の輪、グループの見出しの芽の紋', async ({ page }) => {
+    await openHome(page);
+    await page.getByTestId('study-import-file').setInputFiles({
+      name: 's.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies: STUDIES })),
+    });
+    await expect(page.getByTestId('study-item')).toHaveCount(2);
+    await seedStudyRecord(page);
+    await page.reload();
+    // 問題は s-line が 6、銀を上がるが 5（はじめの 4 つは同じ局面・同じ正解なので 1 問）＝全部で 7
+    await expect(page.getByTestId('book-summary-studies')).toHaveText('2 本');
+    await expect(page.getByTestId('book-summary-learned')).toHaveText('3 / 7');
+    await expect(page.getByTestId('book-summary-wrong')).toHaveText('1 問');
+    await expect(page.getByTestId('book-summary-ring')).toHaveAttribute('aria-label', '覚えた問題 3／7（43%）');
+    const rings = page.getByTestId('study-ring');
+    await expect(rings).toHaveCount(2);
+    await expect(rings.nth(0)).toHaveAttribute('aria-label', '覚えた問題 3／6（50%）');
+    await expect(rings.nth(1)).toHaveAttribute('aria-label', '覚えた問題 3／5（60%）');
+    await expect(page.getByTestId('tree-group-head').locator('.sprout-mark')).toHaveCount(1);
+    // 研究手順の行は 1 枚のカード（行と ⋯ が同じ箱）
+    const row = await page.locator('.tree-row').first().boundingBox();
+    const menu = await page.getByTestId('study-menu').first().boundingBox();
+    expect(menu!.x + menu!.width).toBeLessThanOrEqual(row!.x + row!.width + 0.5);
+    expect(Math.round(menu!.height)).toBeGreaterThanOrEqual(44);
+  });
+
+  test('定跡帳の盤の画面：［復習］は金、「この局面からの研究」に芽の紋と、その手を通る研究手順の割合の棒', async ({ page }) => {
+    await openHome(page);
+    await page.getByTestId('study-import-file').setInputFiles({
+      name: 's.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies: STUDIES })),
+    });
+    await page.getByTestId('study-item').first().click();
+    await expect(page.getByTestId('study-position')).toBeVisible();
+    // 8 手目（△3二金の後）：次の手は ▲2四歩・▲3八銀 の 2 つ、それぞれ 2 本のうち 1 本
+    for (let i = 0; i < 3; i++) await page.getByTestId('study-prev').click();
+    await expect(page.getByTestId('study-book-branch')).toHaveCount(2);
+    expect(await page.getByTestId('book-head-review').evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgb(201, 165, 76)');
+    await expect(page.getByTestId('study-book-list').locator('.sprout-mark')).toHaveCount(1);
+    const bars = page.getByTestId('study-book-bar');
+    await expect(bars).toHaveCount(2);
+    for (const i of [0, 1]) {
+      const [bar, fill] = await Promise.all([bars.nth(i).boundingBox(), bars.nth(i).locator('.book-bar-fill').boundingBox()]);
+      expect(Math.round((fill!.width / bar!.width) * 100)).toBe(50);
+    }
   });
 });

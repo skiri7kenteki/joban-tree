@@ -1127,7 +1127,8 @@
   min-width: var(--touch-min);
   border: none;
   background: transparent;
-  color: var(--color-text-muted);
+  box-shadow: none;
+  color: var(--color-accent);
 }
 
 /* 研究手順の画面：名前と、戦型・手数 */
@@ -1798,4 +1799,230 @@ div.move-bar-center {
 .start-bar .move-bar-inner {
   height: auto;
   margin-bottom: var(--space-2);
+}
+
+/* ---- 段階12-3：定跡帳（一覧と盤の画面） ---- */
+
+/* 「芽」の紋：金の細い丸の中に、アイコンの芽を線で（置いた場所の金：藍の上は金、カードの中は暗い金） */
+.sprout-mark {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--gold-line);
+  border-radius: 50%;
+  color: var(--color-accent);
+}
+
+.sprout-mark svg {
+  display: block;
+}
+
+.sprout-line,
+.sprout-leaf {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sprout-bud {
+  fill: currentColor;
+}
+
+/* グループの見出し：芽の紋・明朝体の名前・金の本数、下に金の細い線 */
+.tree-group-head {
+  border-bottom: 1px solid var(--color-border);
+  border-radius: 0;
+}
+
+.tree-group-label {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.tree-group-head .tree-group-count {
+  color: var(--color-accent);
+}
+
+/* 一覧の 1 行は 1 枚のカード（行と ⋯ を別々の箱にしない）。⋯ は細い縦線で区切る */
+.tree-row {
+  gap: 0;
+  border: 1px solid var(--paper-border);
+  border-radius: var(--radius-card);
+  background: var(--paper);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+.tree-row .tree-item {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.tree-row .tree-menu-btn {
+  border: 0;
+  border-left: 1px solid var(--paper-border);
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--paper-muted);
+}
+
+/* 研究手順の行：左に文字、右に覚えた割合の輪 */
+.study-row-item {
+  flex-direction: row;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.study-row-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.study-row-text .tree-item-title,
+.study-row-text .tree-item-meta {
+  max-width: 100%;
+}
+
+/* 覚えた割合の輪：灰の輪に暗い金の弧、真ん中に % */
+.learn-ring {
+  position: relative;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.learn-ring svg {
+  position: absolute;
+  inset: 0;
+}
+
+.learn-ring-track {
+  fill: none;
+  stroke: var(--paper-border);
+  stroke-width: 3.5;
+}
+
+.learn-ring-arc {
+  fill: none;
+  stroke: var(--gold-dark);
+  stroke-width: 3.5;
+  stroke-linecap: round;
+}
+
+.learn-ring-text {
+  position: relative;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--paper-text);
+}
+
+/* 定跡帳のタブのいちばん上の集計（3 つを縦の細い線で区切る） */
+.book-summary {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr 1fr;
+  padding: var(--space-2) var(--space-1);
+  margin-bottom: var(--space-2);
+}
+
+.book-summary-cell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  padding: 0 var(--space-1);
+}
+
+.book-summary-cell + .book-summary-cell {
+  border-left: 1px solid var(--paper-border);
+}
+
+.book-summary-learned {
+  flex-direction: row;
+  gap: var(--space-2);
+}
+
+.book-summary-text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.book-summary-label {
+  font-size: 12px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.book-summary-value {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 22px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.book-summary-value small {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: normal;
+  color: var(--color-text-muted);
+}
+
+/* 定跡帳の盤の画面：★ の行の名前は明朝体 */
+.study-head strong {
+  font-family: var(--font-serif);
+  font-weight: 600;
+}
+
+/* 「この局面からの研究」：見出しの左に芽の紋（行の高さは変えない） */
+.book-list .book-list-head {
+  justify-content: flex-start;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* 見出しの行の高さを変えない（盤の大きさは、この一覧の 3 行目までを画面に収めて決まるため）大きさ */
+.book-list-head .sprout-mark {
+  width: 18px;
+  height: 18px;
+}
+
+.book-list-head .sprout-mark svg {
+  width: 13px;
+  height: 13px;
+}
+
+.book-list-head strong {
+  font-family: var(--font-serif);
+  font-weight: 600;
+}
+
+/* その手を通る研究手順の割合の棒 */
+.book-bar {
+  flex: 0 0 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--paper-border);
+  overflow: hidden;
+}
+
+.book-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--gold);
 }

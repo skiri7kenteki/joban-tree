@@ -9,12 +9,14 @@
 // - ★ の行を押すと、今の研究手順の名前・メモを直す
 // - 段階11-2：‹ › の行と手順の行（パンくず）をやめ、盤の下の固定バー（MoveBar）に。手数を押すと手順の一覧
 // - 段階11-3：⋯ は画面の下から（小見出し「この研究手順」「この局面」「定跡帳」・短い文字）。★ の行の右端に［復習］
+// - 段階12-3：［復習］は金。「この局面からの研究」の見出しの左に「芽」の紋、行に、その手を通る研究手順の割合の棒（行の高さは変えない）
 // 研究手順の画面（StudyScreen）と編集モードは段階10-2 で片付けた（古い URL は src/app/LegacyRedirect.tsx でここへ移す）。
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { Board } from '../components/Board';
 import { Dialog } from '../components/Dialog';
 import { OnceHint } from '../components/OnceHint';
+import { SproutMark } from '../components/Marks';
 import { PromotionBox, useMoveInput } from '../components/useMoveInput';
 import { STARTPOS_SFEN, moveText, type Side } from '../shogi/position';
 import { studyPositions } from '../review/studyReview';
@@ -486,7 +488,7 @@ function BookViewScreen({
                 {firstLine(current.note) || 'メモなし'}
               </span>
             </button>
-            <button type="button" class="btn study-head-review" data-testid="book-head-review" onClick={() => go(`/study-review/${current.id}`)}>
+            <button type="button" class="btn btn-primary study-head-review" data-testid="book-head-review" onClick={() => go(`/study-review/${current.id}`)}>
               復習
             </button>
           </>
@@ -775,7 +777,8 @@ function BookBranches({
     [...list.filter((s) => s.id === current?.id), ...list.filter((s) => s.id !== current?.id)].map((s) => s.name).join('・');
   return (
     <div class="card candidates book-list" ref={listRef} data-testid="study-book-list">
-      <div class="candidates-head">
+      <div class="candidates-head book-list-head">
+        <SproutMark />
         <strong data-testid="study-book-head">この局面からの研究（{count} 本）</strong>
       </div>
       <ul class="candidate-list">
@@ -796,6 +799,10 @@ function BookBranches({
                     {moveText(sfen, b.move, prev)}
                   </span>
                   <span class="book-names">{names(b.studies)}</span>
+                  {/* その手を通る研究手順の割合の棒（段階12-3。本数はこの局面を通る研究手順の数に対して） */}
+                  <span class="book-bar" aria-hidden="true" data-testid="study-book-bar">
+                    <span class="book-bar-fill" style={{ width: `${Math.round((b.studies.length / Math.max(count, 1)) * 100)}%` }} />
+                  </span>
                   {b.studies.length >= 2 && <span class="book-count num">（{b.studies.length}）</span>}
                 </span>
               </button>
