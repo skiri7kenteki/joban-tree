@@ -142,6 +142,32 @@
   --chip-dubious-bg: #b9520c;
   --chip-dubious-text: #ffffff;
   --color-unverified: #7c8089;
+  /* 選んだマス・持ち駒の内枠の線、「今いる所」の印（棋譜欄の今の行・今の分岐）。盤の画面ではシアン（v0.37.0） */
+  --color-select-line: var(--gold);
+  --color-current: var(--gold-dark);
+
+  /* ---- 盤の画面：Dark Research Studio（v0.37.0、持ち主の依頼 2026-11-21）----
+     深いネイビーの地・ブルーグレーの面・クールホワイトの文字。シアン＝今いる所、金＝研究の印（★・復習）。
+     base.css の「盤の画面」の並びで、紙・藍の変数をこの値に入れ替える */
+  --studio-bg: #111827;
+  --studio-panel: #202c40;
+  --studio-panel-2: #29374f;
+  --studio-line: rgba(232, 237, 244, 0.1);
+  --studio-button-line: rgba(232, 237, 244, 0.24);
+  --studio-button-bg: rgba(232, 237, 244, 0.06);
+  --studio-text: #e8edf4;
+  --studio-muted: #9ba7b9;
+  --studio-cyan: #55d6e8;
+  --studio-cyan-tint: rgba(85, 214, 232, 0.14);
+  --studio-gold: #c9a54c;
+  --studio-gold-tint: rgba(201, 165, 76, 0.16);
+  --studio-on-gold: #111827;
+  --studio-danger: #f2a093;
+  --studio-ok: #9bd6a9;
+  --studio-eval-good: #8cc4ff;
+  --studio-track: rgba(232, 237, 244, 0.14);
+  --studio-shadow-board: 0 0 0 1px rgba(0, 0, 0, 0.45), 0 6px 18px rgba(0, 0, 0, 0.4);
+  --studio-shadow-board-mini: 0 0 0 1px rgba(0, 0, 0, 0.45), 0 2px 6px rgba(0, 0, 0, 0.35);
 
   --font-sans: system-ui, -apple-system, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic UI', 'Meiryo', sans-serif;
   --font-piece: 'Joban Koma', 'Joban Mincho', serif;

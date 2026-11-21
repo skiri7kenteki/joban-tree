@@ -11,6 +11,10 @@
 // - 段階11-3：⋯ は画面の下から（小見出し「この研究手順」「この局面」「定跡帳」・短い文字）。★ の行の右端に［復習］
 // - 段階12-3：［復習］は金。「この局面からの研究」の見出しの左に「芽」の紋、行に、その手を通る研究手順の割合の棒（行の高さは変えない）
 // 研究手順の画面（StudyScreen）と編集モードは段階10-2 で片付けた（古い URL は src/app/LegacyRedirect.tsx でここへ移す）。
+// - v0.37.0 Dark Research Studio（持ち主の依頼 2026-11-21「おすすめの通りで」）：見出しの右に KIF をコピー・ファイルで渡す・⋯。
+//   ★ の行は名前と「n 手　メモ」の 2 段。操作バーは盤のすぐ下（画面の下に固定しない）。スマホ縦は画面の高さに収め、
+//   「この局面からの研究」から下だけスクロールする。盤は研究候補の見出しと 1.5 行が見える大きさまで（盤を優先）。
+//   候補の行に小さなラベル（本線＝今の研究手順が進む手・変化＝ほかの研究手順の手・終わり＝ここで終わる研究）
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { Board } from '../components/Board';
@@ -47,7 +51,7 @@ import { OUTCOME_TEXT, copyText, shareFile } from './share';
 import { StudyEditDialog, shareStudies } from './StudyDialogs';
 import { applyStudyChange, ensureStudies, library, studiesNow } from './studies';
 import { KifuPanel, KifuSheet, useWideLayout, type KifuRow } from '../components/KifuList';
-import { MoveBar, moveBarHeight } from '../components/MoveBar';
+import { MoveBar } from '../components/MoveBar';
 import { allTemplates, myTemplates, refreshMyTemplates } from './TemplateDialogs';
 
 /** 「書き込む」の入／切（端末ごとに覚える。初期値は入） */
@@ -139,6 +143,7 @@ function initialView(key: string, pool: readonly Study[], templates: readonly Op
 /** 窓 */
 type BookDialog =
   | { kind: 'menu' }
+  | { kind: 'share' }
   | { kind: 'fields' }
   | { kind: 'trees' }
   | { kind: 'cut'; move: string }
@@ -244,22 +249,11 @@ function BookViewScreen({
 
   const treesHere = current ? trees.filter((t) => pathInTree(t, here) !== null) : [];
 
-  // スマホ縦：盤と「この局面からの研究」の 3 行目までが、画面の下に固定したバー（段階11-2）の上にスクロールせずに見える盤の幅
+  // スマホ縦（v0.37.0）：盤を優先。盤のすぐ下の操作バーと、「この局面からの研究」の見出しと 1.5 行が画面に見える幅まで（持ち主の判断 2026-11-21）
   const boardRef = useRef<HTMLDivElement>(null);
   const branchesRef = useRef<HTMLDivElement>(null);
-  /** 盤の下から、一覧の 3 行目の下までの高さ（最後に測った値）。一覧の行が少ない局面でも同じだけ空けて、盤の大きさを変えない */
-  const listReserve = useRef<number | null>(null);
-  const boardFit = useBoardFit(boardRef, (board) => {
-    const rows = branchesRef.current?.querySelectorAll<HTMLElement>('.book-row');
-    if (rows && rows.length > 0) {
-      const n = Math.min(3, rows.length);
-      const rowH = rows[0].getBoundingClientRect().height;
-      // 成る・成らないの小窓は数えない（盤の大きさが変わらないように）
-      const promote = board.parentElement?.querySelector<HTMLElement>('.promote-box')?.getBoundingClientRect().height ?? 0;
-      listReserve.current = rows[n - 1].getBoundingClientRect().bottom - board.getBoundingClientRect().bottom + (3 - n) * rowH - promote;
-    }
-    return measureFitAbove(board, board, moveBarHeight() + (listReserve.current ?? LIST_GUESS));
-  });
+  const barRef = useRef<HTMLDivElement>(null);
+  const boardFit = useBoardFit(boardRef, (board) => measureFitAbove(board, board, listReserve(barRef.current, branchesRef.current)));
 
   const input = useMoveInput(sfen, (move) => void onPlay(move.usi), !busy);
 
@@ -459,7 +453,8 @@ function BookViewScreen({
 
   return (
     <>
-      <div class="screen-header">
+    <div class="book-studio">
+      <div class="screen-header book-header">
         <button type="button" class="btn btn-ghost btn-back" onClick={() => go('/')}>
           ‹<span class="back-text"> 一覧</span>
         </button>
@@ -469,7 +464,29 @@ function BookViewScreen({
           </span>
           <span class="book-label">{label}</span>
         </h1>
-        <button type="button" class="btn tree-menu-btn" aria-label="定跡帳の操作" data-testid="book-menu" onClick={() => setDialog({ kind: 'menu' })}>
+        <button
+          type="button"
+          class="btn header-icon"
+          aria-label="この研究手順の KIF をコピー"
+          title="KIF をコピー"
+          data-testid="study-copy-kif"
+          disabled={!current}
+          onClick={() => void copyKif()}
+        >
+          <IconCopy />
+        </button>
+        <button
+          type="button"
+          class="btn header-icon"
+          aria-label="この研究手順をファイルで渡す"
+          title="ファイルで渡す"
+          data-testid="book-share"
+          disabled={!current}
+          onClick={() => setDialog({ kind: 'share' })}
+        >
+          <IconShare />
+        </button>
+        <button type="button" class="btn tree-menu-btn header-icon" aria-label="定跡帳の操作" data-testid="book-menu" onClick={() => setDialog({ kind: 'menu' })}>
           ⋯
         </button>
       </div>
@@ -478,13 +495,15 @@ function BookViewScreen({
       <div class="study-head">
         {current ? (
           <>
-            <button type="button" class="study-title study-title-line book-head-btn" data-testid="book-head" onClick={() => setDialog({ kind: 'fields' })}>
+            <button type="button" class="study-title book-head-btn" data-testid="book-head" onClick={() => setDialog({ kind: 'fields' })}>
               <span class="study-star" aria-hidden="true">
                 ★
               </span>
-              <strong data-testid="study-title">{current.name}</strong>
-              <span class="muted study-meta-inline" data-testid="study-meta">
-                {firstLine(current.note) || 'メモなし'}
+              <span class="book-head-text">
+                <strong data-testid="study-title">{current.name}</strong>
+                <span class="muted study-meta-inline" data-testid="study-meta">
+                  {current.moves.length} 手　{firstLine(current.note) || 'メモなし'}
+                </span>
               </span>
             </button>
             <button type="button" class="btn btn-primary study-head-review" data-testid="book-head-review" onClick={() => go(`/study-review/${current.id}`)}>
@@ -499,11 +518,31 @@ function BookViewScreen({
       </div>
 
       <div class="tree-layout study-layout">
-        <div ref={boardRef} {...boardFitProps(boardFit, 'tree-board')} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} data-testid="study-board">
-          <Board sfen={sfen} lastMove={prevMove} selection={input.selection} onSquare={input.onSquare} onHand={input.onHand} />
+        <div class="book-board-col">
+          <div ref={boardRef} {...boardFitProps(boardFit, 'tree-board')} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} data-testid="study-board">
+            <Board sfen={sfen} lastMove={prevMove} selection={input.selection} onSquare={input.onSquare} onHand={input.onHand} />
+          </div>
+
+          {/* 盤のすぐ下の操作バー（v0.37.0。前は画面の下に固定）：|‹（出発点へ） ‹ [n手目 ▲X ▾] › ›|（今の研究手順の終わりへ） */}
+          <MoveBar
+            ids={{ bar: 'study-nav', first: 'study-first', prev: 'study-prev', center: 'study-position', next: 'study-next', last: 'study-last' }}
+            firstLabel={`出発点（${startName}）へ`}
+            onFirst={() => moveTo(minIndex)}
+            onPrev={() => moveTo(index - 1)}
+            onNext={() => moveTo(index + 1)}
+            onLast={() => moveTo(last)}
+            canPrev={index > minIndex}
+            canNext={index < last}
+            onCenter={wide ? undefined : () => setKifuOpen(true)}
+            fixed={false}
+            barRef={barRef}
+          >
+            {index === 0 ? '初期局面' : `${index}手目 ${texts[index - 1] ?? ''}`}
+          </MoveBar>
         </div>
 
-        <div class="tree-side">
+        {/* スマホ縦はここから下だけスクロール（v0.37.0） */}
+        <div class="tree-side book-scroll" data-testid="book-scroll">
           <PromotionBox input={input} />
           {/* 手順の一覧：広い画面は盤の横に常に。スマホ縦は固定バーの手数を押すと画面下から（段階11-5・11-2） */}
           {wide && <KifuPanel rows={kifuRows} current={index} onJump={moveTo} />}
@@ -546,21 +585,7 @@ function BookViewScreen({
           )}
         </div>
       </div>
-
-      {/* 盤の下の固定バー（段階11-2）：|‹（出発点へ） ‹ [n手目 ▲X ▾] › ›|（今の研究手順の終わりへ） */}
-      <MoveBar
-        ids={{ bar: 'study-nav', first: 'study-first', prev: 'study-prev', center: 'study-position', next: 'study-next', last: 'study-last' }}
-        firstLabel={`出発点（${startName}）へ`}
-        onFirst={() => moveTo(minIndex)}
-        onPrev={() => moveTo(index - 1)}
-        onNext={() => moveTo(index + 1)}
-        onLast={() => moveTo(last)}
-        canPrev={index > minIndex}
-        canNext={index < last}
-        onCenter={wide ? undefined : () => setKifuOpen(true)}
-      >
-        {index === 0 ? '初期局面' : `${index}手目 ${texts[index - 1] ?? ''}`}
-      </MoveBar>
+    </div>
 
       {kifuOpen && <KifuSheet rows={kifuRows} current={index} onJump={moveTo} onClose={() => setKifuOpen(false)} />}
 
@@ -595,15 +620,6 @@ function BookViewScreen({
                 </button>
                 <button type="button" class="btn" data-testid="book-study-review" onClick={() => go(`/study-review/${current.id}`)}>
                   復習
-                </button>
-                <button type="button" class="btn" data-testid="study-copy-kif" onClick={() => void copyKif()}>
-                  KIFをコピー
-                </button>
-                <button type="button" class="btn" data-testid="study-share-json" onClick={() => void share('json')}>
-                  JSONで渡す
-                </button>
-                <button type="button" class="btn" data-testid="study-share-kif" onClick={() => void share('kif')}>
-                  KIFで渡す
                 </button>
                 <button type="button" class="btn" data-testid="book-end-here" disabled={!endPlan} onClick={() => setDialog({ kind: 'end' })}>
                   ここで終わり…
@@ -653,6 +669,21 @@ function BookViewScreen({
                 {on ? '入' : '切（読むだけ）'}
               </button>
             ))}
+          </div>
+        </Dialog>
+      )}
+
+      {/* 見出しの「ファイルで渡す」（v0.37.0。前は ⋯ の中） */}
+      {dialog?.kind === 'share' && current && (
+        <Dialog title={`★ ${current.name}`} onClose={() => setDialog(null)} testId="book-share-dialog" sheet>
+          <p class="menu-section-title">ファイルで渡す</p>
+          <div class="dialog-actions dialog-actions-column">
+            <button type="button" class="btn" data-testid="study-share-json" onClick={() => void share('json')}>
+              JSONで渡す
+            </button>
+            <button type="button" class="btn" data-testid="study-share-kif" onClick={() => void share('kif')}>
+              KIFで渡す
+            </button>
           </div>
         </Dialog>
       )}
@@ -742,7 +773,48 @@ function CutText({ plan }: { plan: CutPlan }) {
 }
 
 /** 盤の下から一覧の 3 行目までの高さの見込み（まだ測っていないとき。間＋見出し＋3 行） */
-const LIST_GUESS = 200;
+/** 研究候補の 1 行の高さ（まだ測れないとき） */
+const ROW_GUESS = 56;
+/** 研究候補の見出しの高さ（まだ測れないとき） */
+const HEAD_GUESS = 32;
+/** スマホ縦で、盤の下に必ず見せる研究候補の行の数（持ち主の判断 2026-11-21：盤を優先し、候補は 1.5 行まで） */
+const LIST_MIN_ROWS = 1.5;
+
+/**
+ * 盤の下に空けておく高さ（px）：操作バー・研究候補の見出しと 1.5 行・すき間・端末の下の余白。
+ * 行の数や中身によらず同じ値にして、局面を動かしても盤の大きさが変わらないようにする
+ */
+function listReserve(bar: HTMLElement | null, list: HTMLElement | null): number {
+  const barBox = bar?.getBoundingClientRect();
+  const barH = barBox ? barBox.height + parseFloat(getComputedStyle(bar!).marginTop || '0') : 60;
+  const headH = list?.querySelector<HTMLElement>('.candidates-head')?.getBoundingClientRect().height || HEAD_GUESS;
+  const rowH = list?.querySelector<HTMLElement>('.book-row')?.getBoundingClientRect().height || ROW_GUESS;
+  const scroll = list?.parentElement;
+  const gap = scroll ? parseFloat(getComputedStyle(scroll).paddingTop || '0') + parseFloat(getComputedStyle(list!).paddingTop || '0') : 16;
+  const app = document.querySelector<HTMLElement>('.app');
+  const safeBottom = app ? parseFloat(getComputedStyle(app).paddingBottom || '0') : 0;
+  return barH + gap + headH + rowH * LIST_MIN_ROWS + safeBottom;
+}
+
+/** 見出しのアイコン：コピー（2 枚の紙） */
+function IconCopy() {
+  return (
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="8" y="8" width="12" height="12" rx="2" />
+      <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" />
+    </svg>
+  );
+}
+
+/** 見出しのアイコン：共有（箱から上へ出る矢印） */
+function IconShare() {
+  return (
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 15V4M8 8l4-4 4 4" />
+      <path d="M5 13v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5" />
+    </svg>
+  );
+}
 
 /**
  * 「この局面からの研究」：次の手ごとに、その手を通る研究手順の名前と数。今たどっている研究手順の手に印。行の ⋯ で「この手から先を消す」。
@@ -789,20 +861,20 @@ function BookBranches({
                 class={isCurrent ? 'candidate book-row book-current' : 'candidate book-row'}
                 data-testid="study-book-branch"
                 data-current={isCurrent ? 'true' : 'false'}
+                aria-current={isCurrent ? 'true' : undefined}
                 onClick={() => onBranch(b)}
               >
+                {/* 上の段：分岐の手（いちばん目立たせる）・ラベル・割合の棒と本数。下の段：通る研究手順の名前 */}
                 <span class="candidate-line">
-                  <span class="candidate-move">
-                    {isCurrent ? '▶ ' : ''}
-                    {moveText(sfen, b.move, prev)}
-                  </span>
-                  <span class="book-names">{names(b.studies)}</span>
+                  <span class="candidate-move">{moveText(sfen, b.move, prev)}</span>
+                  {current && <BranchLabel kind={isCurrent ? 'main' : 'variation'} />}
                   {/* その手を通る研究手順の割合の棒（段階12-3。本数はこの局面を通る研究手順の数に対して） */}
                   <span class="book-bar" aria-hidden="true" data-testid="study-book-bar">
                     <span class="book-bar-fill" style={{ width: `${Math.round((b.studies.length / Math.max(count, 1)) * 100)}%` }} />
                   </span>
                   {b.studies.length >= 2 && <span class="book-count num">（{b.studies.length}）</span>}
                 </span>
+                <span class="book-names">{names(b.studies)}</span>
               </button>
               <button type="button" class="candidate-menu" aria-label={`${moveText(sfen, b.move, prev)} の操作`} data-testid="book-branch-menu" onClick={() => onMenu(b.move)}>
                 ⋯
@@ -819,12 +891,14 @@ function BookBranches({
                 class={isCurrent ? 'candidate book-row book-current' : 'candidate book-row'}
                 data-testid="study-book-ending"
                 data-current={isCurrent ? 'true' : 'false'}
+                aria-current={isCurrent ? 'true' : undefined}
                 onClick={() => onEnding(s)}
               >
                 <span class="candidate-line">
-                  <span class="candidate-move book-end-label">{isCurrent ? '▶ ' : ''}ここで終わる研究</span>
-                  <span class="book-names">{s.name}</span>
+                  <span class="candidate-move book-end-label">ここで終わる研究</span>
+                  <BranchLabel kind="end" />
                 </span>
+                <span class="book-names">{s.name}</span>
               </button>
             </li>
           );
@@ -839,4 +913,10 @@ function BookBranches({
       </ul>
     </div>
   );
+}
+
+/** 研究候補の小さなラベル（v0.37.0）：本線＝今たどっている研究手順が進む手、変化＝ほかの研究手順の手、終わり＝ここで終わる研究 */
+function BranchLabel({ kind }: { kind: 'main' | 'variation' | 'end' }) {
+  const text = kind === 'main' ? '本線' : kind === 'variation' ? '変化' : '終わり';
+  return <span class={`chip chip-small book-label-${kind}`}>{text}</span>;
 }

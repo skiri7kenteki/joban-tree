@@ -65,9 +65,10 @@ test.describe('9-2 研究手順どうしをつないで見る', () => {
     await expect(page.getByTestId('study-book-head')).toHaveText('この局面からの研究（3 本）');
     const rows = page.getByTestId('study-book-branch');
     await expect(rows).toHaveCount(2);
-    // 3 行目まで見える高さ（ここでは 2 行と、空けた分）
-    const box = await rows.nth(1).boundingBox();
-    expect(box && box.y + box.height).toBeLessThanOrEqual(740);
+    // 盤を優先し、研究候補は 1.5 行まで見える（v0.37.0、持ち主の判断 2026-11-21）。2 行目は上の方が見え、候補から下のスクロールの中で押せる
+    const first = (await rows.nth(0).boundingBox())!;
+    expect(first.y + first.height).toBeLessThanOrEqual(740);
+    expect((await rows.nth(1).boundingBox())!.y).toBeLessThan(740);
 
     // △8四飛 → 2 本
     await rows.nth(0).click();

@@ -1691,7 +1691,7 @@
 .kifu-row.current {
   background: var(--paper-selected);
   color: var(--color-text);
-  box-shadow: inset 3px 0 0 var(--gold-dark);
+  box-shadow: inset 3px 0 0 var(--color-current);
   font-weight: bold;
   opacity: 1;
 }
@@ -2317,4 +2317,293 @@ div.move-bar-center {
 /* 小さな盤（復習の結果）は影を小さく */
 .mini-board .board-wrap {
   box-shadow: var(--shadow-board-mini);
+}
+
+/* ---- v0.37.0：盤の画面 Dark Research Studio（持ち主の依頼 2026-11-21「おすすめの通りで」）----
+   色は base.css の「盤の画面」の並びで入れ替える。ここは定跡帳の盤の並び（見出しのアイコン・★ の行・盤のすぐ下の操作バー・
+   スクロールする研究候補）と、盤の画面に共通のフォーカスの枠 */
+
+/* キーボードで動かしたときの枠：シアン */
+.app:not(.has-tabs) :focus-visible {
+  outline: 2px solid var(--studio-cyan);
+  outline-offset: 2px;
+}
+
+/* 見出し：‹・真ん中に「定跡帳」と戦型の名前（2 段）・右にアイコン 3 つ（44px の正方形、地は透明） */
+.app:not(.has-tabs) .book-header h1.tree-title {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  text-align: center;
+}
+
+.app:not(.has-tabs) .book-header .book-kicker {
+  display: block;
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.3;
+}
+
+.app:not(.has-tabs) .book-header .book-label {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  line-height: 1.3;
+}
+
+.app:not(.has-tabs) .book-header > .btn.header-icon:not(.btn-ghost):not(.btn-primary) {
+  width: var(--touch-min);
+  min-width: var(--touch-min);
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  color: var(--studio-text);
+  font-size: 20px;
+}
+
+.app:not(.has-tabs) .book-header > .btn.header-icon:disabled {
+  opacity: 0.35;
+}
+
+.header-icon .icon {
+  width: 21px;
+  height: 21px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* ★ の行：名前（主）と「n 手　メモ」（控えめ）の 2 段、右に［復習］ */
+.book-studio .study-head {
+  min-height: 52px;
+  gap: var(--space-3);
+}
+
+.book-studio .book-head-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.book-studio .study-head .study-star {
+  flex: none;
+  margin: 0;
+  color: var(--studio-gold);
+  font-size: 17px;
+}
+
+.book-head-text {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-width: 0;
+  gap: 2px;
+}
+
+.book-studio .study-head strong {
+  max-width: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 16px;
+  line-height: 1.3;
+}
+
+.book-studio .study-meta-inline {
+  flex: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+
+/* 盤：左右 16px（画面の端まで広げない） */
+.book-studio .board-fit {
+  --board-bleed: 0px;
+}
+
+/* 盤のすぐ下の操作バー：面の色の角丸の帯。ボタンは 48×44px、真ん中は手数と手（押すと手順の一覧） */
+.book-board-col .move-bar {
+  margin-top: var(--space-2);
+  padding: 0 var(--space-1);
+  border-radius: 14px;
+  background: var(--studio-panel);
+}
+
+.book-board-col .move-bar-inner {
+  height: 52px;
+  gap: 0;
+}
+
+.book-board-col .move-bar-btn {
+  width: 48px;
+  height: var(--touch-min);
+  border: 0;
+  background: transparent;
+  color: var(--studio-text);
+  font-size: 20px;
+}
+
+.book-board-col .move-bar-btn:disabled {
+  opacity: 0.3;
+}
+
+.book-board-col .move-bar-center {
+  font-size: 16px;
+  font-weight: bold;
+  color: var(--studio-text);
+}
+
+.book-board-col .kifu-open::after {
+  color: var(--studio-cyan);
+}
+
+/* 研究候補から下：盤の下の地のまま（帯で塗らない）。スマホ縦はここだけスクロール */
+.app:not(.has-tabs) .book-studio .tree-side {
+  padding-top: 10px;
+  background: transparent;
+  box-shadow: none;
+  clip-path: none;
+}
+
+@media not ((min-width: 768px) and (orientation: landscape)) {
+  .main:has(> .book-studio) {
+    padding-top: var(--space-2);
+    padding-bottom: 0;
+  }
+
+  .book-studio {
+    display: flex;
+    flex-direction: column;
+    height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - var(--space-2));
+  }
+
+  .book-studio > .tree-layout {
+    flex: 1;
+    min-height: 0;
+  }
+
+  /* いちばん下までスクロールしたとき、最後のカードと画面の下の間を少しあける */
+  .book-studio .book-scroll {
+    flex: 1;
+    min-height: 0;
+    padding-bottom: var(--space-3);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+}
+
+/* 広い画面（iPad 横）：盤と操作バーを左の列に */
+@media (min-width: 768px) and (orientation: landscape) {
+  .book-board-col {
+    flex: 0 0 55%;
+    min-width: 0;
+  }
+
+  .book-board-col .tree-board {
+    flex: none;
+  }
+}
+
+/* 研究候補の行：上の段＝分岐の手（いちばん目立たせる）・小さなラベル・割合の棒と本数、下の段＝研究手順の名前（控えめ） */
+.book-studio .book-list {
+  border-radius: 14px;
+}
+
+.book-studio .book-row {
+  min-height: 56px;
+  margin-left: -14px;
+  padding: 6px 0 6px 14px;
+  gap: 4px;
+}
+
+.book-studio .book-row .candidate-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.book-studio .book-row .candidate-move {
+  min-width: 0;
+  font-size: 17px;
+  font-weight: bold;
+  color: var(--studio-text);
+}
+
+.book-studio .book-row .book-end-label {
+  font-size: 15px;
+  font-weight: normal;
+  color: var(--studio-muted);
+}
+
+.book-studio .book-row .book-bar {
+  margin-left: auto;
+  width: 40px;
+  height: 3px;
+  align-self: center;
+}
+
+.book-studio .book-row .book-bar-fill {
+  background: var(--studio-muted);
+}
+
+.book-studio .book-row .book-count {
+  font-size: 13px;
+}
+
+.book-studio .book-row .book-names {
+  display: block;
+  width: 100%;
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: var(--studio-muted);
+}
+
+/* 今たどっている研究手順の行：一段明るい面と左のシアンの線（前の「▶」の代わり） */
+.book-studio .book-current {
+  background: var(--studio-panel-2);
+  box-shadow: inset 3px 0 0 var(--studio-cyan);
+}
+
+.book-studio .book-current .candidate-move {
+  color: var(--studio-text);
+}
+
+.book-studio .book-current .book-names {
+  color: var(--studio-text);
+}
+
+.book-studio .book-current .book-bar-fill {
+  background: var(--studio-cyan);
+}
+
+/* 小さなラベル：本線（シアンの枠）・変化（灰の枠）・終わり（淡い金の地） */
+.book-label-main,
+.book-label-variation,
+.book-label-end {
+  flex: none;
+  font-weight: normal;
+}
+
+.book-label-main {
+  box-shadow: inset 0 0 0 1px var(--studio-cyan);
+  color: var(--studio-cyan);
+}
+
+.book-label-variation {
+  box-shadow: inset 0 0 0 1px var(--studio-button-line);
+  color: var(--studio-muted);
+}
+
+.book-label-end {
+  background: var(--studio-gold-tint);
+  color: var(--studio-gold);
 }

@@ -7,11 +7,66 @@
   box-sizing: border-box;
 }
 
-/* 画面の外（引っ張ったときに見える所・端末の上の余白）は藍 */
+/* 画面の外（引っ張ったときに見える所・端末の上の余白）は藍。盤の画面はスタジオの地（v0.37.0） */
 html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
   background: var(--ink);
+}
+
+html:has(.app:not(.has-tabs)) {
+  background: var(--studio-bg);
+}
+
+/* v0.37.0：盤の画面（下のタブの無い画面）は Dark Research Studio。紙・藍の変数をスタジオの値に入れ替える。
+   中の部品（カード・窓・ボタン・入力欄・棋譜欄・候補手）は、そのまま暗い面とクールホワイトの文字になる。
+   金は研究の印（★・主のボタン）、シアンは今いる所（選んだマス・今の行・今の分岐） */
+.app:not(.has-tabs) {
+  --ground: var(--studio-bg);
+  --ink: var(--studio-bg);
+  --ink-deep: var(--studio-bg);
+  --ink-text: var(--studio-text);
+  --ink-muted: var(--studio-muted);
+  --ink-line: var(--studio-line);
+  --ink-button-line: var(--studio-button-line);
+  --ink-button-bg: var(--studio-button-bg);
+  --ink-accent: var(--studio-gold);
+  --ink-danger: var(--studio-danger);
+  --ink-ok: var(--studio-ok);
+  --paper: var(--studio-panel);
+  --paper-sunken: var(--studio-panel-2);
+  --paper-selected: var(--studio-cyan-tint);
+  --paper-text: var(--studio-text);
+  --paper-muted: var(--studio-muted);
+  --paper-border: var(--studio-line);
+  --paper-accent: var(--studio-gold);
+  --paper-accent-text: var(--studio-on-gold);
+  --paper-danger: var(--studio-danger);
+  --paper-ok: var(--studio-ok);
+  --color-surface: var(--studio-panel);
+  --line-strong: var(--studio-button-line);
+  --gold: var(--studio-gold);
+  --gold-light: var(--studio-gold);
+  --gold-dark: var(--studio-gold);
+  --gold-fill: var(--studio-gold);
+  --gold-fill-text: var(--studio-on-gold);
+  --color-select-line: var(--studio-cyan);
+  --color-current: var(--studio-cyan);
+  --color-progress: var(--studio-cyan);
+  --color-progress-ink: var(--studio-cyan);
+  --color-track: var(--studio-track);
+  --color-track-ink: var(--studio-track);
+  --color-eval-good: var(--studio-eval-good);
+  --color-eval-bad: var(--studio-danger);
+  --color-eval-even: var(--studio-text);
+  --chip-main-bg: var(--studio-cyan-tint);
+  --chip-main-text: var(--studio-cyan);
+  --chip-good-bg: var(--studio-gold-tint);
+  --chip-good-text: var(--studio-gold);
+  --color-unverified: var(--studio-muted);
+  --shadow-card: none;
+  --shadow-board: var(--studio-shadow-board);
+  --shadow-board-mini: var(--studio-shadow-board-mini);
 }
 
 body {
@@ -73,7 +128,7 @@ textarea,
   color: var(--color-text);
 }
 
-/* 盤の画面（下のタブの無い画面）は藍の地。いちばん上に青海波をごく薄く敷いて、下へ消えていく */
+/* 盤の画面（下のタブの無い画面）はスタジオの地（上の並びで --ink を入れ替える）。v0.37.0 から青海波は敷かない */
 .app {
   position: relative;
   /* 端末の上の余白（ホーム画面アプリの時刻などの帯。文字は白）は藍のまま */
@@ -85,7 +140,7 @@ textarea,
 }
 
 .app:not(.has-tabs)::before {
-  content: '';
+  content: none;
   position: absolute;
   top: 0;
   left: 0;
