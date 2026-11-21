@@ -356,21 +356,12 @@ async function expectBarBelowBoard(page: Page, barId: string, boardSel: string, 
 }
 
 test.describe('11-2 盤の下の固定バー', () => {
-  test('定跡帳：‹ › の行と手順の行の代わりに、盤のすぐ下のバー（v0.37.0。前は画面の下に固定）。真ん中を押すと手順の一覧。候補から下だけスクロール', async ({ page }) => {
+  test('定跡帳：‹ › の行と手順の行の代わりに、画面の下に固定。真ん中を押すと手順の一覧。一覧の 3 行目までバーの上に見える', async ({ page }) => {
     await openHome(page);
     await importStudy(page, LINE);
     await page.getByTestId('study-item').click();
     await expect(page.getByTestId('study-position')).toHaveText('11手目 ▲同　飛');
-    const board = (await page.locator('[data-testid="study-board"]').boundingBox())!;
-    const bar = (await page.getByTestId('study-nav').boundingBox())!;
-    expect(bar.y).toBeGreaterThanOrEqual(board.y + board.height - 1);
-    expect(bar.y - (board.y + board.height)).toBeLessThan(16);
-    // ボタンは押しやすい大きさ（44px 以上）
-    for (const id of ['study-first', 'study-prev', 'study-next', 'study-last']) {
-      const b = (await page.getByTestId(id).boundingBox())!;
-      expect(b.width).toBeGreaterThanOrEqual(44);
-      expect(b.height).toBeGreaterThanOrEqual(44);
-    }
+    const bar = await expectBarBelowBoard(page, 'study-nav', '[data-testid="study-board"]', 740);
     // 出発点（初期局面）へ・最後へ
     await expect(page.getByTestId('study-last')).toBeDisabled();
     await page.getByTestId('study-first').click();
@@ -378,12 +369,10 @@ test.describe('11-2 盤の下の固定バー', () => {
     await expect(page.getByTestId('study-prev')).toBeDisabled();
     await page.getByTestId('study-next').click();
     await expect(page.getByTestId('study-position')).toHaveText('1手目 ▲７六歩');
-    // 取り消す・まとめて復習は、候補から下のスクロールの中。画面全体はスクロールしない（盤とバーは動かない）
-    await page.getByTestId('book-review').scrollIntoViewIfNeeded();
+    // 「この局面からの研究」（1 本だけなので出ない）・取り消す・まとめて復習はバーに隠れない位置までスクロールできる
+    await page.mouse.wheel(0, 3000);
     const review = (await page.getByTestId('book-review').boundingBox())!;
-    expect(review.y + review.height).toBeLessThanOrEqual(741);
-    expect(await page.evaluate(() => document.scrollingElement!.scrollHeight)).toBeLessThanOrEqual(741);
-    expect((await page.getByTestId('study-nav').boundingBox())!.y).toBe(bar.y);
+    expect(review.y + review.height).toBeLessThanOrEqual(bar.y);
     await page.getByTestId('study-position').click();
     await expect(page.getByTestId('kifu-sheet').locator('[aria-current="step"]')).toHaveAttribute('data-ply', '1');
     await closeDialog(page);
@@ -503,16 +492,11 @@ test.describe('11-3 ⋯ のメニューと説明文', () => {
     await expectSheet(page, 'book-menu-dialog', 740);
     const menu = page.getByTestId('book-menu-dialog');
     await expect(menu.locator('.menu-section-title')).toHaveText(['この研究手順（★ 横歩の手前）', 'この局面', '定跡帳']);
+    await expect(menu.getByTestId('study-share-json')).toHaveText('JSONで渡す');
     await expect(menu.getByTestId('book-share-kif')).toHaveText('KIFで渡す（1本）');
     for (const b of await menu.locator('.dialog-actions-column .btn').all()) {
       expect((await b.boundingBox())!.height).toBeLessThan(50);
     }
-    await closeDialog(page);
-    // この研究手順の「ファイルで渡す」は見出しのアイコンから（v0.37.0。前は ⋯ の中）。窓は画面の下から
-    await page.getByTestId('book-share').click();
-    await expectSheet(page, 'book-share-dialog', 740);
-    await expect(page.getByTestId('book-share-dialog').getByTestId('study-share-json')).toHaveText('JSONで渡す');
-    await expect(page.getByTestId('book-share-dialog').getByTestId('study-share-kif')).toHaveText('KIFで渡す');
     await closeDialog(page);
 
     // ［復習］でこの研究手順の復習へ。答え方の説明も初めての 1 回だけ

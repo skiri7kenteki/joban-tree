@@ -46,10 +46,10 @@
   fill: var(--color-last-move-from);
 }
 
-/* 選んだマス：藍を重ねて、内側に金の線（段階12-2。最終手の朱と見分ける）。盤の画面ではシアンの線（v0.37.0） */
+/* 選んだマス：藍を重ねて、内側に金の線（段階12-2。最終手の朱と見分ける） */
 .sq-selected {
   fill: var(--color-selected);
-  stroke: var(--color-select-line);
+  stroke: var(--gold);
   stroke-width: 2.5;
 }
 
@@ -224,7 +224,7 @@ button.hand-tap {
 /* 選んだ持ち駒：駒のまわりに明るい金の地と金の縁 */
 button.hand-tap.selected {
   background: var(--stand-selected);
-  box-shadow: inset 0 0 0 2px var(--color-select-line);
+  box-shadow: inset 0 0 0 2px var(--gold-light);
   border-radius: 4px;
 }
 
