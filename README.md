@@ -104,6 +104,6 @@ PC（Windows）では、ブラウザの中のエンジンの代わりに、PC �
 - つようら王11micro / 11mini の評価関数（`nn.bin`・`progress.bin`）：MIT License（`public/eval/LICENSE-tuyoura.txt`。出典：[やねうら王公式サイトの公開記事](https://yaneuraou.yaneu.com/2026/10/14/tsuyou-11-mini-micro-released-under-mit-license/)）
 - 使っている主な部品：
   - [tsshogi](https://github.com/sunfish-shogi/tsshogi)（MIT License）
-  - [Noto Serif JP](https://github.com/google/fonts/tree/main/ofl/notoserifjp)（SIL Open Font License 1.1。見出しの明朝体。太さ 600・JIS 第 1 水準までに削ったもの。`public/fonts/OFL-NotoSerifJP.txt`、作り方は `scripts/make-font.py`）
+  - [Noto Serif JP](https://github.com/google/fonts/tree/main/ofl/notoserifjp)（SIL Open Font License 1.1。見出しの明朝体。太さ 600・JIS 第 1 水準までに削ったもの。駒の文字は太さ 900 を駒の字だけに削ったもの。`public/fonts/OFL-NotoSerifJP.txt`、作り方は `scripts/make-font.py`・`scripts/make-koma-font.py`）
   - [Preact](https://preactjs.com/) / @preact/signals（MIT License）
   - [Vite](https://vite.dev/)・vite-plugin-pwa・Vitest・Playwright（ビルドとテストにだけ使用）

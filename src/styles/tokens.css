@@ -2,8 +2,15 @@
    段階12（v0.30.0〜）：C 案「対局室」。全画面を藍の地にして、本文は生成りのカード（紙）の中に置く。
    --color-text などは「藍の地の上」の値。カードの中（base.css の「紙」の部品）では --paper-* に入れ替わる */
 
-/* 見出し・駒の文字の明朝体（Noto Serif JP の太さ 600 を JIS 第 1 水準まで削ったもの。scripts/make-font.py、
+/* 見出し・盤の数字の明朝体（Noto Serif JP の太さ 600 を JIS 第 1 水準まで削ったもの。scripts/make-font.py、
    ライセンスは public/fonts/OFL-NotoSerifJP.txt）。無い文字は端末の明朝体で出る */
+/* 駒の文字だけの太い字体（駒の 15 字ほどに削ったもの。SIL OFL 1.1） */
+@font-face {
+  font-family: 'Joban Koma';
+  src: url('../assets/fonts/joban-koma.woff2') format('woff2');
+  font-display: block;
+}
+
 @font-face {
   font-family: 'Joban Mincho';
   src: url('../assets/fonts/joban-mincho-600.woff2') format('woff2');
@@ -64,13 +71,26 @@
   --color-board-frame: #3d2a0e;
   --color-board-coord: #4a3414;
   --shadow-board: 0 0 0 2px #c9a54c, 0 0 0 3px #3d2a0e, 0 10px 22px rgba(5, 8, 20, 0.55);
-  --color-piece-top: #fcf3da;
-  --color-piece: #f4e1b2;
-  --color-piece-bottom: #e6c98c;
-  --color-piece-edge: #9c7838;
-  --color-piece-shadow: rgba(40, 22, 0, 0.42);
-  --color-piece-text: #161616;
-  --color-piece-promoted: #b3231a;
+  --color-piece-top: #fbe9bf;
+  --color-piece: #efce8e;
+  --color-piece-bottom: #dcb06a;
+  --color-piece-edge: #8a6326;
+  --color-piece-side: #a87a3e;
+  --color-piece-side-edge: #6e4a1c;
+  --color-piece-rim: rgba(255, 249, 230, 0.75);
+  --color-piece-shadow: rgba(36, 18, 0, 0.5);
+  --color-piece-shadow-far: rgba(36, 18, 0, 0.18);
+  --color-piece-text: #120c06;
+  --color-piece-promoted: #a8150e;
+  /* 駒台（持ち駒の列） */
+  --stand-shade: linear-gradient(180deg, rgba(70, 40, 12, 0.72), rgba(48, 27, 8, 0.82));
+  --stand-base: #3b240c;
+  --stand-tag: rgba(20, 28, 48, 0.85);
+  --stand-text: #f3ecdc;
+  --stand-muted: #d8c8a4;
+  --stand-selected: rgba(226, 199, 125, 0.5);
+  --stand-count-shadow: 0 0 2px #1c1206, 0 0 2px #1c1206;
+  --shadow-stand: 0 1px 0 rgba(255, 230, 180, 0.18) inset, 0 2px 6px rgba(5, 8, 20, 0.4);
   --color-last-move: rgba(176, 58, 28, 0.3);
   --color-last-move-from: rgba(176, 58, 28, 0.12);
   --color-selected: rgba(28, 39, 64, 0.42);
@@ -92,6 +112,7 @@
   --color-unverified: #7c8089;
 
   --font-sans: system-ui, -apple-system, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic UI', 'Meiryo', sans-serif;
+  --font-piece: 'Joban Koma', 'Joban Mincho', serif;
   --font-serif: 'Joban Mincho', 'Hiragino Mincho ProN', 'Noto Serif CJK JP', 'Yu Mincho', serif;
   --font-mono: ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
   --font-size-body: 16px;

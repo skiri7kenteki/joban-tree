@@ -5,6 +5,9 @@
 // - タップで指さない盤（閲覧画面）は、持ち駒の列を薄くして縦の幅を詰める
 // - 段階12-2：盤は木目の画像（board.css。src/assets/board/wood.webp）と金の縁。駒は明朝体、面に上から下への濃淡（1 つの定義を全部の駒で使う）、
 //   右下に少しずらした影の形（CSS の filter は使わない。駒が多くても軽い）
+// - 段階12 の追加（v0.34.0）：駒の字は駒専用の太い字体（Noto Serif JP Black を駒の字だけに削ったもの）、横 92%。
+//   駒に側面（厚み）・2 段の影・面のふちの光る線。持ち駒の列は駒台（濃い木と金の縁）に、盤と同じ形の駒を小さく並べる。
+//   行の高さは前と同じ（盤の大きさを変えない）
 // - 段階12-4：flash（復習で正解したとき）なら、最終手の行き先のマスに金の光の輪を一瞬出す（動きを減らす設定の端末では出さない。board.css）
 
 import { Color, PieceType, Position, Square, parseUSIMove, pieceTypeToStringForBoard } from 'tsshogi';
@@ -27,9 +30,23 @@ const RANK_KANJI = ['一', '二', '三', '四', '五', '六', '七', '八', '九
 
 /** 駒の面の濃淡の定義の id（盤が画面に複数あっても中身は同じなので、どれを指してもよい） */
 const PIECE_GRADIENT = 'piece-grad';
-/** 駒の影のずれ（SVG の単位） */
-const SHADOW_DX = 1.2;
-const SHADOW_DY = 1.8;
+/** 駒の形（上がとがった五角形。中心からのずれ、SVG の単位） */
+const PIECE_POINTS = [
+  [0, -19],
+  [13, -14],
+  [16, 19],
+  [-16, 19],
+  [-13, -14],
+];
+/** 駒の側面（厚み）：同じ形を下へずらして濃い木の色で描く */
+const SIDE_DY = 2.4;
+/** 影は 2 段：近くに濃い影、少し遠くに薄い影（filter は使わない） */
+const SHADOW_NEAR = { dx: 0.7, dy: 3.4 };
+const SHADOW_FAR = { dx: 1.8, dy: 5.2 };
+/** 面のふちの少し内側の明るい線（光の当たったふち）の大きさ */
+const RIM_SCALE = 0.84;
+/** 駒の文字の横の縮め（面いっぱいに見せる） */
+const TEXT_SCALE_X = 0.92;
 
 /** 持ち駒を並べる順 */
 const HAND_ORDER: PieceType[] = [
@@ -145,8 +162,9 @@ export function Board({ sfen, lastMove, selection, onSquare, onHand, flash }: Bo
       <svg class="board" viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} role="img" aria-label="将棋盤" data-testid="board" data-sfen={sfen}>
         <defs>
           {/* 駒の面の濃淡（色は board.css の stop-color） */}
-          <linearGradient id={PIECE_GRADIENT} x1="0" y1="0" x2="0" y2="1">
+          <linearGradient id={PIECE_GRADIENT} x1="0.2" y1="0" x2="0.8" y2="1">
             <stop offset="0" class="piece-grad-top" />
+            <stop offset="0.55" class="piece-grad-mid" />
             <stop offset="1" class="piece-grad-bottom" />
           </linearGradient>
         </defs>
@@ -173,26 +191,32 @@ export function Board({ sfen, lastMove, selection, onSquare, onHand, flash }: Bo
   );
 }
 
-/** 五角形の駒 */
+/** 駒の形の頂点（中心 cx, cy、大きさ s 倍） */
+function piecePoints(cx: number, cy: number, s = 1) {
+  return PIECE_POINTS.map(([x, y]) => `${cx + x * s},${cy + y * s}`).join(' ');
+}
+
+/** 五角形の駒。下から 遠い影・近い影・側面（厚み）・面・光のふち・文字 */
 function PieceShape({ cx, cy, type, upsideDown }: { cx: number; cy: number; type: PieceType; upsideDown: boolean }) {
-  // 駒の形（上がとがった五角形）
-  const points = [
-    [cx, cy - 19],
-    [cx + 13, cy - 14],
-    [cx + 16, cy + 19],
-    [cx - 16, cy + 19],
-    [cx - 13, cy - 14],
-  ]
-    .map((p) => p.join(','))
-    .join(' ');
-  const rotate = upsideDown ? `rotate(180 ${cx} ${cy})` : '';
+  // 側面の分だけ少し上に描いて、マスの真ん中に見せる
+  const y = cy - 1;
+  const points = piecePoints(cx, y);
+  const rotate = upsideDown ? `rotate(180 ${cx} ${y})` : '';
+  // 影と側面は、後手の駒でも下（右下）に出す（光は画面の上から）
+  const below = (dx: number, dy: number) => `translate(${dx} ${dy}) ${rotate}`.trim();
   return (
     <g class="piece">
-      {/* 影：駒の形を右下に少しずらす（後手の駒も影は右下） */}
-      <polygon points={points} class="piece-shadow" transform={`translate(${SHADOW_DX} ${SHADOW_DY}) ${rotate}`.trim()} />
+      <polygon points={points} class="piece-shadow-far" transform={below(SHADOW_FAR.dx, SHADOW_FAR.dy)} />
+      <polygon points={points} class="piece-shadow" transform={below(SHADOW_NEAR.dx, SHADOW_NEAR.dy)} />
+      <polygon points={points} class="piece-side" transform={below(0, SIDE_DY)} />
       <g transform={rotate || undefined}>
         <polygon points={points} class="piece-body" />
-        <text x={cx} y={cy + 3} class={PROMOTED.has(type) ? 'piece-text promoted' : 'piece-text'} dominant-baseline="central">
+        <polygon points={piecePoints(cx, y + 1.2, RIM_SCALE)} class="piece-rim" />
+        <text
+          transform={`translate(${cx} ${y + 2.5}) scale(${TEXT_SCALE_X} 1)`}
+          class={PROMOTED.has(type) ? 'piece-text promoted' : 'piece-text'}
+          dominant-baseline="central"
+        >
           {pieceTypeToStringForBoard(type)}
         </text>
       </g>
@@ -200,7 +224,22 @@ function PieceShape({ cx, cy, type, upsideDown }: { cx: number; cy: number; type
   );
 }
 
-/** 持ち駒の列（☗/☖ と、駒と枚数） */
+/** 駒台の駒（盤と同じ形を小さく。影は近い 1 段だけ） */
+function HandPiece({ type }: { type: PieceType }) {
+  return (
+    <svg class="hand-piece" viewBox="-17.5 -20.5 36 43">
+      <polygon points={piecePoints(0, 0)} class="piece-shadow" transform={`translate(${SHADOW_NEAR.dx} ${SHADOW_NEAR.dy})`} />
+      <polygon points={piecePoints(0, 0)} class="piece-side" transform={`translate(0 ${SIDE_DY})`} />
+      <polygon points={piecePoints(0, 0)} class="piece-body" />
+      <polygon points={piecePoints(0, 1.2, RIM_SCALE)} class="piece-rim" />
+      <text transform={`translate(0 2.5) scale(${TEXT_SCALE_X} 1)`} class="piece-text" dominant-baseline="central">
+        {pieceTypeToStringForBoard(type)}
+      </text>
+    </svg>
+  );
+}
+
+/** 持ち駒の列＝駒台（☗ 先手／☖ 後手 の札と、盤と同じ形の駒、2 枚以上なら右下に金の数字） */
 function HandRow({
   position,
   side,
@@ -218,18 +257,27 @@ function HandRow({
   const pieces = HAND_ORDER.filter((t) => hand.count(t) > 0);
   return (
     <div class={compact ? 'hand compact' : 'hand tappable'} data-testid={`hand-${side}`}>
-      <span class="hand-mark">{side === 'black' ? '☗' : '☖'}</span>
+      <span class="hand-mark">
+        {side === 'black' ? '☗' : '☖'}
+        <span class="hand-side">{side === 'black' ? ' 先手' : ' 後手'}</span>
+      </span>
       {pieces.length === 0 && <span class="hand-empty">持ち駒なし</span>}
       {pieces.map((t) => {
         const selected = selection?.kind === 'hand' && selection.pieceType === t;
-        const label = `${pieceTypeToStringForBoard(t)}${hand.count(t) > 1 ? hand.count(t) : ''}`;
+        const n = hand.count(t);
+        const inner = (
+          <>
+            <HandPiece type={t} />
+            {n > 1 && <span class="hand-count">{n}</span>}
+          </>
+        );
         return onHand ? (
           <button type="button" key={t} class={selected ? 'hand-tap selected' : 'hand-tap'} aria-pressed={selected} onClick={() => onHand(side, t)}>
-            <span class="hand-piece">{label}</span>
+            {inner}
           </button>
         ) : (
-          <span key={t} class="hand-piece">
-            {label}
+          <span key={t} class="hand-slot">
+            {inner}
           </span>
         );
       })}

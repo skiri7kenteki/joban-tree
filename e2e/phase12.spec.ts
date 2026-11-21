@@ -239,11 +239,11 @@ test.describe('12-2 盤と駒', () => {
     const css = (sel: string, prop: string) => page.locator(sel).first().evaluate((e, p) => getComputedStyle(e).getPropertyValue(p), prop);
     expect(await css('svg.board', 'background-image')).toContain('wood');
     expect(await css('svg.board', 'box-shadow')).toContain('rgb(201, 165, 76)');
-    expect(await css('.piece-text', 'font-family')).toContain('Joban Mincho');
+    expect(await css('.piece-text', 'font-family')).toContain('Joban Koma');
     expect(await css('.board-coord', 'font-family')).toContain('Joban Mincho');
     // 影は駒と同じ数（初期配置は 40 枚）。CSS の filter は使わない
-    await expect(page.locator('.piece-body')).toHaveCount(40);
-    await expect(page.locator('.piece-shadow')).toHaveCount(40);
+    await expect(page.locator('svg.board .piece-body')).toHaveCount(40);
+    await expect(page.locator('svg.board .piece-shadow')).toHaveCount(40);
     expect(await css('.piece-body', 'filter')).toBe('none');
     // 360×740 の新しいツリーの盤の幅は v0.29.0 で 352px
     expect(Math.round((await board.boundingBox())!.width)).toBeGreaterThanOrEqual(352);
@@ -405,5 +405,101 @@ test.describe('12-4 残りの画面', () => {
     await page.locator('[data-square="76"]').click();
     await expect(page.getByTestId('answer-flash')).toHaveCount(1);
     expect(await page.getByTestId('answer-flash').evaluate((e) => getComputedStyle(e).display)).toBe('none');
+  });
+});
+
+test.describe('段階12 の追加：駒と駒台（v0.34.0）', () => {
+  // 角交換 → 飛車先の歩の交換 → 両方の龍（持ち駒：先手 角・歩 2、後手 角・歩 2）
+  const MID: Study = {
+    id: 's-mid',
+    name: '両方の龍',
+    note: '',
+    moves: '7g7f 3c3d 8h2b+ 3a2b 2g2f 8c8d 2f2e 8d8e 2e2d 2c2d 2h2d 8e8f 8g8f 8b8f 2d2c+ 8f8h+'.split(' '),
+    mySide: 'black',
+    createdAt: 1,
+    updatedAt: 1,
+  };
+
+  test('駒は駒専用の太い字体で、側面・2 段の影・光のふち付き。持ち駒は駒台に盤と同じ形の駒、2 枚以上は金の数字', async ({ page }) => {
+    await openHome(page);
+    await page.getByTestId('study-import-file').setInputFiles({
+      name: 's.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies: [MID] })),
+    });
+    await page.getByTestId('study-item').first().click();
+    const board = page.getByTestId('board');
+    await expect(board).toBeVisible();
+    // 駒の字体がアプリの中から読み込まれる（オフラインでも出る）
+    expect(await page.evaluate(async () => (await document.fonts.load('28px "Joban Koma"', '歩龍')).length)).toBeGreaterThan(0);
+    // 盤の上の駒 34 枚それぞれに 遠い影・近い影・側面・面・光のふち。filter は使わない
+    for (const cls of ['piece-shadow-far', 'piece-shadow', 'piece-side', 'piece-body', 'piece-rim']) {
+      await expect(board.locator(`polygon.${cls}`)).toHaveCount(34);
+    }
+    expect(await board.locator('.piece-side').first().evaluate((e) => getComputedStyle(e).filter)).toBe('none');
+    // 成った駒（龍）は赤い字
+    await expect(board.locator('.piece-text.promoted')).toHaveCount(2);
+
+    // 先手の駒台：「☗ 先手」の札・角・歩（2 枚なので数字 2）。行の高さは前と同じ 32px
+    const black = page.getByTestId('hand-black');
+    expect(Math.round((await black.boundingBox())!.height)).toBe(32);
+    await expect(black.locator('.hand-mark')).toHaveText('☗ 先手');
+    await expect(black.locator('button.hand-tap')).toHaveText(['角', '歩2']);
+    await expect(black.locator('svg.hand-piece polygon.piece-body')).toHaveCount(2);
+    await expect(black.locator('.hand-count')).toHaveText(['2']);
+    await expect(page.getByTestId('hand-white').locator('.hand-mark')).toHaveText('☖ 後手');
+    await expect(page.getByTestId('hand-white').locator('.hand-count')).toHaveText(['2']);
+    // 駒台の駒は盤の駒の 8 割ほど（盤の駒の面の高さと比べる）
+    const big = (await board.locator('polygon.piece-body').first().boundingBox())!.height;
+    const small = (await black.locator('svg.hand-piece polygon.piece-body').first().boundingBox())!.height;
+    expect(small / big).toBeGreaterThan(0.7);
+    expect(small / big).toBeLessThan(0.95);
+
+    // 選んだ持ち駒は金の地と金の内枠。押せる範囲は高さ 32px のまま
+    const kaku = black.locator('button.hand-tap').first();
+    expect((await kaku.boundingBox())!.height).toBeGreaterThanOrEqual(32);
+    await kaku.click();
+    await expect(kaku).toHaveAttribute('aria-pressed', 'true');
+    expect(await kaku.evaluate((e) => getComputedStyle(e).boxShadow)).toContain('rgb(226, 199, 125)');
+  });
+
+  test('閲覧の盤（ツリー）の駒台は高さ 24px のまま。小さな盤（復習の結果）の駒台は 1 行で、札は ☗☖ だけ', async ({ page }) => {
+    await openHome(page);
+    await page.goto('./#/trees');
+    await page.getByTestId('import-file').setInputFiles({ name: 't.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(sampleTree())) });
+    await page.getByTestId('tree-item').click();
+    await expect(page.getByTestId('candidate')).toHaveCount(4);
+    for (const side of ['black', 'white']) {
+      expect(Math.round((await page.getByTestId(`hand-${side}`).boundingBox())!.height)).toBe(24);
+    }
+
+    // 復習の結果のまちがえた問題（1 回 5 問、全部まちがえる）
+    await page.goto('./');
+    await page.getByTestId('study-import-file').setInputFiles({
+      name: 's.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies: [MID] })),
+    });
+    await expect(page.getByTestId('study-item')).toHaveCount(1);
+    await page.goto('./#/settings');
+    await page.getByTestId('review-batch-5').click();
+    await page.goto('./#/study-review/s-mid');
+    const progress = page.getByTestId('review-progress');
+    for (let i = 1; i <= 5; i++) {
+      await expect(progress).toContainText(`今日 ${i}／5問`);
+      await page.locator('[data-square="17"]').click();
+      await page.locator('[data-square="16"]').click();
+      await expect(page.getByTestId('review-wrong')).toBeVisible();
+      await page.getByTestId('review-show').click();
+      // 5 問目の後は「結果を見る」（同じボタン）
+      await page.getByTestId('review-continue').click();
+    }
+    await expect(page.getByTestId('review-result-score')).toBeVisible();
+    const mini = page.locator('.mini-board').first();
+    for (const side of ['black', 'white']) {
+      const hand = mini.getByTestId(`hand-${side}`);
+      expect((await hand.boundingBox())!.height).toBeLessThanOrEqual(20);
+      expect(await hand.locator('.hand-side').evaluate((e) => getComputedStyle(e).display)).toBe('none');
+    }
   });
 });

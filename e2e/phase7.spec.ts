@@ -156,7 +156,7 @@ test.describe('小さな不具合', () => {
     await expect(page.getByTestId('kifu-open')).toHaveText('棋譜を貼り付ける');
   });
 
-  test('入力画面の持ち駒は小さな札（行の高さ 32px）。駒を取っても行の高さは変わらず、札を押して打てる', async ({ page }) => {
+  test('入力画面の持ち駒は駒台の小さな駒（行の高さ 32px）。駒を取っても行の高さは変わらず、駒を押して打てる', async ({ page }) => {
     await page.goto('./#/new');
     await expect(page.getByTestId('isolation')).toHaveAttribute('data-state', 'isolated', { timeout: 30_000 });
     const hand = page.getByTestId('hand-black');
@@ -168,8 +168,9 @@ test.describe('小さな不具合', () => {
     expect(Math.round((await hand.boundingBox())!.height)).toBe(32);
     const piece = hand.locator('button.hand-tap');
     await expect(piece).toHaveText('角');
+    // 駒台の駒は行（32px）の中に収まる（v0.34.0 で札から盤と同じ形の駒に。前は札の高さ 22px 以下）
     const chip = (await hand.locator('.hand-piece').boundingBox())!;
-    expect(chip.height).toBeLessThanOrEqual(22);
+    expect(chip.height).toBeLessThanOrEqual(30);
     const tap = (await piece.boundingBox())!;
     expect(tap.height).toBeGreaterThanOrEqual(32);
     // 押すと選んだ状態 → 盤に打てる（▲5五角）

@@ -1442,6 +1442,40 @@
   margin: 0;
 }
 
+/* 小さな盤の駒台は 1 行に（札は ☗☖ だけ、文字は小さく） */
+.mini-board .hand.compact {
+  flex-wrap: nowrap;
+  min-height: 18px;
+  padding: 0 2px;
+  gap: 1px;
+  overflow: hidden;
+  font-size: 10px;
+}
+
+.mini-board .hand-side {
+  display: none;
+}
+
+.mini-board .hand.compact .hand-mark {
+  padding: 0 3px;
+  margin-right: 2px;
+  line-height: 14px;
+  font-size: 9px;
+}
+
+.mini-board .hand-empty {
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.mini-board .hand.compact .hand-piece {
+  height: 15px;
+}
+
+.mini-board .hand-count {
+  font-size: 10px;
+}
+
 .review-mistake-text {
   display: flex;
   flex-direction: column;

@@ -37,6 +37,7 @@
 | テスト | Vitest（ロジック）、Playwright（画面の通し確認） | GitHub Actions で毎回実行 |
 | 公開 | GitHub Actions → GitHub Pages | テストが失敗したら公開しない |
 | 見出しの明朝体 | Noto Serif JP（太さ 600、JIS 第 1 水準までに削る。SIL OFL 1.1） | 段階12-1。`src/assets/fonts/`、作り方は `scripts/make-font.py`、ライセンスは `public/fonts/OFL-NotoSerifJP.txt` |
+| 駒の文字の字体 | Noto Serif JP の Black（太さ 900、駒に書く 17 字だけに削る。約 5KB） | v0.34.0。`src/assets/fonts/joban-koma.woff2`、作り方は `scripts/make-koma-font.py`、ライセンスは同じ |
 | エンジン | やねうら王（WASM 版、GPLv3）＋つようら王11micro/11mini（評価関数、MIT） | |
 
 - ほかのライブラリを足すときは事前に相談する。**外部 CDN は使わない**（オフラインで動かすため）
@@ -370,6 +371,8 @@
 - **定跡帳の集計と輪（段階12-3、v0.32.0〜）**：定跡帳のタブのいちばん上に「研究手順 n 本・覚えた問題（輪と n / m）・前回まちがい n 問」、研究手順の行の右に覚えた割合の輪、
   定跡帳の盤の画面の「この局面からの研究」の行に、その手を通る研究手順の割合の棒。数え方は復習と同じ `summarizeStudies`（覚えた＝2 回続けて正解）。記録を読むだけ
 - **正解の演出（段階12-4、v0.33.0〜）**：復習で正解すると `Board` の `flash` で指したマスに金の光の輪を 0.6 秒（`.sq-flash`）。まちがえたとき・さかのぼって見ているとき・`prefers-reduced-motion` では出さない
+- **駒と駒台（段階12 の追加、v0.34.0〜）**：駒は駒専用の太い字体・側面（厚み）・2 段の影・光のふち（filter は使わない）。持ち駒の列は駒台（濃い木・金の縁・「☗ 先手」の札）に、
+  盤と同じ形の駒を小さく（`HandPiece`）、2 枚以上は金の数字。**列の高さは前と同じ**（タップで打てる盤 32px・閲覧 24px）で、盤の大きさは変えない。値は DESIGN.md の「将棋盤と駒」
 
 ## PC 版（精密ツリー、段階3）
 - 持ち主の判断（2026-11-14）：**PC の画面から作る**。`pc/start.bat` → `pc/server.mjs`（Node.js の標準機能だけ）→ ブラウザで `http://localhost:18765/joban-tree/`
@@ -458,7 +461,7 @@ pc/bake/                    同梱ツリーを PC で作るコマンド（bake.b
 src/isolation.ts            service worker の登録と cross-origin isolated の確保
 src/sw.ts                   service worker
 src/styles/                 CSS（tokens.css に色などの変数・明朝体の読み込み。base.css に「紙」＝生成りのカードの部品の並び）
-src/assets/fonts/           見出しの明朝体（段階12-1。scripts/make-font.py で作る）
+src/assets/fonts/           見出しの明朝体（段階12-1。scripts/make-font.py で作る）・駒の文字の字体（v0.34.0。scripts/make-koma-font.py で作る）
 src/assets/board/           盤の木目（段階12-2。scripts/make-wood.py で作る）
 docs/design/                見た目の見本（段階12 の C 案）
 public/manifest.webmanifest ホーム画面用の設定（アイコンは public/*.png。scripts/make-icons.mjs で icon.svg から作る）
