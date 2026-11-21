@@ -2318,3 +2318,106 @@ div.move-bar-center {
 .mini-board .board-wrap {
   box-shadow: var(--shadow-board-mini);
 }
+
+/* ---- 段階14：盤の画面を 1 画面に収める（ページ全体はスクロールしない）----
+   上から 見出し → 盤 → 操作バー → 一覧の枠。盤と操作バーは動かず、一覧の枠（.board-frame）の中だけスクロールする。
+   盤の大きさは boardFit.ts の measureFitFrame（枠の中で 3 行が見える大きさ） */
+.board-screen {
+  --screen-pad-top: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - var(--screen-pad-top));
+}
+
+@media (max-width: 600px) {
+  .board-screen {
+    --screen-pad-top: var(--space-2);
+  }
+}
+
+.main:has(> .board-screen) {
+  padding-bottom: 0;
+}
+
+.board-screen > .tree-layout,
+.board-screen > .input-layout {
+  flex: 1;
+  min-height: 0;
+}
+
+/* スクロールバーの場所は最初から取っておく（パソコンなど幅のあるスクロールバーが出たり消えたりして、行の高さ・盤の大きさが揺れないように） */
+.board-screen .board-frame {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding-bottom: var(--space-3);
+}
+
+/* 盤のすぐ下の操作バー（段階14。前は画面の下に固定）：濃い藍の角丸の帯 */
+.board-col .move-bar {
+  margin-top: var(--space-2);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-card);
+  background: var(--ink-deep);
+}
+
+.board-col .move-bar-inner {
+  height: 52px;
+}
+
+/* 新しいツリー：作るボタンのバーは画面のいちばん下（スクロールしない箱の最後） */
+.board-screen .start-bar {
+  position: static;
+  flex: none;
+  margin-top: 0;
+}
+
+@media not ((min-width: 768px) and (orientation: landscape)) {
+  .board-screen > .input-layout {
+    display: flex;
+    flex-direction: column;
+  }
+}
+
+@media (min-width: 768px) and (orientation: landscape) {
+  .board-screen > .tree-layout {
+    align-items: stretch;
+  }
+
+  .board-col {
+    flex: 0 0 55%;
+    min-width: 0;
+  }
+
+  .board-screen .board-frame {
+    height: 100%;
+  }
+
+  .board-screen > .input-layout {
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    align-items: stretch;
+  }
+}
+
+.board-screen .start-bar {
+  margin-bottom: 0;
+}
+
+@media (min-width: 768px) and (orientation: landscape) {
+  .input-board-col {
+    grid-area: board;
+  }
+}
+
+/* 初めての 1 回だけの説明を、画面の下の知らせで出すとき（2 行まで折り返す） */
+.toast-text.toast-wrap {
+  white-space: normal;
+}
+
+/* キーボードで動かしたときのフォーカスの枠（v0.37.0 から残した。段階14 で色を金に）。指で触るときは出ない */
+.app :focus-visible {
+  outline: 2px solid var(--gold);
+  outline-offset: 2px;
+}

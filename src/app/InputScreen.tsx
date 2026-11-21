@@ -17,6 +17,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { Position, type Move } from 'tsshogi';
 import { Board } from '../components/Board';
+import { Dialog } from '../components/Dialog';
 import { PromotionBox, useMoveInput } from '../components/useMoveInput';
 import { KifuPanel, KifuSheet, useWideLayout, type KifuRow } from '../components/KifuList';
 import { MoveBar } from '../components/MoveBar';
@@ -35,7 +36,7 @@ import { openTree, startGeneration, isGenerating } from './generation';
 import { go } from './router';
 import { generationSettingsFor, presetLabel } from './settings';
 import { RegisterTemplateDialog, TemplatePicker, allTemplates } from './TemplateDialogs';
-import { boardFitProps, measureFitAbove, useBoardFit } from './boardFit';
+import { boardFitProps, bottomInFrame, measureFitFrame, useBoardFit } from './boardFit';
 import { copyBundledToList } from './bundledTrees';
 import { takeInputHandoff } from './handoff';
 import { AddToBookDialog, addProblem, studyBookUrl } from './addToBook';
@@ -191,12 +192,18 @@ export function InputScreen() {
     setBundledBusy(false);
   }
 
-  // スマホ縦：盤・持ち駒の行が、作るボタンのバー（段階11-2 から手順の操作 ‹ › もこの中）の上に収まる盤の幅（成る・成らないの小窓は数えない）
+  // 段階14：1 画面に収める。盤のすぐ下に手順の操作、その下の枠の中で「自分は」の行が見える盤の幅（成る・成らないの小窓は数えない）。
+  // 作るボタンのバーは画面のいちばん下。枠の中の残り（戦型のメモ・定跡帳に足す・戦型として登録）は枠の中でスクロール
   const boardRef = useRef<HTMLDivElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
-  const boardFit = useBoardFit(boardRef, (board) =>
-    pasteOpen ? null : measureFitAbove(board, board, barRef.current?.offsetHeight ?? 0, [board.querySelector<HTMLElement>('.promote-box')]),
-  );
+  const frameRef = useRef<HTMLDivElement>(null);
+  const sideRef = useRef<HTMLDivElement>(null);
+  const boardFit = useBoardFit(boardRef, (board) => {
+    const frame = frameRef.current;
+    if (!frame || !sideRef.current) return null;
+    const promote = board.querySelector<HTMLElement>('.promote-box')?.getBoundingClientRect().height ?? 0;
+    return measureFitFrame(board, frame, bottomInFrame(frame, sideRef.current.querySelector(".side-choice") ?? sideRef.current) - promote);
+  });
   /** 手順の操作（段階11-2）：スマホ縦は作るボタンのバーの中、広い画面は右の列の上 */
   const moveBar = (
     <MoveBar
@@ -282,7 +289,7 @@ export function InputScreen() {
   }
 
   return (
-    <>
+    <div class="board-screen">
       <div class="screen-header">
         <button type="button" class="btn btn-ghost btn-back" onClick={() => go('/trees')}>
           ‹<span class="back-text"> 一覧</span>
@@ -290,68 +297,68 @@ export function InputScreen() {
         <h1>新しいツリー</h1>
       </div>
 
-      {/* スマホ縦は上から「貼り付け・盤・操作」、iPad 横は左に盤、右に貼り付けと操作（盤が作るボタンに隠れないように） */}
+      {/* スマホ縦は上から「貼り付け・戦型の 2 つのボタン、盤、手順の操作、枠（自分は・…）、作るボタン」。
+          iPad 横は左に盤と手順の操作、右に 2 つのボタン・枠・作るボタン。段階14：1 画面に収め、枠の中だけスクロール */}
       <div class="input-layout">
         <div class="input-paste">
-          {!pasteOpen ? (
-            <div class="input-sources">
-              <button type="button" class="btn kifu-open" data-testid="kifu-open" onClick={() => setPasteOpen(true)}>
-                棋譜を貼り付ける
-              </button>
-              <button type="button" class="btn" data-testid="template-open" onClick={() => setPickerOpen(true)}>
-                戦型から選ぶ
-              </button>
-            </div>
-          ) : (
-            <div class="card kifu-box" data-testid="kifu-box">
-              <textarea
-                class="kifu-input"
-                data-testid="kifu-input"
-                rows={5}
-                placeholder={'例）7g7f 3c3d 2g2f\nKIF・KI2・CSA・SFEN の棋譜をそのまま貼り付けても読めます'}
-                value={kifu}
-                onInput={(e) => setKifu((e.target as HTMLTextAreaElement).value)}
-              />
-              <div class="btn-row">
-                <button type="button" class="btn btn-primary" data-testid="kifu-load" onClick={loadKifu}>
-                  読み込む
-                </button>
-                <button type="button" class="btn" onClick={resetToStart}>
-                  平手の初期局面に戻す
-                </button>
-                <button type="button" class="btn btn-ghost" data-testid="kifu-close" onClick={() => setPasteOpen(false)}>
-                  閉じる
-                </button>
-              </div>
-            </div>
-          )}
-          {/* 貼り付け欄を開いている間は、読み込めなかった理由などを欄の下に。閉じているときは盤の上の 1 行に出す */}
-          {message && pasteOpen && (
-            <p class="muted" data-testid="input-message">
-              {message}
-            </p>
-          )}
+          {/* 段階14：貼り付け欄は画面の下から出る窓（下の kifu-dialog）。開いても画面が伸びない */}
+          <div class="input-sources">
+            <button type="button" class="btn kifu-open" data-testid="kifu-open" onClick={() => setPasteOpen(true)}>
+              棋譜を貼り付ける
+            </button>
+            <button type="button" class="btn" data-testid="template-open" onClick={() => setPickerOpen(true)}>
+              戦型から選ぶ
+            </button>
+          </div>
         </div>
-        <div ref={boardRef} {...boardFitProps(boardFit, 'input-board')}>
-          {onTemplate ? (
-            <p class="template-current" data-testid="template-current">
-              戦型：{onTemplate.name}
-              {relation === 'after' && ` → ${current.text ?? ''}`}
-            </p>
-          ) : message && !pasteOpen ? (
-            // 読み込んだ手数などの一言は、案内の行と入れ替える（盤の上の行を増やさない。v0.12.4）
-            <p class="muted" data-testid="input-message">
-              {message}
-            </p>
-          ) : (
-            <OnceHint id="board-tap">盤の駒をタップ → 行き先をタップで指せます。</OnceHint>
-          )}
-          <Board sfen={current.sfen} lastMove={current.usi} selection={input.selection} onSquare={input.onSquare} onHand={input.onHand} />
+        <div class="board-col input-board-col">
+          <div ref={boardRef} {...boardFitProps(boardFit, 'input-board')}>
+            {onTemplate ? (
+              <p class="template-current" data-testid="template-current">
+                戦型：{onTemplate.name}
+                {relation === 'after' && ` → ${current.text ?? ''}`}
+              </p>
+            ) : message && !pasteOpen ? (
+              // 読み込んだ手数などの一言は、案内の行と入れ替える（盤の上の行を増やさない。v0.12.4）
+              <p class="muted" data-testid="input-message">
+                {message}
+              </p>
+            ) : (
+              <OnceHint id="board-tap">盤の駒をタップ → 行き先をタップで指せます。</OnceHint>
+            )}
+            <Board sfen={current.sfen} lastMove={current.usi} selection={input.selection} onSquare={input.onSquare} onHand={input.onHand} />
 
-          <PromotionBox input={input} />
+            <PromotionBox input={input} />
+          </div>
+          {/* 手順の操作は盤のすぐ下（段階14。前はスマホ縦は作るボタンのバーの中、広い画面は右の列の上） */}
+          {moveBar}
         </div>
-        <div class="input-controls">
-          {wide && moveBar}
+        {/* 盤の下の枠（段階14）：「自分は」をいちばん上に。入りきらない分はこの中だけスクロール */}
+        <div class="input-controls board-frame" ref={frameRef}>
+          <div class="card" ref={sideRef}>
+            <div class="side-choice" role="radiogroup" aria-label="自分は">
+              <span>自分は</span>
+              {(['black', 'white'] as Side[]).map((s) => (
+                <button
+                  type="button"
+                  key={s}
+                  role="radio"
+                  aria-checked={mySide === s}
+                  data-testid={`side-${s}`}
+                  class={mySide === s ? 'btn btn-toggle on' : 'btn btn-toggle'}
+                  onClick={() => setSideChoice(s)}
+                >
+                  {SIDE_TEXT[s]}
+                </button>
+              ))}
+            </div>
+            {isGenerating() && <p class="muted">ほかのツリーを生成中です。終わるか止めてから作ってください。</p>}
+            {pcEngine.value && (
+              <p class="notice" data-testid="pc-engine-note">
+                PC のエンジンで作ります（{effectivePcThreads(pcEngine.value)} スレッド）。
+              </p>
+            )}
+          </div>
           {line.length > 2 && (
             <input
               type="range"
@@ -379,30 +386,6 @@ export function InputScreen() {
             </div>
           )}
 
-          <div class="card">
-            <div class="side-choice" role="radiogroup" aria-label="自分は">
-              <span>自分は</span>
-              {(['black', 'white'] as Side[]).map((s) => (
-                <button
-                  type="button"
-                  key={s}
-                  role="radio"
-                  aria-checked={mySide === s}
-                  data-testid={`side-${s}`}
-                  class={mySide === s ? 'btn btn-toggle on' : 'btn btn-toggle'}
-                  onClick={() => setSideChoice(s)}
-                >
-                  {SIDE_TEXT[s]}
-                </button>
-              ))}
-            </div>
-            {isGenerating() && <p class="muted">ほかのツリーを生成中です。終わるか止めてから作ってください。</p>}
-            {pcEngine.value && (
-              <p class="notice" data-testid="pc-engine-note">
-                PC のエンジンで作ります（{effectivePcThreads(pcEngine.value)} スレッド）。
-              </p>
-            )}
-          </div>
           <button type="button" class="btn btn-wide" data-testid="input-study-save" onClick={openAddToBook}>
             この手順を定跡帳に足す
           </button>
@@ -419,7 +402,6 @@ export function InputScreen() {
 
         {/* 作るボタン：画面の下に固定（ホーム画面アプリでは、下の端のバーを避ける） */}
         <div class="start-bar" ref={barRef} data-testid="start-bar">
-          {!wide && moveBar}
           {bundled && (
             <BundledOffer
               meta={bundled}
@@ -488,7 +470,38 @@ export function InputScreen() {
           onClose={() => setRegisterOpen(false)}
         />
       )}
-    </>
+      {/* 棋譜の貼り付け（段階14：画面の下から出る窓。読み込めなかった理由などは欄の下に） */}
+      {pasteOpen && (
+        <Dialog title="棋譜を貼り付ける" onClose={() => setPasteOpen(false)} testId="kifu-dialog" sheet>
+          <div class="card kifu-box" data-testid="kifu-box">
+            <textarea
+              class="kifu-input"
+              data-testid="kifu-input"
+              rows={5}
+              placeholder={'例）7g7f 3c3d 2g2f\nKIF・KI2・CSA・SFEN の棋譜をそのまま貼り付けても読めます'}
+              value={kifu}
+              onInput={(e) => setKifu((e.target as HTMLTextAreaElement).value)}
+            />
+            <div class="btn-row">
+              <button type="button" class="btn btn-primary" data-testid="kifu-load" onClick={loadKifu}>
+                読み込む
+              </button>
+              <button type="button" class="btn" onClick={resetToStart}>
+                平手の初期局面に戻す
+              </button>
+              <button type="button" class="btn btn-ghost" data-testid="kifu-close" onClick={() => setPasteOpen(false)}>
+                閉じる
+              </button>
+            </div>
+          </div>
+          {message && pasteOpen && (
+            <p class="muted" data-testid="input-message">
+              {message}
+            </p>
+          )}
+        </Dialog>
+      )}
+    </div>
   );
 }
 

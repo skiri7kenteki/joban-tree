@@ -126,7 +126,10 @@ test.describe('8-1 登録（エンジンを使わない）', () => {
     await page.getByTestId('book-head').click();
     await page.getByTestId('study-note').fill('狙い：早めの▲2六歩\n2 行目');
     await page.getByTestId('study-save').click();
-    await expect(page.getByTestId('study-screen-note')).toHaveText('狙い：早めの▲2六歩\n2 行目');
+    // 段階14：メモの全文は ★ の行を押して開く窓で
+    await page.getByTestId('book-head').click();
+    await expect(page.getByTestId('study-note')).toHaveValue('狙い：早めの▲2六歩\n2 行目');
+    await page.locator('dialog[open]').last().getByRole('button', { name: '閉じる' }).click();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 
     // 一覧に出る
@@ -450,7 +453,10 @@ test.describe('8-1 移し替え（段階7の研究手順 → 独立した研究�
 
     // メモは両方残る。記録も写っている（▲7六歩の後の △3四歩 は「覚えた」）
     await page.getByTestId('study-item').first().click();
-    await expect(page.getByTestId('study-screen-note')).toHaveText('新しいメモ\n――\n古いメモ');
+    // 段階14：メモの全文は ★ の行を押して開く窓で
+    await page.getByTestId('book-head').click();
+    await expect(page.getByTestId('study-note')).toHaveValue('新しいメモ\n――\n古いメモ');
+    await page.locator('dialog[open]').last().getByRole('button', { name: '閉じる' }).click();
     await page.getByTestId('book-menu').click();
     await page.getByTestId('book-study-review').click();
     await expect(page.getByTestId('review-summary')).toContainText('問題 1（まだ 0・前回まちがい 0・覚えた 1）');
@@ -564,7 +570,10 @@ test.describe('8-2 変化付き KIF からまとめて取り込む', () => {
 
     // メモ：その変化の終わりまでの手のコメントを手数付きで。「#」の行は入らない
     await page.getByTestId('study-item').filter({ hasText: '3手目 ▲６六歩' }).click();
-    await expect(page.getByTestId('study-screen-note')).toHaveText('1手目 ▲７六歩：初手は角道\n4手目 △８四歩：△8四歩なら');
+    // 段階14：メモの全文は ★ の行を押して開く窓で
+    await page.getByTestId('book-head').click();
+    await expect(page.getByTestId('study-note')).toHaveValue('1手目 ▲７六歩：初手は角道\n4手目 △８四歩：△8四歩なら');
+    await page.locator('dialog[open]').last().getByRole('button', { name: '閉じる' }).click();
     await expect(page.getByTestId('book-title')).toContainText('平手から（先手番）');
   });
 

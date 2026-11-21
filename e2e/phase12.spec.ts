@@ -173,7 +173,8 @@ test.describe('12-1 色・文字・部品の土台（段階13 で洗練）', () 
     expect(await style('.app', 'background-color')).toBe('rgb(28, 39, 64)');
     expect(await page.locator('.app').evaluate((e) => getComputedStyle(e, '::before').backgroundImage)).toContain("stroke-opacity='0.03'");
     expect(await style('.tree-side', 'background-color')).toBe('rgb(243, 238, 227)');
-    expect(await style('.move-bar-fixed', 'background-color')).toBe('rgb(21, 29, 49)');
+    // 段階14：操作バーは盤のすぐ下（画面の下に固定しない）。色は同じ濃い藍
+    expect(await style('.move-bar', 'background-color')).toBe('rgb(21, 29, 49)');
     expect(await style('.move-bar-btn', 'color')).toBe('rgb(243, 236, 220)');
   });
 
@@ -243,7 +244,7 @@ test.describe('12-1 色・文字・部品の土台（段階13 で洗練）', () 
 });
 
 test.describe('12-2 盤と駒', () => {
-  test('盤は木目と金の縁、駒は明朝体で影付き。選んだマスは藍に金の線。盤の大きさは前（v0.29.0）より小さくない', async ({ page }) => {
+  test('盤は木目と金の縁、駒は明朝体で影付き。選んだマスは藍に金の線。新しいツリーの盤は段階14 の大きさ', async ({ page }) => {
     await openHome(page);
     await page.goto('./#/trees');
     await page.getByTestId('new-tree').click();
@@ -261,8 +262,8 @@ test.describe('12-2 盤と駒', () => {
     await expect(page.locator('svg.board .piece-body')).toHaveCount(40);
     await expect(page.locator('svg.board .piece-shadow')).toHaveCount(40);
     expect(await css('.piece-body', 'filter')).toBe('none');
-    // 360×740 の新しいツリーの盤の幅は v0.29.0 で 352px
-    expect(Math.round((await board.boundingBox())!.width)).toBeGreaterThanOrEqual(352);
+    // 360×740 の新しいツリーの盤の幅は v0.29.0 で 352px。段階14 で 1 画面に収めるため「自分は」の行を見せる分だけ小さく（持ち主の了承 2026-11-22）
+    expect(Math.round((await board.boundingBox())!.width)).toBeGreaterThanOrEqual(290);
 
     await page.locator('[data-square="77"]').click();
     const sel = page.locator('[data-square="77"] rect');

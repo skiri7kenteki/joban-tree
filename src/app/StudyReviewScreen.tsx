@@ -12,7 +12,7 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import type { Move } from 'tsshogi';
 import { Board } from '../components/Board';
 import { Dialog } from '../components/Dialog';
-import { MoveBar, moveBarHeight } from '../components/MoveBar';
+import { MoveBar } from '../components/MoveBar';
 import { OnceHint } from '../components/OnceHint';
 import { PromotionBox, useMoveInput } from '../components/useMoveInput';
 import { moveText, sfenKey, sideToMove } from '../shogi/position';
@@ -36,7 +36,7 @@ import { bookLabel, bookPool } from '../tree/organize';
 import { moveTexts, studyStartIndex, treeBaseMoves } from '../tree/studies';
 import type { OpeningTemplate } from '../tree/templates';
 import type { Study, TreeData } from '../tree/types';
-import { boardFitProps, measureFitAbove, useBoardFit } from './boardFit';
+import { boardFitProps, bottomInFrame, measureFitFrame, useBoardFit } from './boardFit';
 import { openTree } from './generation';
 import { ReviewModeTabs } from './ReviewScreen';
 import { back, go } from './router';
@@ -143,10 +143,15 @@ function StudyReviewView({ target, pool, startOf, record: initialRecord, tree, l
   // スマホ縦：盤と問題のカードが画面に収まる盤の幅（同じ問題の間は、一度縮めた盤を戻さない）
   const boardRef = useRef<HTMLDivElement>(null);
   const promptRef = useRef<HTMLDivElement>(null);
+  /** 段階14：盤の下の枠（問題のカードと、いちばん下の数・記録を消す）。入りきらない分はこの中だけスクロール */
+  const frameRef = useRef<HTMLDivElement>(null);
   const fitMemo = useRef<{ question: string; width: number | null }>({ question: '', width: null });
   const question = `${study?.id ?? ''}:${pos}`;
   const boardFit = useBoardFit(boardRef, (board) => {
-    const width = measureFitAbove(board, promptRef.current, moveBarHeight(), [board.querySelector<HTMLElement>('.promote-box')]);
+    // 段階14：枠の中で問題のカードが見える盤の幅（成る・成らないの小窓は数えない）
+    const frame = frameRef.current;
+    const promote = board.querySelector<HTMLElement>('.promote-box')?.getBoundingClientRect().height ?? 0;
+    const width = frame && promptRef.current ? measureFitFrame(board, frame, bottomInFrame(frame, promptRef.current) - promote) : null;
     const memo = fitMemo.current;
     const kept = memo.question === question && memo.width !== null && width !== null ? Math.min(memo.width, width) : width;
     fitMemo.current = { question, width: kept };
@@ -237,8 +242,23 @@ function StudyReviewView({ target, pool, startOf, record: initialRecord, tree, l
     </p>
   );
 
+  /** いちばん下の全体の数と「記録を消す…」（段階14：問題の画面では盤の下の枠の中、結果の画面では結果の下） */
+  const footer = (
+    <div class="review-footer">
+          {/* 結果の画面では結果の中に出すので、ここには出さない */}
+          {phase.kind !== 'result' && (
+            <span class="muted review-summary" data-testid="review-summary">
+              {overall}
+            </span>
+          )}
+          <button type="button" class="btn btn-ghost" data-testid="review-clear" onClick={() => setConfirmClear(true)}>
+            記録を消す…
+          </button>
+        </div>
+  );
+
   return (
-    <>
+    <div class={phase.kind === 'result' ? undefined : 'board-screen'}>
       <div class="screen-header">
         {tree ? (
           <button type="button" class="btn btn-ghost btn-back" onClick={() => go(`/tree/${tree.id}`)}>
@@ -264,21 +284,42 @@ function StudyReviewView({ target, pool, startOf, record: initialRecord, tree, l
       ) : (
         <>
       <div class="tree-layout">
-        <div ref={boardRef} {...boardFitProps(boardFit, 'tree-board')}>
-          {sfen && (
-            <Board
-              sfen={shownSfen}
-              lastMove={shownLast}
-              selection={input.selection}
-              onSquare={input.onSquare}
-              onHand={input.onHand}
-              flash={phase.kind === 'answered' && phase.ok && view === null}
-            />
-          )}
-          <PromotionBox input={input} />
+        <div class="board-col">
+          <div ref={boardRef} {...boardFitProps(boardFit, 'tree-board')}>
+            {sfen && (
+              <Board
+                sfen={shownSfen}
+                lastMove={shownLast}
+                selection={input.selection}
+                onSquare={input.onSquare}
+                onHand={input.onHand}
+                flash={phase.kind === 'answered' && phase.ok && view === null}
+              />
+            )}
+            <PromotionBox input={input} />
+          </div>
+          {/* 盤のすぐ下の操作バー（段階14。前は画面の下に固定）：真ん中は「今日 3／10問」。さかのぼって見ているときは、その局面も */}
+          <MoveBar
+            fixed={false}
+            ids={{ bar: 'review-nav', prev: 'review-prev', center: 'review-position', next: 'review-next-move' }}
+            onPrev={() => setView(shown - 1)}
+            onNext={() => setView(shown + 1 >= pos ? null : shown + 1)}
+            canPrev={canBrowse && shown > start}
+            canNext={canBrowse && shown < pos}
+          >
+            <span class="move-bar-main" data-testid="review-progress">
+              {progressText(session, phase.kind === 'ask' && phase.firstTry)}
+            </span>
+            {shown < pos && (
+              <span class="move-bar-sub" data-testid="review-viewing">
+                {shown === 0 ? '初期局面' : `${shown}手目 ${texts[shown - 1] ?? ''}`}を表示中
+              </span>
+            )}
+          </MoveBar>
         </div>
 
-        <div class="tree-side">
+        {/* 盤の下の枠（段階14）：問題のカードと、いちばん下の数・記録を消す */}
+        <div class="tree-side board-frame" ref={frameRef}>
           <div class="card review-prompt" ref={promptRef} data-testid="review-prompt" data-phase={phase.kind}>
             {opponentLine}
             {phase.kind === 'ask' && (
@@ -317,43 +358,15 @@ function StudyReviewView({ target, pool, startOf, record: initialRecord, tree, l
             {phase.kind === 'end' && <StudyEnd study={study} start={start} score={lineScore} single={pool.length <= 1} onNext={startLine} />}
             {saveError && <p class="status-ng">{saveError}</p>}
           </div>
+          {footer}
         </div>
       </div>
 
         </>
       )}
 
-      {/* 盤の下の固定バー（段階11-2）：真ん中は「今日 3／10問」。さかのぼって見ているときは、その局面も */}
-      {phase.kind !== 'result' && (
-        <MoveBar
-          ids={{ bar: 'review-nav', prev: 'review-prev', center: 'review-position', next: 'review-next-move' }}
-          onPrev={() => setView(shown - 1)}
-          onNext={() => setView(shown + 1 >= pos ? null : shown + 1)}
-          canPrev={canBrowse && shown > start}
-          canNext={canBrowse && shown < pos}
-        >
-          <span class="move-bar-main" data-testid="review-progress">
-            {progressText(session, phase.kind === 'ask' && phase.firstTry)}
-          </span>
-          {shown < pos && (
-            <span class="move-bar-sub" data-testid="review-viewing">
-              {shown === 0 ? '初期局面' : `${shown}手目 ${texts[shown - 1] ?? ''}`}を表示中
-            </span>
-          )}
-        </MoveBar>
-      )}
 
-      <div class="review-footer">
-        {/* 結果の画面では結果の中に出すので、ここには出さない */}
-        {phase.kind !== 'result' && (
-          <span class="muted review-summary" data-testid="review-summary">
-            {overall}
-          </span>
-        )}
-        <button type="button" class="btn btn-ghost" data-testid="review-clear" onClick={() => setConfirmClear(true)}>
-          記録を消す…
-        </button>
-      </div>
+      {phase.kind === 'result' && footer}
 
       {confirmClear && (
         <Dialog title="記録を消す" onClose={() => setConfirmClear(false)} testId="review-clear-dialog">
@@ -368,7 +381,7 @@ function StudyReviewView({ target, pool, startOf, record: initialRecord, tree, l
           </div>
         </Dialog>
       )}
-    </>
+    </div>
   );
 }
 

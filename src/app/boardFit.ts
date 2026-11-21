@@ -1,19 +1,14 @@
-// スマホ縦（盤と操作を上下に並べる配置）で、盤の下の大事な所がスクロールせずに見えるよう、盤の幅の上限を決める（v0.12.2〜）。
+// 盤の画面で、盤の幅の上限を決める（v0.12.2〜。段階14（v0.38.0〜）で決め方を変えた）。
+// 段階14：盤の画面（定跡帳の盤・ツリー・新しいツリー・復習）は 1 画面に収め、ページ全体はスクロールしない。
+//   上から 見出し → 盤 → 操作バー → 一覧の枠（.board-frame）。一覧の枠は残りの高さいっぱいで、入りきらない分は枠の中だけスクロールする。
+//   盤は「枠の中で見せたいところ」が見える大きさまで縮める（measureFitFrame）：
+//     ツリー・定跡帳：候補手・研究候補の 3 行目まで（threeRowsNeed。4 行目からは枠の中でスクロール）
+//     新しいツリー：「自分は」の行まで。復習：問題のカードまで（いちばん下の数・記録を消すは枠の中でスクロール）
+//   盤は MIN_BOARD_W より小さくしない（360×640 の定跡帳は 2 行＋スクロールになる。持ち主の判断 2026-11-22）。
+//   iPad 横（盤と一覧を左右に並べる配置）は、盤と操作バーの列が画面の高さに収まる大きさ。
 // 引く分は決め打ちにせず、実際の高さを測る（端末の文字を大きくしていても、その分だけ盤が縮む）。
-// iPad 横など、盤と操作を左右に並べる配置では制限しない。
-//   閲覧画面：候補手（measureBoardFit。下の決め方）
-//   入力画面：盤・持ち駒・手順の操作（‹ ›）を、下に固定した作るボタンのバーの上に（v0.12.4、measureFitAbove）
-//   復習画面：盤と問題のカード（問題の文・答えの操作）を画面の中に（v0.12.4、measureFitAbove）
-//
-// 閲覧画面の決め方（v0.12.3）：
-//
-//   （持ち主の依頼。「ふつう」「じっくり」は候補手を 4 つ取るので、4 つ目があることに気づけるように）
-//   1. 3 行目までは必ず収める（盤は MIN_BOARD_W より小さくしない）
-//   2. 候補手が 4 つ以上あり、盤の幅を画面幅の KEEP_RATIO 以上に保ったまま 4 行目まで収まるなら、4 行目まで収める
-//   3. 収まらなければ、4 行目の上半分が画面の下に見える（のぞく）ようにする。ただし、のぞかせるために KEEP_RATIO 未満には縮めない
-//   4. 5 つ以上でも目標は 4 行まで（5 行目からはスクロール）
 
-import { useEffect, useLayoutEffect, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 
 type ElementRef = { readonly current: HTMLElement | null };
 
@@ -23,75 +18,53 @@ const SIDE_BY_SIDE = '(min-width: 768px) and (orientation: landscape)';
 const ROW_GUESS = 51;
 /** 最後に収める行の下の、画面の端との余白（px） */
 const BOTTOM_MARGIN = 4;
-/** 盤をこれより小さくはしない（px）。とても低い画面（スマホの横向きなど）では、スクロールしてもらう */
+/** 一覧の枠の中で、最後に見せる行の下に残す余白（px。段階14。小数点以下の端数で行が画面の下端を越えない分だけ） */
+const FRAME_MARGIN = 0.5;
+/** 盤をこれより小さくはしない（px） */
 const MIN_BOARD_W = 220;
-/** 4 行目を見せる（収める・のぞかせる）ために、盤をここまでは縮めてよい（画面幅に対する割合。仮の値） */
-export const KEEP_RATIO = 0.85;
-/** 4 行目をのぞかせるときに見せる、行の高さの割合 */
-const PEEK_RATIO = 0.5;
 
 /**
- * 盤（SVG）の下端から target の下端までと、画面の下に固定したもの（reserve px）を残して、盤が画面に収まる幅（px）。
- * skip の要素（成る・成らないの小窓など、一時的に出るもの）の高さは数えない（盤の大きさが変わらないように）。
- * 盤と操作を左右に並べる配置では null（制限しない）
+ * 段階14（v0.38.0〜）：盤の画面は 1 画面に収める（ページ全体はスクロールしない）。上から 見出し → 盤 → 操作バー → 一覧の枠（.board-frame）。
+ * 一覧の枠の中で need px（3 行目の下端までなど。枠の中身の先頭から測る）が見える盤の幅を返す。
+ * 枠は残りの高さいっぱいに伸びるので、盤を縮めた分だけ枠が広がる（1 回で落ち着く）。
+ * 盤と一覧を左右に並べる配置（iPad 横）では、盤と操作バーの列が画面の高さに収まる幅
  */
-export function measureFitAbove(board: HTMLElement, target: HTMLElement | null, reserve = 0, skip: (HTMLElement | null)[] = []): number | null {
-  if (window.matchMedia(SIDE_BY_SIDE).matches || !target) return null;
+export function measureFitFrame(board: HTMLElement, frame: HTMLElement | null, need: number): number | null {
   const svg = board.querySelector<SVGSVGElement>('svg.board');
-  if (!svg) return null;
+  const screen = board.closest<HTMLElement>('.board-screen');
+  if (!svg || !screen) return null;
   const svgRect = svg.getBoundingClientRect();
   if (svgRect.width === 0 || svgRect.height === 0) return null;
-  const skipped = skip.reduce((sum, el) => sum + (el ? el.getBoundingClientRect().height : 0), 0);
-  const below = target.getBoundingClientRect().bottom - svgRect.bottom - skipped;
-  const availH = window.innerHeight - reserve - (svgRect.top + window.scrollY) - below - BOTTOM_MARGIN;
+  let extra: number;
+  if (window.matchMedia(SIDE_BY_SIDE).matches) {
+    // 盤の列の中身（盤と操作バー）の下端から画面の下端まで（列そのものは画面の高さまで伸びているので、最後の要素で測る）
+    const col = board.closest<HTMLElement>('.board-col') ?? board;
+    const last = col.lastElementChild ?? col;
+    extra = screen.getBoundingClientRect().bottom - last.getBoundingClientRect().bottom;
+  } else {
+    if (!frame) return null;
+    extra = frame.clientHeight - need;
+  }
+  // 枠の中は下の余白をほとんど取らない（枠の下端が画面の下端。盤を今より小さくしないため。0.5px は小数点以下の端数の分）
+  const availH = svgRect.height + extra - (window.matchMedia(SIDE_BY_SIDE).matches ? BOTTOM_MARGIN : FRAME_MARGIN);
   return Math.max(MIN_BOARD_W, Math.floor((availH * svgRect.width) / svgRect.height));
 }
 
-/** 閲覧画面：盤の幅の上限（px）を測る。reserve＝画面の下に固定したもの（px。段階11-2 の固定バー）。制限しないときは null */
-export function measureBoardFit(board: HTMLElement, side: HTMLElement, reserve = 0): number | null {
-  if (window.matchMedia(SIDE_BY_SIDE).matches) return null;
-  const svg = board.querySelector<SVGSVGElement>('svg.board');
-  const wrap = board.querySelector<HTMLElement>('.board-wrap');
-  const card = side.querySelector<HTMLElement>('.candidates');
-  if (!svg || !wrap || !card) return null;
-  const svgRect = svg.getBoundingClientRect();
-  if (svgRect.width === 0 || svgRect.height === 0) return null;
-  const wrapRect = wrap.getBoundingClientRect();
-  const cardRect = card.getBoundingClientRect();
+/** 一覧の枠（frame）の中身の先頭から、el の下端までの高さ（枠がスクロールしていても同じ値） */
+export function bottomInFrame(frame: HTMLElement, el: Element): number {
+  return el.getBoundingClientRect().bottom - frame.getBoundingClientRect().top + frame.scrollTop;
+}
 
-  // 盤（SVG）の上端（ページの先頭から。スクロールしていても同じ値）
-  const svgTop = svgRect.top + window.scrollY;
-  // 盤の下：先手の持ち駒の行、盤と下の列の間。「別の手を調べる」の案内などは数えない（盤の大きさが変わらないように）
-  const belowSvg = wrapRect.bottom - svgRect.bottom;
-  // 段階13：盤と下の列の間は、下の列（生成りの地）の上の余白（padding）にした。その分も数える
-  const gap = side.getBoundingClientRect().top - wrapRect.bottom + (parseFloat(getComputedStyle(side).paddingTop) || 0);
-  /** 候補手のカードの上端から y（画面上の位置）までを画面に収める盤の幅 */
-  const widthFor = (y: number) => {
-    const availH = window.innerHeight - reserve - svgTop - belowSvg - gap - (y - cardRect.top) - BOTTOM_MARGIN;
-    return Math.floor((availH * svgRect.width) / svgRect.height);
-  };
-
-  // 1. 3 行目の下端まで
-  const rows = card.querySelectorAll<HTMLElement>('[data-testid="candidate"]');
-  let third: number;
-  if (rows.length >= 3) {
-    third = rows[2].getBoundingClientRect().bottom;
-  } else {
-    const last = rows.length > 0 ? rows[rows.length - 1] : card.querySelector<HTMLElement>('.candidates-head');
-    const lastBottom = last ? last.getBoundingClientRect().bottom : cardRect.top;
-    const rowH = rows.length > 0 ? rows[0].getBoundingClientRect().height : ROW_GUESS;
-    third = lastBottom + (3 - rows.length) * rowH;
-  }
-  const w3 = Math.max(MIN_BOARD_W, widthFor(third));
-  if (rows.length < 4) return w3;
-
-  // 2・3. 4 行目：収める → のぞかせる（どちらも、盤を画面幅の KEEP_RATIO 未満には縮めない）
-  const keep = Math.ceil(document.documentElement.clientWidth * KEEP_RATIO);
-  const fourth = rows[3].getBoundingClientRect();
-  const w4 = widthFor(fourth.bottom);
-  if (w4 >= keep) return Math.min(w3, w4);
-  const peek = widthFor(fourth.top + fourth.height * PEEK_RATIO);
-  return Math.min(w3, Math.max(peek, keep));
+/**
+ * 一覧の枠の中で 3 行目の下端までの高さ（行が 3 つに満たないときは、あるとして同じだけ空ける。盤の大きさを局面で変えないため）。
+ * rows：行の要素、head：行の上の見出し（行が 0 のとき、その下から数える）
+ */
+export function threeRowsNeed(frame: HTMLElement, rows: ArrayLike<HTMLElement>, head: HTMLElement | null, rowGuess = ROW_GUESS): number {
+  if (rows.length >= 3) return bottomInFrame(frame, rows[2]);
+  const last = rows.length > 0 ? rows[rows.length - 1] : head;
+  const lastBottom = last ? bottomInFrame(frame, last) : 0;
+  const rowH = rows.length > 0 ? rows[0].getBoundingClientRect().height : rowGuess;
+  return lastBottom + (3 - rows.length) * rowH;
 }
 
 /**
@@ -102,12 +75,17 @@ export function measureBoardFit(board: HTMLElement, side: HTMLElement, reserve =
 export function useBoardFit(boardRef: ElementRef, measure: (board: HTMLElement) => number | null): number | null {
   const [fit, setFit] = useState<number | null>(null);
   const [tick, setTick] = useState(0);
+  /** 1 つ前に決めた値（段階14：2 つの値を行ったり来たりしたら、小さい方で止める） */
+  const before = useRef<number | null>(null);
 
   useLayoutEffect(() => {
     const board = boardRef.current;
     if (!board) return;
-    const next = measure(board);
-    if (next !== fit && !(next !== null && fit !== null && Math.abs(next - fit) < 1)) setFit(next);
+    let next = measure(board);
+    if (next === fit || (next !== null && fit !== null && Math.abs(next - fit) < 1)) return;
+    if (next !== null && fit !== null && before.current !== null && Math.abs(next - before.current) < 1) next = Math.min(next, fit);
+    before.current = fit;
+    if (next !== fit) setFit(next);
   });
 
   useEffect(() => {
@@ -118,6 +96,18 @@ export function useBoardFit(boardRef: ElementRef, measure: (board: HTMLElement) 
     const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(again) : null;
     const main = boardRef.current?.closest('.main');
     if (observer && main) observer.observe(main);
+    // 段階14：1 画面に収める画面は外の箱の高さが変わらないので、中の見出し・★ の行・一覧の枠の高さの変化も見る
+    const screen = boardRef.current?.closest('.board-screen');
+    if (observer && screen) {
+      for (const child of Array.from(screen.children)) observer.observe(child);
+      // 枠そのものの高さは変わらないことが多いので、枠の中の部品（候補手のカードなど）の高さの変化も見る
+      screen.querySelectorAll('.board-frame').forEach((el) => {
+        observer.observe(el);
+        for (const child of Array.from(el.children)) observer.observe(child);
+      });
+    }
+    // 見出しの字体を読み終えて行の高さが変わったときも
+    void document.fonts?.ready.then(again);
     return () => {
       window.removeEventListener('resize', again);
       window.visualViewport?.removeEventListener('resize', again);

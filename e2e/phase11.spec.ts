@@ -346,22 +346,29 @@ test.describe('11-5 手順の一覧（iPad 横）', () => {
   });
 });
 
-/** 盤の下の固定バーが画面の下端にあり、盤（と持ち駒の行）がその上にあること */
-async function expectBarBelowBoard(page: Page, barId: string, boardSel: string, height: number) {
+/** 段階14：操作バーは盤（と持ち駒の行）のすぐ下。ページ全体はスクロールしない */
+async function expectBarUnderBoard(page: Page, barId: string, boardSel: string, height: number) {
   const bar = (await page.getByTestId(barId).boundingBox())!;
-  expect(Math.round(bar.y + bar.height)).toBe(height);
   const board = (await page.locator(boardSel).first().boundingBox())!;
-  expect(board.y + board.height).toBeLessThanOrEqual(bar.y);
+  expect(bar.y).toBeGreaterThanOrEqual(board.y + board.height - 1);
+  expect(bar.y - (board.y + board.height)).toBeLessThan(16);
+  expect(bar.y + bar.height).toBeLessThanOrEqual(height);
+  expect(await page.evaluate(() => document.scrollingElement!.scrollHeight)).toBeLessThanOrEqual(height + 1);
   return bar;
 }
 
 test.describe('11-2 盤の下の固定バー', () => {
-  test('定跡帳：‹ › の行と手順の行の代わりに、画面の下に固定。真ん中を押すと手順の一覧。一覧の 3 行目までバーの上に見える', async ({ page }) => {
+  test('定跡帳：‹ › の行と手順の行の代わりに、盤のすぐ下のバー（段階14）。真ん中を押すと手順の一覧。ページはスクロールしない', async ({ page }) => {
     await openHome(page);
     await importStudy(page, LINE);
     await page.getByTestId('study-item').click();
     await expect(page.getByTestId('study-position')).toHaveText('11手目 ▲同　飛');
-    const bar = await expectBarBelowBoard(page, 'study-nav', '[data-testid="study-board"]', 740);
+    await expectBarUnderBoard(page, 'study-nav', '[data-testid="study-board"]', 740);
+    for (const id of ['study-first', 'study-prev', 'study-next', 'study-last']) {
+      const b = (await page.getByTestId(id).boundingBox())!;
+      expect(b.width).toBeGreaterThanOrEqual(44);
+      expect(b.height).toBeGreaterThanOrEqual(44);
+    }
     // 出発点（初期局面）へ・最後へ
     await expect(page.getByTestId('study-last')).toBeDisabled();
     await page.getByTestId('study-first').click();
@@ -369,28 +376,30 @@ test.describe('11-2 盤の下の固定バー', () => {
     await expect(page.getByTestId('study-prev')).toBeDisabled();
     await page.getByTestId('study-next').click();
     await expect(page.getByTestId('study-position')).toHaveText('1手目 ▲７六歩');
-    // 「この局面からの研究」（1 本だけなので出ない）・取り消す・まとめて復習はバーに隠れない位置までスクロールできる
-    await page.mouse.wheel(0, 3000);
-    const review = (await page.getByTestId('book-review').boundingBox())!;
-    expect(review.y + review.height).toBeLessThanOrEqual(bar.y);
+    // 取り消す・まとめて復習は ⋯ の中（段階14：盤の下から外した）
+    await page.getByTestId('book-menu').click();
+    await expect(page.getByTestId('book-review')).toBeVisible();
+    await expect(page.getByTestId('book-undo')).toBeVisible();
+    await closeDialog(page);
     await page.getByTestId('study-position').click();
     await expect(page.getByTestId('kifu-sheet').locator('[aria-current="step"]')).toHaveAttribute('data-ply', '1');
     await closeDialog(page);
     expect(await overflowing(page)).toEqual([]);
   });
 
-  test('ツリー：パンくずの行と操作のボタンは無く、操作は見出しの ⋯ に。候補手 3 行目までバーの上に見える', async ({ page }) => {
+  test('ツリー：パンくずの行と操作のボタンは無く、操作は見出しの ⋯ に。バーは盤のすぐ下、候補手はその下（段階14）', async ({ page }) => {
     await openHome(page);
     const tree = lineTree('b1', ['7g7f'], ['3c3d', '2g2f', '8c8d']);
     await page.getByTestId('tab-trees').click();
     await page.getByTestId('import-file').setInputFiles({ name: 't.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(tree)) });
     await page.getByTestId('tree-item').click();
     await expect(page.getByTestId('tree-title')).toHaveText('ツリー棋譜欄 b1');
-    const bar = await expectBarBelowBoard(page, 'tree-nav', '.tree-board', 740);
+    const bar = await expectBarUnderBoard(page, 'tree-nav', '.tree-board', 740);
     await expect(page.getByTestId('expand-here')).toHaveCount(0);
     await expect(page.getByTestId('candidate')).toHaveCount(1);
     const row = (await page.getByTestId('candidate').first().boundingBox())!;
-    expect(row.y + row.height).toBeLessThanOrEqual(bar.y);
+    expect(row.y).toBeGreaterThanOrEqual(bar.y + bar.height);
+    expect(row.y + row.height).toBeLessThanOrEqual(740);
     // › ›| で本線を進む、|‹ で開始局面へ
     await page.getByTestId('nav-forward').click();
     await expect(page.getByTestId('tree-position')).toHaveText('2手目 △３四歩');
@@ -418,7 +427,7 @@ test.describe('11-2 盤の下の固定バー', () => {
     await page.getByTestId('review-open').click();
     await expect(page.getByTestId('review-prompt')).toHaveAttribute('data-phase', 'ask');
     await expect(page.getByTestId('review-progress')).toHaveText('今日 1／10問');
-    await expectBarBelowBoard(page, 'review-nav', '.tree-board', 740);
+    await expectBarUnderBoard(page, 'review-nav', '.tree-board', 740);
     await expect(page.getByTestId('review-prev')).toBeDisabled();
     await expect(page.getByTestId('review-next-move')).toBeDisabled();
     // △3四歩と答える → 正解 → この先に問題が無いので手順の終わり
@@ -441,16 +450,19 @@ test.describe('11-2 盤の下の固定バー', () => {
     expect(await overflowing(page)).toEqual([]);
   });
 
-  test('新しいツリー：手順の操作は作るボタンのバーの中（画面の下）', async ({ page }) => {
+  test('新しいツリー：手順の操作は盤のすぐ下、作るボタンのバーは画面の下（段階14）。貼り付け欄は画面の下から出る窓', async ({ page }) => {
     await openHome(page);
     await page.getByTestId('tab-trees').click();
     await page.getByTestId('new-tree').click();
     await page.getByTestId('kifu-open').click();
+    await expectSheet(page, 'kifu-dialog', 740);
     await page.getByTestId('kifu-input').fill('7g7f 3c3d 2g2f 8c8d');
     await page.getByTestId('kifu-load').click();
+    await expect(page.getByTestId('kifu-dialog')).toHaveCount(0);
+    await expectBarUnderBoard(page, 'input-nav', '.input-board', 740);
     const bar = (await page.getByTestId('start-bar').boundingBox())!;
     const nav = (await page.getByTestId('input-nav').boundingBox())!;
-    expect(nav.y).toBeGreaterThanOrEqual(bar.y);
+    expect(nav.y + nav.height).toBeLessThanOrEqual(bar.y);
     expect(Math.round(bar.y + bar.height)).toBe(740);
     await expect(page.getByTestId('start-bar')).toContainText('この局面から作る（自分は☖後手）');
     await page.getByTestId('input-first').click();

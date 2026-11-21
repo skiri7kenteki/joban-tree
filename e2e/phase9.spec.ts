@@ -96,7 +96,8 @@ test.describe('9-2 研究手順どうしをつないで見る', () => {
     await expect(page.getByTestId('study-title')).toHaveText('研究C');
     await expect(page.getByTestId('study-meta')).toContainText('Cのメモ');
 
-    // まとめて復習
+    // まとめて復習（段階14：⋯ の中）
+    await page.getByTestId('book-menu').click();
     await page.getByTestId('book-review').click();
     await expect(page).toHaveURL(/#\/study-review\/group\//);
     await expect(page.getByTestId('review-summary')).toContainText('研究手順 3 本');

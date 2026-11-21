@@ -20,7 +20,7 @@ import { Board } from '../components/Board';
 import { Dialog } from '../components/Dialog';
 import { OnceHint } from '../components/OnceHint';
 import { KifuPanel, KifuSheet, useWideLayout } from '../components/KifuList';
-import { MoveBar, moveBarHeight } from '../components/MoveBar';
+import { MoveBar } from '../components/MoveBar';
 import { treeKifu } from '../tree/treeKifu';
 import { PromotionBox, useMoveInput } from '../components/useMoveInput';
 import { formatScore, scoreToNumber, type Score } from '../engine/usi';
@@ -35,7 +35,7 @@ import { LABEL_TEXT, labelOf } from '../tree/labels';
 import type { PresetId } from '../tree/presets';
 import { closestTemplate, templateLine } from '../tree/templates';
 import { movesOfPath, startsWith, studyEndingAt, studyMovesText, studyNextMoves, traceStudy, treeBaseMoves } from '../tree/studies';
-import { boardFitProps, measureBoardFit, useBoardFit } from './boardFit';
+import { boardFitProps, measureFitFrame, threeRowsNeed, useBoardFit } from './boardFit';
 import { availablePresets } from './engineService';
 import type { Study, TreeData, TreeEdge } from '../tree/types';
 import {
@@ -126,10 +126,21 @@ function TreeView({ tree, studies, studyId, ply }: { tree: TreeData; studies: re
   const [deleting, setDeleting] = useState<TreeEdge | null>(null);
   /** 操作の結果（「コピーしました」など） */
   const [note, setNote] = useState(initial.note);
+  // 一言は 5 秒で消す（段階14：画面の下の知らせ）
+  useEffect(() => {
+    if (!note) return;
+    const timer = setTimeout(() => setNote(''), 5000);
+    return () => clearTimeout(timer);
+  }, [note]);
   const boardRef = useRef<HTMLDivElement>(null);
   const sideRef = useRef<HTMLDivElement>(null);
-  // スマホ縦：候補手 3 行が、画面の下に固定したバーの上に収まる盤の幅（制限しないときは null）
-  const boardFit = useBoardFit(boardRef, (board) => (sideRef.current ? measureBoardFit(board, sideRef.current, moveBarHeight()) : null));
+  // 段階14：1 画面に収める。候補手の枠の中で 3 行目まで見える盤の幅（4 行目からは枠の中でスクロール）
+  const boardFit = useBoardFit(boardRef, (board) => {
+    const frame = sideRef.current;
+    if (!frame) return null;
+    const rows = frame.querySelectorAll<HTMLElement>('[data-testid="candidate"]');
+    return measureFitFrame(board, frame, threeRowsNeed(frame, rows, frame.querySelector<HTMLElement>('.candidates-head')));
+  });
   const thresholds = settings.value.thresholds;
 
   const key = path[path.length - 1];
@@ -354,7 +365,7 @@ function TreeView({ tree, studies, studyId, ply }: { tree: TreeData; studies: re
   const sideText = tree.mySide === 'black' ? '☗先手' : '☖後手';
 
   return (
-    <>
+    <div class="board-screen">
       <div class="screen-header">
         <button type="button" class="btn btn-ghost btn-back" onClick={() => go('/trees')}>
           ‹<span class="back-text"> 一覧</span>
@@ -375,21 +386,39 @@ function TreeView({ tree, studies, studyId, ply }: { tree: TreeData; studies: re
       {gen && <GenerationPanel tree={tree} />}
 
       <div class="tree-layout">
-        <div
-          ref={boardRef}
-          {...boardFitProps(boardFit, 'tree-board')}
-          data-fit-width={boardFit ?? undefined}
-          onTouchStart={onTouchStart}
-          onTouchEnd={onTouchEnd}
-        >
-          <Board
-            sfen={node.sfen}
-            lastMove={path.length > 1 ? incoming?.move : lastPrefixMove(tree)}
-            {...(picking ? { selection: input.selection, onSquare: input.onSquare, onHand: input.onHand } : {})}
-          />
+        <div class="board-col">
+          <div
+            ref={boardRef}
+            {...boardFitProps(boardFit, 'tree-board')}
+            data-fit-width={boardFit ?? undefined}
+            onTouchStart={onTouchStart}
+            onTouchEnd={onTouchEnd}
+          >
+            <Board
+              sfen={node.sfen}
+              lastMove={path.length > 1 ? incoming?.move : lastPrefixMove(tree)}
+              {...(picking ? { selection: input.selection, onSquare: input.onSquare, onHand: input.onHand } : {})}
+            />
+          </div>
+          {/* 盤のすぐ下の操作バー（段階14。前は画面の下に固定）：|‹ ‹ [n手目 ▲X ▾] › ›|。› はさっきまでいた手順、無ければ本線へ */}
+          <MoveBar
+            fixed={false}
+            ids={{ bar: 'tree-nav', first: 'nav-first', prev: 'nav-back', center: 'tree-position', next: 'nav-forward', last: 'nav-last' }}
+            firstLabel="開始局面へ"
+            onFirst={() => jumpTo(1)}
+            onPrev={goBack}
+            onNext={goForward}
+            onLast={() => jumpPly(kifu.rows[kifu.rows.length - 1].ply)}
+            canPrev={path.length > 1}
+            canNext={node.edges.length > 0}
+            onCenter={wide ? undefined : () => setKifuOpen(true)}
+          >
+            {positionText}
+          </MoveBar>
         </div>
 
-        <div class="tree-side" ref={sideRef}>
+        {/* 一覧の枠（段階14）：入りきらない分は、この中だけスクロール */}
+        <div class="tree-side board-frame" ref={sideRef}>
           {/* 手順の一覧：広い画面は盤の横に常に。スマホ縦は固定バーの真ん中を押すと画面下から（段階11-5・11-2） */}
           {wide && <KifuPanel rows={kifu.rows} current={kifu.current} onJump={jumpPly} />}
           {kifuOpen && <KifuSheet rows={kifu.rows} current={kifu.current} onJump={jumpPly} onClose={() => setKifuOpen(false)} />}
@@ -502,28 +531,15 @@ function TreeView({ tree, studies, studyId, ply }: { tree: TreeData; studies: re
             )}
           </div>
 
-          {note && (
-            <p class="muted" role="status" data-testid="tree-note">
-              {note}
-            </p>
-          )}
         </div>
       </div>
 
-      {/* 盤の下の固定バー（段階11-2）：|‹ ‹ [n手目 ▲X ▾] › ›|。› はさっきまでいた手順、無ければ本線へ */}
-      <MoveBar
-        ids={{ bar: 'tree-nav', first: 'nav-first', prev: 'nav-back', center: 'tree-position', next: 'nav-forward', last: 'nav-last' }}
-        firstLabel="開始局面へ"
-        onFirst={() => jumpTo(1)}
-        onPrev={goBack}
-        onNext={goForward}
-        onLast={() => jumpPly(kifu.rows[kifu.rows.length - 1].ply)}
-        canPrev={path.length > 1}
-        canNext={node.edges.length > 0}
-        onCenter={wide ? undefined : () => setKifuOpen(true)}
-      >
-        {positionText}
-      </MoveBar>
+      {/* 操作の結果の一言（段階14：候補手の下から、画面の下の知らせへ。5 秒で消える） */}
+      {note && (
+        <div class="toast" role="status" data-testid="tree-note">
+          <span class="toast-text toast-wrap">{note}</span>
+        </div>
+      )}
 
       {/* 見出しの ⋯（段階11-2）：前は候補手の下に並べていた操作 */}
       {dialog === 'menu' && (
@@ -722,7 +738,7 @@ function TreeView({ tree, studies, studyId, ply }: { tree: TreeData; studies: re
           </div>
         </Dialog>
       )}
-    </>
+    </div>
   );
 }
 

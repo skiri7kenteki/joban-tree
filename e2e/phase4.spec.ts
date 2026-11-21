@@ -117,7 +117,7 @@ for (const [width, height, label, four] of [
   test.describe(`スマホ縦（${width}×${height}、${label}）`, () => {
     test.use({ viewport: { width, height }, hasTouch: true });
 
-    test(`候補手 4 つ：${four === 'fit' ? '盤を 85% 以上に保って 4 行目まで見える' : '3 行目まで見え、4 行目がのぞく'}。ヘッダーのボタン・見出しは 1 行`, async ({ page }) => {
+    test(`候補手 4 つ：3 行目まで見え、4 行目は候補手の枠の中でスクロール（段階14）。ヘッダーのボタン・見出しは 1 行`, async ({ page }) => {
       await openTree(page, FOUR);
       expect(await page.evaluate(() => window.scrollY)).toBe(0);
       await expect(page.getByTestId('candidates-title')).toHaveText('相手の応手（4）');
@@ -128,15 +128,16 @@ for (const [width, height, label, four] of [
       const fourth = (await rows.nth(3).boundingBox())!;
       expect(header.y).toBeGreaterThanOrEqual(0);
       expect(board.y).toBeGreaterThan(header.y);
-      // 3 行目までは必ず収める
+      // 3 行目までは必ず収める。4 行目は枠の中でスクロールすると見える。ページ全体はスクロールしない（段階14）
+      void four;
       expect(third.y + third.height).toBeLessThanOrEqual(height);
-      if (four === 'fit') {
-        expect(fourth.y + fourth.height).toBeLessThanOrEqual(height);
-        expect(board.width).toBeGreaterThanOrEqual(width * 0.85 - 0.5);
-      } else {
-        // 4 行目の上端が画面の中（下にまだ手があることが分かる）
-        expect(fourth.y).toBeLessThan(height);
-      }
+      expect(await page.evaluate(() => document.scrollingElement!.scrollHeight)).toBeLessThanOrEqual(height + 1);
+      expect(fourth.y).toBeGreaterThan(third.y);
+      await expect(async () => {
+        await rows.nth(3).scrollIntoViewIfNeeded();
+        await expect(rows.nth(3)).toBeInViewport({ ratio: 0.99, timeout: 500 });
+      }).toPass();
+      expect((await page.getByTestId('board').boundingBox())!.y).toBeCloseTo(board.y, 0);
       // 盤は画面からはみ出さず、左右の真ん中
       expect(board.x).toBeGreaterThanOrEqual(0);
       expect(board.x + board.width).toBeLessThanOrEqual(width);
@@ -161,11 +162,10 @@ for (const [width, height] of [
       await expect(page.getByTestId('candidates-title')).toHaveText('相手の応手（3）');
       const board = (await page.getByTestId('board').boundingBox())!;
       const third = (await page.getByTestId('candidate').nth(2).boundingBox())!;
-      // 段階11-2：3 行目は画面の下に固定したバーの上
-      const bar = (await page.getByTestId('tree-nav').boundingBox())!;
-      expect(third.y + third.height).toBeLessThanOrEqual(bar.y);
-      // 画面の端まで（左右 4px ずつの余白）の大きさのまま。そうでなければ、3 行目がちょうどバーの上に来る大きさ（4 行目のためには縮めていない）
-      const gap = bar.y - (third.y + third.height);
+      // 段階14：3 行目は画面の中（操作バーは盤のすぐ下、候補手はその下の枠）
+      expect(third.y + third.height).toBeLessThanOrEqual(height);
+      // 画面の端まで（左右 4px ずつの余白）の大きさのまま。そうでなければ、3 行目がちょうど画面の下に来る大きさ（4 行目のためには縮めていない）
+      const gap = height - (third.y + third.height);
       expect(board.width >= width - 8 - 1 || gap <= 12, `盤 ${board.width}・3 行目の下の空き ${gap}`).toBe(true);
     });
   });
@@ -261,24 +261,26 @@ test.describe('iPad 横（1180×820）', () => {
 test.describe('4-2 スマホ縦（390×844）', () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
 
-  test('入力画面：作るボタンは画面の下に固定され、盤の操作と重ならない', async ({ page }) => {
+  test('入力画面：作るボタンは画面の下、手順の操作は盤のすぐ下（段階14）。重ならない', async ({ page }) => {
     await page.goto('./#/new');
     await expect(page.getByTestId('isolation')).toHaveAttribute('data-state', 'isolated', { timeout: 30_000 });
     await expect(page.getByTestId('start-normal')).toBeInViewport({ ratio: 1 });
     const bar = (await page.getByTestId('start-bar').boundingBox())!;
     expect(bar.y + bar.height).toBeLessThanOrEqual(844 + 1);
-    // 開いたときは、盤はバーの上（重なっていない）。手順の操作はバーの中（段階11-2）
+    // 盤 → 手順の操作 → 枠 → 作るボタンのバー（段階14）。重なっていない
     const board = (await page.getByTestId('board').boundingBox())!;
-    expect(board.y + board.height).toBeLessThanOrEqual(bar.y);
     const nav = (await page.getByTestId('input-next').boundingBox())!;
-    expect(nav.y).toBeGreaterThanOrEqual(bar.y);
-    expect(nav.y + nav.height).toBeLessThanOrEqual(bar.y + bar.height);
-    // 貼り付け欄を開いても、作るボタンは押せる
+    expect(board.y + board.height).toBeLessThanOrEqual(nav.y);
+    expect(nav.y + nav.height).toBeLessThanOrEqual(bar.y);
+    // 貼り付け欄は画面の下から出る窓。閉じれば元のまま
     await page.getByTestId('kifu-open').click();
+    await expect(page.getByTestId('kifu-input')).toBeVisible();
+    await page.getByTestId('kifu-close').click();
     await expect(page.getByTestId('start-normal')).toBeInViewport({ ratio: 1 });
-    // いちばん下までスクロールしても、手順の操作（バーの中）は押せる
+    // ページ全体はスクロールしない。手順の操作はいつも押せる
     await page.mouse.wheel(0, 3000);
     await expect(page.getByTestId('input-next')).toBeInViewport({ ratio: 1 });
+    expect(await page.evaluate(() => document.scrollingElement!.scrollHeight)).toBeLessThanOrEqual(845);
   });
 
   test('一覧：自分の側と、開始局面までの最後の数手。速度測定は設定画面へ', async ({ page }) => {
@@ -290,7 +292,7 @@ test.describe('4-2 スマホ縦（390×844）', () => {
     await expect(page.getByTestId('open-bench')).toHaveAttribute('href', /bench\.html$/);
   });
 
-  test('復習：相手が直前に指した手を、盤（最終手のマス）と一言で示す。記録を消すは画面の下', async ({ page }) => {
+  test('復習：相手が直前に指した手を、盤（最終手のマス）と一言で示す。記録を消すは問題の下（枠の中）', async ({ page }) => {
     await openTree(page, OPENING);
     await page.getByTestId('review-open').click();
     await expect(page.getByTestId('review-prompt')).toHaveAttribute('data-phase', 'ask');
@@ -303,14 +305,18 @@ test.describe('4-2 スマホ縦（390×844）', () => {
     const clear = (await page.getByTestId('review-clear').boundingBox())!;
     const prompt = (await page.getByTestId('review-prompt').boundingBox())!;
     expect(clear.y).toBeGreaterThan(prompt.y + prompt.height);
-    // 盤の下の固定バー（段階11-2）に「今日 n／10問」。問題を出している間は ‹ › を押せない。いちばん下までスクロールすれば「記録を消す…」はバーに隠れない
+    // 盤のすぐ下のバー（段階14）に「今日 n／10問」。問題を出している間は ‹ › を押せない。「記録を消す…」は枠の中で見える
     await expect(page.getByTestId('review-progress')).toHaveText(/今日 1／\d+問/);
     await expect(page.getByTestId('review-prev')).toBeDisabled();
     await expect(page.getByTestId('review-next-move')).toBeDisabled();
-    await page.mouse.wheel(0, 3000);
-    const clear2 = (await page.getByTestId('review-clear').boundingBox())!;
+    // 盤の大きさの測り直しで位置が少し動くことがあるので、見えるまでスクロールし直す
+    await expect(async () => {
+      await page.getByTestId('review-clear').scrollIntoViewIfNeeded();
+      await expect(page.getByTestId('review-clear')).toBeInViewport({ ratio: 0.99, timeout: 500 });
+    }).toPass();
     const nav = (await page.getByTestId('review-nav').boundingBox())!;
-    expect(clear2.y + clear2.height).toBeLessThanOrEqual(nav.y);
+    expect((await page.getByTestId('review-clear').boundingBox())!.y).toBeGreaterThan(nav.y + nav.height);
+    expect(await page.evaluate(() => document.scrollingElement!.scrollHeight)).toBeLessThanOrEqual(845);
   });
 });
 
@@ -492,17 +498,17 @@ test.describe('4-3 自分の手', () => {
 
 // ---- v0.12.4：入力画面・復習画面も、盤の大きさを画面の高さに合わせる ----
 
-/** 入力画面：盤・先手の持ち駒の行が、作るボタンのバーの上に（スクロールせずに）収まっている。手順の操作はバーの中（段階11-2） */
+/** 入力画面（段階14）：ページはスクロールしない。盤・先手の持ち駒の行 → 手順の操作 → 枠 → 作るボタンのバー（画面の下） */
 async function expectInputAboveBar(page: Page, height: number) {
-  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  expect(await page.evaluate(() => document.scrollingElement!.scrollHeight)).toBeLessThanOrEqual(height + 1);
   const bar = (await page.getByTestId('start-bar').boundingBox())!;
   expect(bar.y + bar.height).toBeLessThanOrEqual(height + 1);
+  const nav = (await page.getByTestId('input-nav').boundingBox())!;
   for (const id of ['board', 'hand-black']) {
     const box = (await page.getByTestId(id).boundingBox())!;
-    expect(box.y + box.height, id).toBeLessThanOrEqual(bar.y);
+    expect(box.y + box.height, id).toBeLessThanOrEqual(nav.y);
   }
-  const nav = (await page.getByTestId('input-nav').boundingBox())!;
-  expect(nav.y).toBeGreaterThanOrEqual(bar.y);
+  expect(nav.y + nav.height).toBeLessThanOrEqual(bar.y);
 }
 
 for (const [width, height] of [
@@ -514,7 +520,7 @@ for (const [width, height] of [
   test.describe(`入力画面・復習画面（${width}×${height}）`, () => {
     test.use({ viewport: { width, height }, hasTouch: true });
 
-    test('入力画面：はじめ・戦型を選んだ後・棋譜を読み込んだ後のどれでも、盤がバーの上・手順の操作はバーの中', async ({ page }) => {
+    test('入力画面：はじめ・戦型を選んだ後・棋譜を読み込んだ後のどれでも、盤 → 手順の操作 → 作るボタンのバー（段階14）', async ({ page }) => {
       await page.goto('./#/new');
       await expect(page.getByTestId('isolation')).toHaveAttribute('data-state', 'isolated', { timeout: 30_000 });
       await expectInputAboveBar(page, height);

@@ -15,7 +15,6 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { Board } from '../components/Board';
 import { Dialog } from '../components/Dialog';
-import { OnceHint } from '../components/OnceHint';
 import { PromotionBox, useMoveInput } from '../components/useMoveInput';
 import { STARTPOS_SFEN, moveText, type Side } from '../shogi/position';
 import { studyPositions } from '../review/studyReview';
@@ -40,14 +39,15 @@ import { bookAt, bookOrder, bookStart, type BookBranch, type BookPosition } from
 import { studiesToKif } from '../tree/studyFile';
 import { listName, type OpeningTemplate } from '../tree/templates';
 import type { Study, TreeData } from '../tree/types';
-import { boardFitProps, measureFitAbove, useBoardFit } from './boardFit';
+import { boardFitProps, measureFitFrame, threeRowsNeed, useBoardFit } from './boardFit';
+import { takeHint } from './recent';
 import { inputHandoff } from './handoff';
 import { bookPath, go, groupReviewPath } from './router';
 import { OUTCOME_TEXT, copyText, shareFile } from './share';
 import { StudyEditDialog, shareStudies } from './StudyDialogs';
 import { applyStudyChange, ensureStudies, library, studiesNow } from './studies';
 import { KifuPanel, KifuSheet, useWideLayout, type KifuRow } from '../components/KifuList';
-import { MoveBar, moveBarHeight } from '../components/MoveBar';
+import { MoveBar } from '../components/MoveBar';
 import { allTemplates, myTemplates, refreshMyTemplates } from './TemplateDialogs';
 
 /** 「書き込む」の入／切（端末ごとに覚える。初期値は入） */
@@ -244,22 +244,32 @@ function BookViewScreen({
 
   const treesHere = current ? trees.filter((t) => pathInTree(t, here) !== null) : [];
 
-  // スマホ縦：盤と「この局面からの研究」の 3 行目までが、画面の下に固定したバー（段階11-2）の上にスクロールせずに見える盤の幅
+  // 段階14：1 画面に収める。「この局面からの研究」の枠の中で 3 行目まで見える盤の幅（一覧の行が少ない局面でも同じだけ空けて、盤の大きさを変えない）
   const boardRef = useRef<HTMLDivElement>(null);
+  const frameRef = useRef<HTMLDivElement>(null);
   const branchesRef = useRef<HTMLDivElement>(null);
-  /** 盤の下から、一覧の 3 行目の下までの高さ（最後に測った値）。一覧の行が少ない局面でも同じだけ空けて、盤の大きさを変えない */
-  const listReserve = useRef<number | null>(null);
   const boardFit = useBoardFit(boardRef, (board) => {
-    const rows = branchesRef.current?.querySelectorAll<HTMLElement>('.book-row');
-    if (rows && rows.length > 0) {
-      const n = Math.min(3, rows.length);
-      const rowH = rows[0].getBoundingClientRect().height;
-      // 成る・成らないの小窓は数えない（盤の大きさが変わらないように）
-      const promote = board.parentElement?.querySelector<HTMLElement>('.promote-box')?.getBoundingClientRect().height ?? 0;
-      listReserve.current = rows[n - 1].getBoundingClientRect().bottom - board.getBoundingClientRect().bottom + (3 - n) * rowH - promote;
-    }
-    return measureFitAbove(board, board, moveBarHeight() + (listReserve.current ?? LIST_GUESS));
+    const frame = frameRef.current;
+    const list = branchesRef.current;
+    if (!frame || !list) return null;
+    const rows = list.querySelectorAll<HTMLElement>('.book-row:not(.book-empty)');
+    // 成る・成らないの小窓は数えない（盤の大きさが変わらないように）
+    const promote = frame.querySelector<HTMLElement>('.promote-box')?.getBoundingClientRect().height ?? 0;
+    return measureFitFrame(board, frame, threeRowsNeed(frame, rows, list.querySelector<HTMLElement>('.candidates-head'), ROW_GUESS) - promote);
   });
+  // 段階14：操作の結果の一言（コピーしました・読むだけ など）は、一覧の下ではなく画面の下の知らせで 5 秒（画面を広げない）
+  useEffect(() => {
+    if (!note) return;
+    const timer = setTimeout(() => setNote(''), TOAST_MS);
+    return () => clearTimeout(timer);
+  }, [note]);
+  /** 初めての 1 回だけの説明（盤で指すと足される）。画面の下の知らせとして 8 秒 */
+  const [hint, setHint] = useState(() => write && pool.length > 0 && takeHint('book-write'));
+  useEffect(() => {
+    if (!hint) return;
+    const timer = setTimeout(() => setHint(false), 8000);
+    return () => clearTimeout(timer);
+  }, [hint]);
 
   const input = useMoveInput(sfen, (move) => void onPlay(move.usi), !busy);
 
@@ -458,7 +468,7 @@ function BookViewScreen({
   const outside = index > covered || pool.length === 0;
 
   return (
-    <>
+    <div class="board-screen">
       <div class="screen-header">
         <button type="button" class="btn btn-ghost btn-back" onClick={() => go('/')}>
           ‹<span class="back-text"> 一覧</span>
@@ -499,11 +509,29 @@ function BookViewScreen({
       </div>
 
       <div class="tree-layout study-layout">
-        <div ref={boardRef} {...boardFitProps(boardFit, 'tree-board')} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} data-testid="study-board">
-          <Board sfen={sfen} lastMove={prevMove} selection={input.selection} onSquare={input.onSquare} onHand={input.onHand} />
+        <div class="board-col">
+          <div ref={boardRef} {...boardFitProps(boardFit, 'tree-board')} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} data-testid="study-board">
+            <Board sfen={sfen} lastMove={prevMove} selection={input.selection} onSquare={input.onSquare} onHand={input.onHand} />
+          </div>
+          {/* 盤のすぐ下の操作バー（段階14。前は画面の下に固定）：|‹（出発点へ） ‹ [n手目 ▲X ▾] › ›|（今の研究手順の終わりへ） */}
+          <MoveBar
+            fixed={false}
+            ids={{ bar: 'study-nav', first: 'study-first', prev: 'study-prev', center: 'study-position', next: 'study-next', last: 'study-last' }}
+            firstLabel={`出発点（${startName}）へ`}
+            onFirst={() => moveTo(minIndex)}
+            onPrev={() => moveTo(index - 1)}
+            onNext={() => moveTo(index + 1)}
+            onLast={() => moveTo(last)}
+            canPrev={index > minIndex}
+            canNext={index < last}
+            onCenter={wide ? undefined : () => setKifuOpen(true)}
+          >
+            {index === 0 ? '初期局面' : `${index}手目 ${texts[index - 1] ?? ''}`}
+          </MoveBar>
         </div>
 
-        <div class="tree-side">
+        {/* 一覧の枠（段階14）：入りきらない分は、この中だけスクロール */}
+        <div class="tree-side board-frame" ref={frameRef}>
           <PromotionBox input={input} />
           {/* 手順の一覧：広い画面は盤の横に常に。スマホ縦は固定バーの手数を押すと画面下から（段階11-5・11-2） */}
           {wide && <KifuPanel rows={kifuRows} current={index} onJump={moveTo} />}
@@ -519,48 +547,22 @@ function BookViewScreen({
             onEnding={(s) => switchTo(s, index)}
             onMenu={(move) => setDialog({ kind: 'cut', move })}
           />
-          <div class="node-actions">
-            <button type="button" class="btn" data-testid="book-undo" disabled={undoCount === 0 || busy} onClick={() => void undo()}>
-              ↶ 取り消す
-            </button>
-            <button type="button" class="btn btn-primary" data-testid="book-review" disabled={pool.length === 0} onClick={() => go(groupReviewPath(bookKey))}>
-              まとめて復習（{pool.length} 本）
-            </button>
-          </div>
-          {write && pool.length > 0 && <OnceHint id="book-write">盤で指すと、その場で研究手順に足されます（名前は自動。あとで直せます）。</OnceHint>}
-          {note && (
-            <p class="muted" role="status" data-testid="study-screen-status">
-              {note}
-            </p>
-          )}
-          {current && (
-            <div class="card">
-              {current.note ? (
-                <p class="study-note" data-testid="study-screen-note">
-                  {current.note}
-                </p>
-              ) : (
-                <p class="muted">「{current.name}」にメモはありません（★ の行を押すと書けます）。</p>
-              )}
-            </div>
-          )}
         </div>
       </div>
 
-      {/* 盤の下の固定バー（段階11-2）：|‹（出発点へ） ‹ [n手目 ▲X ▾] › ›|（今の研究手順の終わりへ） */}
-      <MoveBar
-        ids={{ bar: 'study-nav', first: 'study-first', prev: 'study-prev', center: 'study-position', next: 'study-next', last: 'study-last' }}
-        firstLabel={`出発点（${startName}）へ`}
-        onFirst={() => moveTo(minIndex)}
-        onPrev={() => moveTo(index - 1)}
-        onNext={() => moveTo(index + 1)}
-        onLast={() => moveTo(last)}
-        canPrev={index > minIndex}
-        canNext={index < last}
-        onCenter={wide ? undefined : () => setKifuOpen(true)}
-      >
-        {index === 0 ? '初期局面' : `${index}手目 ${texts[index - 1] ?? ''}`}
-      </MoveBar>
+      {/* 操作の結果の一言（段階14：一覧の下から、画面の下の知らせへ。取り消しの知らせが出ている間はそちらを出す） */}
+      {note && !toast && (
+        <div class="toast" role="status" data-testid="study-screen-status">
+          <span class="toast-text toast-wrap">{note}</span>
+        </div>
+      )}
+
+      {/* 初めての 1 回だけの説明（段階14：一覧の下から、画面の下の知らせへ） */}
+      {hint && !toast && !note && (
+        <div class="toast" role="status" data-testid="hint-book-write">
+          <span class="toast-text toast-wrap">盤で指すと、その場で研究手順に足されます（名前は自動。あとで直せます）。</span>
+        </div>
+      )}
 
       {kifuOpen && <KifuSheet rows={kifuRows} current={index} onJump={moveTo} onClose={() => setKifuOpen(false)} />}
 
@@ -632,6 +634,28 @@ function BookViewScreen({
           </div>
           <p class="menu-section-title">定跡帳</p>
           <div class="dialog-actions dialog-actions-column">
+            {/* 段階14：盤の下から ⋯ へ移した */}
+            <button
+              type="button"
+              class="btn"
+              data-testid="book-review"
+              disabled={pool.length === 0}
+              onClick={() => go(groupReviewPath(bookKey))}
+            >
+              まとめて復習（{pool.length} 本）
+            </button>
+            <button
+              type="button"
+              class="btn"
+              data-testid="book-undo"
+              disabled={undoCount === 0 || busy}
+              onClick={() => {
+                setDialog(null);
+                void undo();
+              }}
+            >
+              ↶ 取り消す
+            </button>
             {pool.length > 0 && (
               <button type="button" class="btn" data-testid="book-share-kif" onClick={() => void shareBook()}>
                 KIFで渡す（{pool.length}本）
@@ -723,7 +747,7 @@ function BookViewScreen({
           </div>
         </Dialog>
       )}
-    </>
+    </div>
   );
 }
 
@@ -742,7 +766,8 @@ function CutText({ plan }: { plan: CutPlan }) {
 }
 
 /** 盤の下から一覧の 3 行目までの高さの見込み（まだ測っていないとき。間＋見出し＋3 行） */
-const LIST_GUESS = 200;
+/** 「この局面からの研究」の 1 行の高さ（行が無いときの見込み。px） */
+const ROW_GUESS = 44;
 
 /**
  * 「この局面からの研究」：次の手ごとに、その手を通る研究手順の名前と数。今たどっている研究手順の手に印。行の ⋯ で「この手から先を消す」。

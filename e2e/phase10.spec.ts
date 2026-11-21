@@ -155,18 +155,18 @@ test.describe('10-1 定跡帳で直接指して研究を足す', () => {
     await expect(page.getByTestId('study-position')).toContainText('19手目');
     await expect(page.getByTestId('study-last')).toBeDisabled();
     await expect(page.getByTestId('book-toast')).toContainText('取り消しました');
-    await expect(page.getByTestId('book-undo')).toBeDisabled();
+    await expectUndoDisabled(page);
 
-    // 2 手足して、「↶ 取り消す」で 2 回
+    // 2 手足して、⋯ の「↶ 取り消す」で 2 回（段階14：盤の下から ⋯ へ）
     await play(page, '31', '22');
     await expect(page.getByTestId('study-position')).toContainText('20手目');
     await play(page, '59', '58'); // ▲5八玉
     await expect(page.getByTestId('study-position')).toContainText('21手目');
-    await page.getByTestId('book-undo').click();
+    await undoFromMenu(page);
     await expect(page.getByTestId('study-position')).toContainText('20手目');
-    await page.getByTestId('book-undo').click();
+    await undoFromMenu(page);
     await expect(page.getByTestId('study-position')).toContainText('19手目');
-    await expect(page.getByTestId('book-undo')).toBeDisabled();
+    await expectUndoDisabled(page);
 
     // 読むだけ：指しても足さない
     await page.getByTestId('book-menu').click();
@@ -206,7 +206,7 @@ test.describe('10-1 定跡帳で直接指して研究を足す', () => {
     await expect(page.getByTestId('study-meta')).toContainText('Aのメモ');
 
     // 取り消すと、研究A の ▲2六飛 が戻る
-    await page.getByTestId('book-undo').click();
+    await undoFromMenu(page);
     await expect(rows).toHaveCount(1);
     await expect(rows).toContainText('研究A');
 
@@ -245,7 +245,7 @@ test.describe('10-1 定跡帳で直接指して研究を足す', () => {
     await page.getByTestId('book-delete-study').click();
     await page.getByTestId('book-delete-ok').click();
     await expect(page.getByTestId('book-head-empty')).toBeVisible();
-    await page.getByTestId('book-undo').click();
+    await undoFromMenu(page);
     await expect(page.getByTestId('study-title')).toHaveText('本線');
   });
 });
@@ -370,3 +370,18 @@ test('前の版でずれた研究手順（後手番に先手番の戦型・戦�
   await page.getByTestId('study-prev').click();
   await expect(page.getByTestId('study-position')).toContainText('16手目');
 });
+
+/** ⋯ の「↶ 取り消す」（段階14：盤の下から ⋯ の中へ） */
+async function undoFromMenu(page: Page) {
+  await page.getByTestId('book-menu').click();
+  await page.getByTestId('book-undo').click();
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
+}
+
+/** 取り消せるものが無いとき、⋯ の「↶ 取り消す」は押せない */
+async function expectUndoDisabled(page: Page) {
+  await page.getByTestId('book-menu').click();
+  await expect(page.getByTestId('book-undo')).toBeDisabled();
+  await page.locator('dialog[open]').last().getByRole('button', { name: '閉じる' }).click();
+  await expect(page.locator('dialog[open]')).toHaveCount(0);
+}

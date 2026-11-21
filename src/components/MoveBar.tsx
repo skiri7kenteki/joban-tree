@@ -1,8 +1,8 @@
-// 盤の下の固定バー（段階11-2）：「|‹  ‹  [17手目 ▲3六飛 ▾]  ›  ›|」。
+// 盤の下のバー（段階11-2）：「|‹  ‹  [17手目 ▲3六飛 ▾]  ›  ›|」。
 // 定跡帳・ツリー・新しいツリー・復習の画面で同じ部品を使う。前の版の ‹ › の行と、手順のボタンの並び（パンくず）の代わり。
-//   - 画面の下に固定（高さ 56px＋端末の下の余白）。中身が隠れないよう、同じ高さの空きを画面の最後に置く
+//   - 段階14（v0.38.0〜）：どの画面も盤のすぐ下に置く（fixed={false}）。画面の下に固定する置き方（fixed）は今は使っていない
 //   - 真ん中を押すと手順の一覧（棋譜欄）が開く（onCenter があるとき。広い画面では棋譜欄が盤の横に出ているので押しても何もしない）
-//   - 新しいツリーの画面は、作るボタンのバー（画面の下に貼り付く）の中に置く（fixed=false）
+//   - 段階11-2〜13 の新しいツリーは、作るボタンのバーの中に置いていた
 
 import type { ComponentChildren, Ref } from 'preact';
 
@@ -67,10 +67,4 @@ export function MoveBar(p: MoveBarProps) {
       {bar}
     </>
   );
-}
-
-/** 固定したバーの高さ（px。端末の下の余白を含む）。盤の大きさを決めるときに引く */
-export function moveBarHeight(): number {
-  const el = document.querySelector<HTMLElement>('.move-bar-fixed');
-  return el ? el.getBoundingClientRect().height : 0;
 }
