@@ -8,6 +8,7 @@
 // - 段階12 の追加（v0.34.0）：駒の字は駒専用の太い字体（Noto Serif JP Black を駒の字だけに削ったもの）、横 92%。
 //   駒に側面（厚み）・2 段の影・面のふちの光る線。持ち駒の列は駒台（濃い木と金の縁）に、盤と同じ形の駒を小さく並べる。
 //   行の高さは前と同じ（盤の大きさを変えない）
+// - v0.36.1：後手の駒は影・側面も含めて駒全体を 180 度回す（面の濃淡と向きをそろえる。前は影と側面だけ画面の下に出ていた）
 // - 段階12-4：flash（復習で正解したとき）なら、最終手の行き先のマスに金の光の輪を一瞬出す（動きを減らす設定の端末では出さない。board.css）
 
 import { Color, PieceType, Position, Square, parseUSIMove, pieceTypeToStringForBoard } from 'tsshogi';
@@ -201,25 +202,23 @@ function PieceShape({ cx, cy, type, upsideDown }: { cx: number; cy: number; type
   // 側面の分だけ少し上に描いて、マスの真ん中に見せる
   const y = cy - 1;
   const points = piecePoints(cx, y);
-  const rotate = upsideDown ? `rotate(180 ${cx} ${y})` : '';
-  // 影と側面は、後手の駒でも下（右下）に出す（光は画面の上から）
-  const below = (dx: number, dy: number) => `translate(${dx} ${dy}) ${rotate}`.trim();
+  // 後手の駒は、影・側面も含めて駒全体をマスの真ん中で 180 度回す（v0.36.1。影と側面は駒の向きの手前側＝画面の上に出る）
+  const rotate = upsideDown ? `rotate(180 ${cx} ${cy})` : undefined;
+  const shift = (dx: number, dy: number) => `translate(${dx} ${dy})`;
   return (
-    <g class="piece">
-      <polygon points={points} class="piece-shadow-far" transform={below(SHADOW_FAR.dx, SHADOW_FAR.dy)} />
-      <polygon points={points} class="piece-shadow" transform={below(SHADOW_NEAR.dx, SHADOW_NEAR.dy)} />
-      <polygon points={points} class="piece-side" transform={below(0, SIDE_DY)} />
-      <g transform={rotate || undefined}>
-        <polygon points={points} class="piece-body" />
-        <polygon points={piecePoints(cx, y + 1.2, RIM_SCALE)} class="piece-rim" />
-        <text
-          transform={`translate(${cx} ${y + 2.5}) scale(${TEXT_SCALE_X} 1)`}
-          class={PROMOTED.has(type) ? 'piece-text promoted' : 'piece-text'}
-          dominant-baseline="central"
-        >
-          {pieceTypeToStringForBoard(type)}
-        </text>
-      </g>
+    <g class="piece" transform={rotate}>
+      <polygon points={points} class="piece-shadow-far" transform={shift(SHADOW_FAR.dx, SHADOW_FAR.dy)} />
+      <polygon points={points} class="piece-shadow" transform={shift(SHADOW_NEAR.dx, SHADOW_NEAR.dy)} />
+      <polygon points={points} class="piece-side" transform={shift(0, SIDE_DY)} />
+      <polygon points={points} class="piece-body" />
+      <polygon points={piecePoints(cx, y + 1.2, RIM_SCALE)} class="piece-rim" />
+      <text
+        transform={`translate(${cx} ${y + 2.5}) scale(${TEXT_SCALE_X} 1)`}
+        class={PROMOTED.has(type) ? 'piece-text promoted' : 'piece-text'}
+        dominant-baseline="central"
+      >
+        {pieceTypeToStringForBoard(type)}
+      </text>
     </g>
   );
 }
