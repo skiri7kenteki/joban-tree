@@ -15,7 +15,7 @@
 - 作業の区切りごとに git commit し、PROGRESS.md（完了したこと・実機で未確認のこと・次にやること・テスト結果）を更新する
 - **push の前に必ず `git pull --rebase`**
 - 公開する変更のたびに `package.json` の `version` を上げる（画面下に表示され、スマホに更新が届いたか確認できる）
-- 見た目は **DESIGN.md に従う**
+- 見た目は **DESIGN.md に従う**（段階12〜 C 案「対局室」：全画面 藍の地に生成りのカード、金、見出しは明朝体。テーマは 1 つだけ）
 
 ## 基本の使い方（目標）
 1. 棋譜を貼り付ける（または盤上で手を進める）
@@ -36,6 +36,7 @@
 | PWA | vite-plugin-pwa（`injectManifest`、自前の service worker） | `src/sw.ts` |
 | テスト | Vitest（ロジック）、Playwright（画面の通し確認） | GitHub Actions で毎回実行 |
 | 公開 | GitHub Actions → GitHub Pages | テストが失敗したら公開しない |
+| 見出しの明朝体 | Noto Serif JP（太さ 600、JIS 第 1 水準までに削る。SIL OFL 1.1） | 段階12-1。`src/assets/fonts/`、作り方は `scripts/make-font.py`、ライセンスは `public/fonts/OFL-NotoSerifJP.txt` |
 | エンジン | やねうら王（WASM 版、GPLv3）＋つようら王11micro/11mini（評価関数、MIT） | |
 
 - ほかのライブラリを足すときは事前に相談する。**外部 CDN は使わない**（オフラインで動かすため）
@@ -451,7 +452,9 @@ pc/                         PC 版（start.bat・server.mjs・engine-files.mjs�
 pc/bake/                    同梱ツリーを PC で作るコマンド（bake.bat から。段階6）
 src/isolation.ts            service worker の登録と cross-origin isolated の確保
 src/sw.ts                   service worker
-src/styles/                 CSS（tokens.css に色などの変数）
+src/styles/                 CSS（tokens.css に色などの変数・明朝体の読み込み。base.css に「紙」＝生成りのカードの部品の並び）
+src/assets/fonts/           見出しの明朝体（段階12-1。scripts/make-font.py で作る）
+docs/design/                見た目の見本（段階12 の C 案）
 public/manifest.webmanifest ホーム画面用の設定（アイコンは public/*.png。scripts/make-icons.mjs で icon.svg から作る）
 public/eval/                評価関数（nn.bin・progress.bin・ライセンス。リポジトリに含める）
 public/trees/               同梱ツリー（<id>.v<版>.json。開くときに取りに行く。段階6-3）
@@ -466,6 +469,6 @@ e2e/                        Playwright
 - LLM による手順の解説の自動生成
 - ネイティブアプリ化
 - 棋譜サイトへのアクセス・スクレイピング（棋譜の取り込みは貼り付けとファイルのみ）
-- ダークモード
+- 端末のダークモードに合わせて切り替える仕組み（段階12 からテーマは藍の 1 つだけ）
 - 持ち主の確認なしの機能追加
 - 確認なしにデータを消す・上書きする処理

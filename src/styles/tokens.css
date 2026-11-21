@@ -1,14 +1,56 @@
-/* 見た目の変数（DESIGN.md の表と同じ値）。色はここ以外に直接書かない */
+/* 見た目の変数（DESIGN.md の表と同じ値）。色はここ以外に直接書かない
+   段階12（v0.30.0〜）：C 案「対局室」。全画面を藍の地にして、本文は生成りのカード（紙）の中に置く。
+   --color-text などは「藍の地の上」の値。カードの中（base.css の「紙」の部品）では --paper-* に入れ替わる */
+
+/* 見出し・駒の文字の明朝体（Noto Serif JP の太さ 600 を JIS 第 1 水準まで削ったもの。scripts/make-font.py、
+   ライセンスは public/fonts/OFL-NotoSerifJP.txt）。無い文字は端末の明朝体で出る */
+@font-face {
+  font-family: 'Joban Mincho';
+  src: url('../assets/fonts/joban-mincho-600.woff2') format('woff2');
+  font-weight: 500 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
-  --color-bg: #f6f5f2;
-  --color-surface: #ffffff;
-  --color-text: #1f2328;
-  --color-text-muted: #5f6670;
-  --color-border: #d9d6cf;
-  --color-accent: #2f5d8a;
-  --color-accent-text: #ffffff;
-  --color-danger: #c0392b;
-  --color-ok: #1e7a3c;
+  /* 藍の地の上 */
+  --color-bg: #1c2740;
+  --color-bg-deep: #141c30;
+  --color-bg-glow: #2a3a66;
+  --color-text: #f3ecdc;
+  --color-text-muted: #b5bccd;
+  --color-border: rgba(201, 165, 76, 0.38);
+  --color-accent: #c9a54c;
+  --color-accent-text: #1c2740;
+  --color-danger: #f2a093;
+  --color-ok: #9bd6a9;
+
+  /* 生成りのカード（紙）の中 */
+  --paper: #f8f3e7;
+  --paper-sunken: #efe6d2;
+  --paper-selected: #ecdcae;
+  --paper-text: #1d2333;
+  --paper-muted: #5c6070;
+  --paper-border: #d9ccad;
+  --paper-accent: #7a5c1a;
+  --paper-accent-text: #f8f3e7;
+  --paper-danger: #b3311f;
+  --paper-ok: #1e6b37;
+  --color-surface: var(--paper);
+
+  /* 金（明るい金は藍の上だけ。生成りの上の金の文字は --paper-accent） */
+  --gold: #c9a54c;
+  --gold-light: #e2c77d;
+  --gold-dark: #8f6f24;
+  --gold-line: rgba(201, 165, 76, 0.6);
+  --gold-fill: linear-gradient(180deg, #e6ca7c 0%, #c9a54c 55%, #b38e37 100%);
+  --gold-fill-text: #1c2740;
+
+  /* 影（カードは少し浮かせる。窓・知らせはもう少し） */
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.55) inset, 0 2px 6px rgba(5, 8, 20, 0.28);
+  --shadow-button: 0 1px 2px rgba(5, 8, 20, 0.22);
+  --shadow-gold: 0 1px 0 rgba(255, 255, 255, 0.45) inset, 0 3px 8px rgba(5, 8, 20, 0.35);
+  --shadow-raise: 0 6px 24px rgba(5, 8, 20, 0.45);
 
   --color-board: #e8c98a;
   --color-board-line: #5a4320;
@@ -18,26 +60,28 @@
   --color-piece-promoted: #c0261b;
   --color-last-move: rgba(214, 96, 40, 0.28);
   --color-last-move-from: rgba(214, 96, 40, 0.12);
-  --color-selected: rgba(47, 93, 138, 0.32);
-  --color-backdrop: rgba(0, 0, 0, 0.35);
+  --color-selected: rgba(201, 165, 76, 0.45);
+  --color-backdrop: rgba(5, 8, 20, 0.6);
 
   --color-eval-good: #1f5fae;
-  --color-eval-bad: #c0392b;
-  --color-eval-even: #1f2328;
+  --color-eval-bad: #b3311f;
+  --color-eval-even: #1d2333;
 
-  --chip-main-bg: #e6e6e6;
+  --chip-main-bg: #e6e1d4;
   --chip-main-text: #333333;
   --chip-good-bg: #dceafe;
   --chip-good-text: #1d4f91;
-  --chip-dubious-bg: #ff8c1a;
+  --chip-dubious-bg: #b9520c;
   --chip-dubious-text: #ffffff;
-  --color-unverified: #8a8f98;
+  --color-unverified: #7c8089;
 
   --font-sans: system-ui, -apple-system, 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic UI', 'Meiryo', sans-serif;
+  --font-serif: 'Joban Mincho', 'Hiragino Mincho ProN', 'Noto Serif CJK JP', 'Yu Mincho', serif;
   --font-mono: ui-monospace, 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
   --font-size-body: 16px;
   --font-size-small: 13px;
   --font-size-heading: 18px;
+  --font-size-title: 21px;
 
   --space-1: 4px;
   --space-2: 8px;
@@ -46,7 +90,7 @@
   --space-6: 24px;
 
   --radius-button: 8px;
-  --radius-card: 12px;
+  --radius-card: 10px;
   --radius-chip: 999px;
 
   --touch-min: 44px;

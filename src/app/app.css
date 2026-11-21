@@ -4,23 +4,30 @@
   width: 100%;
 }
 
+/* 枠の無いボタン：置いた場所の金（藍の上は金、カードの中は暗い金） */
 .btn-ghost {
   border-color: transparent;
   background: transparent;
   color: var(--color-accent);
   padding: 0 var(--space-2);
+  box-shadow: none;
 }
 
+/* 危ない操作：生成りに朱の縁と文字 */
 .btn-danger {
-  background: var(--color-surface);
-  border-color: var(--color-danger);
-  color: var(--color-danger);
+  background: var(--paper);
+  border-color: var(--paper-danger);
+  color: var(--paper-danger);
 }
 
+/* 選んでいるもの：金（段階12） */
 .btn-toggle.on {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
-  color: var(--color-accent-text);
+  background: var(--gold-fill);
+  background-color: var(--gold);
+  border-color: var(--gold-dark);
+  color: var(--gold-fill-text);
+  font-weight: 600;
+  box-shadow: var(--shadow-gold);
 }
 
 .notice {
@@ -46,6 +53,14 @@
 .screen-header h1 {
   margin: 0;
   min-width: 0;
+}
+
+/* 段階12：見出しの行のボタン（‹ 一覧・復習・⋯・書き出し）は、藍の上に金の細い枠 */
+.screen-header > .btn:not(.btn-ghost) {
+  background: transparent;
+  border-color: var(--gold-line);
+  color: var(--gold-light);
+  box-shadow: none;
 }
 
 .tree-title {
@@ -78,6 +93,7 @@
   font: inherit;
   text-align: left;
   cursor: pointer;
+  box-shadow: var(--shadow-card);
 }
 
 .tree-item-meta {
@@ -424,8 +440,8 @@
   z-index: 1;
   margin: var(--space-3) calc(-1 * var(--space-4)) calc(-1 * var(--space-4));
   padding: var(--space-2) var(--space-4) calc(var(--space-2) + env(safe-area-inset-bottom));
-  border-top: 1px solid var(--color-border);
-  background: var(--color-bg);
+  border-top: 1px solid var(--gold-line);
+  background: var(--color-bg-deep);
 }
 
 /* 段階6-3：用意済みのツリーを開く（作るボタンより目立たせる） */
@@ -641,10 +657,11 @@
   width: min(92vw, 440px);
   max-height: 85dvh;
   padding: 0;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--gold-line);
   border-radius: var(--radius-card);
   background: var(--color-surface);
   color: var(--color-text);
+  box-shadow: var(--shadow-raise);
 }
 
 .dialog::backdrop {
@@ -1339,10 +1356,11 @@
   width: max-content;
   max-width: calc(100vw - 2 * var(--space-3));
   padding: var(--space-1) var(--space-1) var(--space-1) var(--space-3);
+  border: 1px solid var(--gold-line);
   border-radius: var(--radius-card);
-  background: var(--color-text);
-  color: var(--color-bg);
-  box-shadow: 0 2px 8px rgb(0 0 0 / 0.3);
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: var(--shadow-raise);
 }
 
 .toast-text {
@@ -1357,7 +1375,7 @@
   min-height: var(--touch-min);
   border: none;
   background: transparent;
-  color: var(--color-bg);
+  color: var(--color-accent);
   font-weight: bold;
   text-decoration: underline;
 }
@@ -1445,8 +1463,8 @@
   right: 0;
   bottom: 0;
   z-index: 40;
-  background: var(--color-surface);
-  border-top: 1px solid var(--color-border);
+  background: var(--color-bg-deep);
+  border-top: 1px solid var(--gold-line);
   padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
 }
 
@@ -1475,9 +1493,25 @@
   cursor: pointer;
 }
 
+/* 選んでいるタブは金の文字と、下の金の線（段階12） */
+.tabbar-tab {
+  position: relative;
+}
+
 .tabbar-tab.on {
-  color: var(--color-accent);
+  color: var(--gold);
   font-weight: 700;
+}
+
+.tabbar-tab.on::after {
+  content: '';
+  position: absolute;
+  left: 30%;
+  right: 30%;
+  bottom: 4px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--gold);
 }
 
 .tabbar-icon {
@@ -1600,8 +1634,9 @@
 }
 
 .kifu-row.current {
-  background: var(--color-accent);
-  color: var(--color-accent-text);
+  background: var(--paper-selected);
+  color: var(--color-text);
+  box-shadow: inset 3px 0 0 var(--gold-dark);
   font-weight: bold;
   opacity: 1;
 }
@@ -1609,7 +1644,7 @@
 .kifu-row.current .kifu-ply,
 .kifu-row.current .kifu-note,
 .kifu-row.current .kifu-move {
-  color: var(--color-accent-text);
+  color: var(--color-text);
 }
 
 /* 広い画面：盤の横に常に出す（高さを決めて、中だけスクロール） */
@@ -1629,7 +1664,8 @@
   max-width: 560px;
   margin: auto auto 0;
   border-radius: var(--radius-card) var(--radius-card) 0 0;
-  border-bottom: 0;
+  border: 0;
+  border-top: 2px solid var(--gold);
   padding-bottom: env(safe-area-inset-bottom);
 }
 
@@ -1643,6 +1679,7 @@
 .kifu-open {
   border: 0;
   background: none;
+  box-shadow: none;
   color: inherit;
   font: inherit;
   cursor: pointer;
@@ -1679,10 +1716,10 @@
   width: var(--touch-min);
   height: var(--touch-min);
   padding: 0;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--gold-line);
   border-radius: var(--radius-button);
-  background: var(--color-surface);
-  color: var(--color-accent);
+  background: transparent;
+  color: var(--gold);
   font: inherit;
   font-size: var(--font-size-heading);
   font-weight: bold;
@@ -1738,8 +1775,8 @@ div.move-bar-center {
   bottom: 0;
   z-index: 30;
   padding: 0 calc(var(--space-2) + env(safe-area-inset-right)) env(safe-area-inset-bottom) calc(var(--space-2) + env(safe-area-inset-left));
-  border-top: 1px solid var(--color-border);
-  background: var(--color-surface);
+  border-top: 1px solid var(--gold-line);
+  background: var(--color-bg-deep);
 }
 
 .move-bar-fixed .move-bar-inner {

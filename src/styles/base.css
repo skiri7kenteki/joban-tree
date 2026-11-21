@@ -10,15 +10,45 @@
 html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
+  background: var(--color-bg);
 }
 
+/* 段階12：藍の地。上の方だけ少し明るく */
 body {
   margin: 0;
-  background: var(--color-bg);
+  background: radial-gradient(130% 45% at 50% 0%, var(--color-bg-glow) 0%, transparent 70%) no-repeat, var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-sans);
   font-size: var(--font-size-body);
   line-height: 1.5;
+}
+
+/* 段階12：生成りのカード（紙）。中では色の変数を紙の値に入れ替える（文字は墨、補助は灰、金は暗い金）。
+   本文はこの中に置き、藍の地の上には見出しと短い知らせだけを置く */
+.card,
+.dialog,
+.notice,
+.toast,
+select,
+input,
+textarea,
+.tree-item,
+.tree-menu-btn,
+.candidates,
+.book-list,
+.kifu-list,
+.review-entry,
+.template-item,
+.template-menu,
+.gen-panel {
+  --color-text: var(--paper-text);
+  --color-text-muted: var(--paper-muted);
+  --color-border: var(--paper-border);
+  --color-accent: var(--paper-accent);
+  --color-accent-text: var(--paper-accent-text);
+  --color-danger: var(--paper-danger);
+  --color-ok: var(--paper-ok);
+  --color-bg: var(--paper-sunken);
 }
 
 /* ホーム画面アプリとして開いたときに、画面の端（ノッチやホームバー）を避ける */
@@ -37,13 +67,20 @@ body {
   padding: var(--space-4);
 }
 
+/* 見出しは明朝体（段階12） */
 h1 {
-  font-size: var(--font-size-heading);
+  font-family: var(--font-serif);
+  font-size: var(--font-size-title);
+  font-weight: 600;
+  letter-spacing: 0.04em;
   margin: 0 0 var(--space-3);
 }
 
 h2 {
+  font-family: var(--font-serif);
   font-size: var(--font-size-body);
+  font-weight: 600;
+  letter-spacing: 0.03em;
   margin: var(--space-6) 0 var(--space-2);
 }
 
@@ -66,6 +103,8 @@ p {
   border-radius: var(--radius-card);
   padding: var(--space-4);
   margin-bottom: var(--space-4);
+  color: var(--color-text);
+  box-shadow: var(--shadow-card);
 }
 
 /* ボタン：高さ 44px 以上 */
@@ -76,12 +115,14 @@ p {
   min-height: var(--touch-min);
   padding: 0 var(--space-4);
   border-radius: var(--radius-button);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text);
+  /* 普通のボタンは生成り（藍の地の上でも、カードの中でも同じ） */
+  border: 1px solid var(--paper-border);
+  background: var(--paper);
+  color: var(--paper-text);
   font: inherit;
   text-decoration: none;
   cursor: pointer;
+  box-shadow: var(--shadow-button);
 }
 
 .btn:disabled {
@@ -89,10 +130,16 @@ p {
   cursor: default;
 }
 
+/* 大事な操作は金（段階12）。文字は藍・明朝体 */
 .btn-primary {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
-  color: var(--color-accent-text);
+  background: var(--gold-fill);
+  background-color: var(--gold);
+  border-color: var(--gold-dark);
+  color: var(--gold-fill-text);
+  font-family: var(--font-serif);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  box-shadow: var(--shadow-gold);
 }
 
 .btn-row {

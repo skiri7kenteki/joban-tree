@@ -29,7 +29,7 @@ export default defineConfig({
       // ホーム画面用の設定は public/manifest.webmanifest に手で書いている
       manifest: false,
       injectManifest: {
-        globPatterns: ['**/*.{js,css,html,svg,png,webmanifest}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,webmanifest,woff2,webp}'],
         // エンジンと評価関数は大きいので事前保存しない（使ったときに保存する）
         globIgnores: ['engine/**', 'eval/**', 'pc-engine/**'],
       },
