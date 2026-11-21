@@ -11,7 +11,7 @@ import { STARTPOS_SFEN, applyUsiMove, sfenKey, sideToMove } from '../shogi/posit
 import { liftTreeStudies, startsWith, traceStudy, treeBaseMoves } from '../tree/studies';
 import { isOpponentNode } from '../tree/generator';
 import type { Study, TreeData } from '../tree/types';
-import { LEARNED_STREAK, answerOf, emptyRecord, questionNeed, replyKey, type NodeRecord, type ReviewRecord, type ReviewSummary } from './review';
+import { answerOf, emptyRecord, questionNeed, replyKey, type NodeRecord, type ReviewRecord, type ReviewSummary } from './review';
 
 /** 研究手順の復習の記録の、保存場所でのキー（ツリーの id とは重ならない） */
 export const STUDY_RECORD_ID = 'studies';
@@ -106,7 +106,7 @@ export function summarizeStudies<S extends Pick<Study, 'moves' | 'mySide'>>(stud
       const rec = record.nodes[q.recordKey];
       if (!rec) summary.unseen++;
       else if (!rec.lastOk) summary.wrong++;
-      else if (rec.streak >= LEARNED_STREAK) summary.learned++;
+      else summary.learned++;
     }
   }
   return summary;

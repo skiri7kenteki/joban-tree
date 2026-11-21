@@ -156,12 +156,12 @@ test.describe('12-1 色・文字・部品の土台（段階13 で洗練）', () 
     expect(await style('.tree-group', 'background-color')).toBe('rgb(255, 253, 248)');
     expect(await style('.tree-group .tree-row', 'box-shadow')).toBe('none');
     // 主なボタンは平らな金（グラデーション・影なし）
-    expect(await style('[data-testid="study-register"]', 'background-color')).toBe('rgb(201, 165, 76)');
+    expect(await style('[data-testid="study-register"]', 'background-color')).toBe('rgb(191, 160, 99)');
     expect(await style('[data-testid="study-register"]', 'background-image')).toBe('none');
     expect(await style('[data-testid="study-register"]', 'box-shadow')).toBe('none');
     expect(await style('h1', 'font-family')).toContain('Joban Mincho');
     expect(await style('.tabbar', 'background-color')).toBe('rgb(21, 29, 49)');
-    expect(await style('.tabbar-tab.on', 'color')).toBe('rgb(226, 199, 125)');
+    expect(await style('.tabbar-tab.on', 'color')).toBe('rgb(216, 194, 144)');
     // 生成りの地には青海波を敷かない
     expect(await page.locator('.app').evaluate((e) => getComputedStyle(e, '::before').backgroundImage)).toBe('none');
     // 明朝体はアプリに入っている（端末に無くても出る）
@@ -171,7 +171,7 @@ test.describe('12-1 色・文字・部品の土台（段階13 で洗練）', () 
     await expect(page.getByTestId('study-position')).toBeVisible();
     // 盤の画面：藍の地（上に青海波をごく薄く）、盤の下の一覧は生成りの地
     expect(await style('.app', 'background-color')).toBe('rgb(28, 39, 64)');
-    expect(await page.locator('.app').evaluate((e) => getComputedStyle(e, '::before').backgroundImage)).toContain("stroke-opacity='0.05'");
+    expect(await page.locator('.app').evaluate((e) => getComputedStyle(e, '::before').backgroundImage)).toContain("stroke-opacity='0.03'");
     expect(await style('.tree-side', 'background-color')).toBe('rgb(243, 238, 227)');
     expect(await style('.move-bar-fixed', 'background-color')).toBe('rgb(21, 29, 49)');
     expect(await style('.move-bar-btn', 'color')).toBe('rgb(243, 236, 220)');
@@ -251,8 +251,10 @@ test.describe('12-2 盤と駒', () => {
     await expect(board).toBeVisible();
     const css = (sel: string, prop: string) => page.locator(sel).first().evaluate((e, p) => getComputedStyle(e).getPropertyValue(p), prop);
     expect(await css('svg.board', 'background-image')).toContain('wood');
-    // 盤のまわりは金の細い線 1 本（段階13）
-    expect(await css('svg.board', 'box-shadow')).toContain('rgba(201, 165, 76, 0.55) 0px 0px 0px 1px');
+    // 盤と駒台をひとつの板として、まわりに金の細い線 1 本（段階13、段階13-2 で盤と駒台をまとめた）
+    expect(await css('.board-wrap', 'box-shadow')).toContain('rgba(191, 160, 99, 0.5) 0px 0px 0px 1px');
+    expect(await css('svg.board', 'box-shadow')).toBe('none');
+    expect(await css('[data-testid="hand-black"]', 'box-shadow')).toBe('none');
     expect(await css('.piece-text', 'font-family')).toContain('Joban Koma');
     expect(await css('.board-coord', 'font-family')).toContain('Joban Mincho');
     // 影は駒と同じ数（初期配置は 40 枚）。CSS の filter は使わない
@@ -265,12 +267,12 @@ test.describe('12-2 盤と駒', () => {
     await page.locator('[data-square="77"]').click();
     const sel = page.locator('[data-square="77"] rect');
     await expect(sel).toHaveClass('sq-selected');
-    expect(await sel.evaluate((e) => getComputedStyle(e).stroke)).toBe('rgb(201, 165, 76)');
+    expect(await sel.evaluate((e) => getComputedStyle(e).stroke)).toBe('rgb(191, 160, 99)');
   });
 });
 
 /** 研究手順の復習の記録を端末の保存場所に書く（s-line の問題のうち、はじめの 3 問を覚えた・4 問目を前回まちがい） */
-async function seedStudyRecord(page: Page) {
+async function seedStudyRecord(page: Page, streak = 2) {
   const keys: string[] = [];
   let sfen = STARTPOS_SFEN;
   for (const m of STUDIES[0].moves) {
@@ -279,7 +281,7 @@ async function seedStudyRecord(page: Page) {
     sfen = applyUsiMove(sfen, m)!.sfen;
   }
   const nodes: Record<string, unknown> = {};
-  for (const k of keys.slice(0, 3)) nodes[k] = { seen: 2, correct: 2, streak: 2, lastOk: true, lastAt: 1 };
+  for (const k of keys.slice(0, 3)) nodes[k] = { seen: streak, correct: streak, streak, lastOk: true, lastAt: 1 };
   nodes[keys[3]] = { seen: 1, correct: 0, streak: 0, lastOk: false, lastAt: 1 };
   await page.evaluate(
     (rec) =>
@@ -337,7 +339,7 @@ test.describe('12-3 定跡帳', () => {
     // 8 手目（△3二金の後）：次の手は ▲2四歩・▲3八銀 の 2 つ、それぞれ 2 本のうち 1 本
     for (let i = 0; i < 3; i++) await page.getByTestId('study-prev').click();
     await expect(page.getByTestId('study-book-branch')).toHaveCount(2);
-    expect(await page.getByTestId('book-head-review').evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgb(201, 165, 76)');
+    expect(await page.getByTestId('book-head-review').evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgb(191, 160, 99)');
     const bars = page.getByTestId('study-book-bar');
     await expect(bars).toHaveCount(2);
     for (const i of [0, 1]) {
@@ -347,6 +349,28 @@ test.describe('12-3 定跡帳', () => {
       const names = (await page.getByTestId('study-book-branch').nth(i).locator('.book-names').boundingBox())!;
       expect(bar!.y).toBeGreaterThanOrEqual(names.y + names.height - 1);
     }
+  });
+});
+
+test.describe('覚えた＝最後に答えたとき正解（v0.36.0）', () => {
+  test('1 回の正解で「覚えた」に数える。集計・研究手順の輪・復習の画面・復習のタブの数がそろう', async ({ page }) => {
+    await openHome(page);
+    await page.getByTestId('study-import-file').setInputFiles({
+      name: 's.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies: STUDIES })),
+    });
+    await expect(page.getByTestId('study-item')).toHaveCount(2);
+    // はじめの 3 問は 1 回だけ正解（続けての正解は 1）、4 問目は前回まちがい
+    await seedStudyRecord(page, 1);
+    await page.reload();
+    await expect(page.getByTestId('book-summary-learned')).toHaveText('3 / 7');
+    await expect(page.getByTestId('book-summary-wrong')).toHaveText('1 問');
+    await expect(page.getByTestId('study-ring').nth(0)).toHaveAttribute('aria-label', '覚えた問題 3／6（50%）');
+    await page.goto('./#/reviews');
+    await expect(page.getByTestId('reviews-overview').first()).toContainText('前回まちがえた 1 問');
+    await page.goto('./#/study-review/s-line');
+    await expect(page.getByTestId('review-summary')).toContainText('問題 6（まだ 2・前回まちがい 1・覚えた 3）');
   });
 });
 
@@ -479,7 +503,7 @@ test.describe('段階12 の追加：駒と駒台（v0.34.0）', () => {
     expect((await kaku.boundingBox())!.height).toBeGreaterThanOrEqual(32);
     await kaku.click();
     await expect(kaku).toHaveAttribute('aria-pressed', 'true');
-    expect(await kaku.evaluate((e) => getComputedStyle(e).boxShadow)).toContain('rgb(226, 199, 125)');
+    expect(await kaku.evaluate((e) => getComputedStyle(e).boxShadow)).toContain('rgb(216, 194, 144)');
   });
 
   test('閲覧の盤（ツリー）の駒台は高さ 24px のまま。小さな盤（復習の結果）の駒台は 1 行で、札は ☗☖ だけ', async ({ page }) => {

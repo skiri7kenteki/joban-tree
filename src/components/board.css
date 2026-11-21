@@ -5,6 +5,12 @@
   margin: 0 auto;
 }
 
+/* 段階13-2：盤と上下の駒台をひとつの板として、まわりに金の細い線 1 本と控えめな影 */
+.board-wrap {
+  border-radius: 4px;
+  box-shadow: var(--shadow-board);
+}
+
 /* 段階12-2：盤は木目の画像（scripts/make-wood.py で作った約 6KB の 1 枚）を敷き、外に金の縁と影。
    縁と影は box-shadow なので場所を取らない（盤の大きさは変わらない） */
 .board {
@@ -15,8 +21,6 @@
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
   background: url('../assets/board/wood.webp') center / 100% 100% no-repeat;
-  border-radius: 3px;
-  box-shadow: var(--shadow-board);
 }
 
 .board-bg {
@@ -135,20 +139,28 @@
   font-size: var(--font-size-body);
   background: var(--stand-shade), url('../assets/board/wood.webp') center / 100% 600% no-repeat;
   background-color: var(--stand-base);
-  border: 1px solid var(--stand-line);
-  border-radius: 4px;
-  box-shadow: var(--shadow-stand);
   color: var(--stand-text);
 }
 
-/* 「☗ 先手」「☖ 後手」の小さな札 */
+/* 駒台は盤とひと続き：盤の側にだけ細い境の線、外側の角だけ丸める（段階13-2。前は金の縁と影の付いた別の板） */
+.hand:first-child {
+  border-bottom: 1px solid var(--stand-seam);
+  border-radius: 4px 4px 0 0;
+}
+
+.hand:last-child {
+  border-top: 1px solid var(--stand-seam);
+  border-radius: 0 0 4px 4px;
+}
+
+/* 「☗ 先手」「☖ 後手」：札の地はやめて文字だけ（段階13-2） */
 .hand-mark {
   flex: none;
   margin-right: var(--space-1);
-  padding: 0 6px;
+  padding: 0 4px;
   border: 0;
   border-radius: 3px;
-  background: var(--stand-tag);
+  background: transparent;
   color: var(--stand-text);
   font-family: var(--font-serif);
   font-weight: 600;

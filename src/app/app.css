@@ -53,10 +53,10 @@
   min-width: 0;
 }
 
-/* 見出しの行のボタン（復習・⋯）は、藍の上に生成りの細い枠と生成りの文字（段階13。金はやめた） */
+/* 見出しの行のボタン（復習・⋯）は、藍の上に生成りをごく薄く重ねた地と生成りの文字（段階13。段階13-2 で枠の線をやめた） */
 .screen-header > .btn:not(.btn-ghost):not(.btn-primary) {
-  background: transparent;
-  border-color: var(--ink-button-line);
+  background: var(--ink-button-bg);
+  border-color: transparent;
   color: var(--ink-text);
 }
 
@@ -2253,4 +2253,68 @@ div.move-bar-center {
 
 .book-row .book-count {
   grid-area: count;
+}
+
+/* ---- 段階13-2：細部の仕上げ（レイアウトは変えない） ---- */
+
+/* 盤の画面の見出し：‹（左端に寄せる）・見出し（残りの幅いっぱい）・ボタン（⋯ は 44px の正方形）。高さは 44px のまま */
+.app:not(.has-tabs) .screen-header {
+  gap: var(--space-1);
+}
+
+.app:not(.has-tabs) .screen-header > .btn-back {
+  width: var(--touch-min);
+  margin-left: calc(-1 * var(--space-2));
+  padding: 0;
+}
+
+.app:not(.has-tabs) .screen-header h1.tree-title {
+  flex: 1 1 auto;
+  padding-right: var(--space-1);
+}
+
+.app:not(.has-tabs) .screen-header > .tree-menu-btn {
+  width: var(--touch-min);
+  min-width: var(--touch-min);
+  padding: 0;
+}
+
+.app:not(.has-tabs) .screen-header > .btn:not(.btn-ghost):not(.tree-menu-btn) {
+  padding: 0 var(--space-3);
+}
+
+/* 「定跡帳」「ツリー」の小さな印は補足の色で、見出しの名前と少し離す */
+.app:not(.has-tabs) .screen-header .book-kicker {
+  color: var(--ink-muted);
+  margin-right: 0.6em;
+}
+
+/* 一覧の見出しの帯：見出しと件数・書き出しの高さをそろえる */
+.list-header {
+  align-items: center;
+}
+
+/* 盤の下のカード：左右の余白を少し広く（上下は変えない。盤の大きさを変えないため） */
+.tree-side .candidates {
+  padding-left: 14px;
+  padding-right: 14px;
+}
+
+/* 横に並ぶボタンは同じ幅（取り消す｜まとめて復習、もう一度｜正解を見る、もう n 問｜終わる） */
+.node-actions .btn,
+.review-prompt .btn-row > .btn,
+.review-result-actions > .btn {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 0 var(--space-3);
+}
+
+/* いちばん下までスクロールしたとき、最後のカードと操作バーの間を少しあける（盤の大きさには関係しない） */
+.move-bar-space {
+  height: calc(var(--movebar-h) + var(--space-3) + env(safe-area-inset-bottom));
+}
+
+/* 小さな盤（復習の結果）は影を小さく */
+.mini-board .board-wrap {
+  box-shadow: var(--shadow-board-mini);
 }

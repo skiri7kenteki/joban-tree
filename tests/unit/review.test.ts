@@ -84,8 +84,16 @@ describe('復習モード', () => {
     expect(summarize(tree, record)).toEqual({ total: 3, unseen: 3, wrong: 0, learned: 0 });
     record = recordAnswer(record, keyAfter('7g7f'), false, 1);
     record = recordAnswer(record, keyAfter('2g2f'), true, 1);
+    // 覚えた＝最後に答えたとき正解（v0.36.0〜）。1 回の正解で覚えたに数える
+    expect(summarize(tree, record)).toEqual({ total: 3, unseen: 1, wrong: 1, learned: 1 });
     record = recordAnswer(record, keyAfter('2g2f'), true, 2);
     expect(summarize(tree, record)).toEqual({ total: 3, unseen: 1, wrong: 1, learned: 1 });
+    // あとでまちがえたら前回まちがいへ、また正解すれば覚えたへ
+    record = recordAnswer(record, keyAfter('2g2f'), false, 3);
+    expect(summarize(tree, record)).toEqual({ total: 3, unseen: 1, wrong: 2, learned: 0 });
+    record = recordAnswer(record, keyAfter('2g2f'), true, 4);
+    record = recordAnswer(record, keyAfter('7g7f'), true, 5);
+    expect(summarize(tree, record)).toEqual({ total: 3, unseen: 1, wrong: 0, learned: 2 });
   });
 
   it('同じ局面に戻る手順（ループ）があっても止まる', () => {

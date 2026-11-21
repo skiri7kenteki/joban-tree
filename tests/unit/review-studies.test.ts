@@ -62,8 +62,14 @@ describe('研究手順の問題', () => {
     expect(studyQuestions(b, 0).map((q) => q.recordKey)).toEqual(qa.slice(0, 2).map((q) => q.recordKey));
     let record = recordAnswer(emptyRecord(STUDY_RECORD_ID), qa[0].recordKey, false, 1);
     record = recordAnswer(record, qa[1].recordKey, true, 2);
+    // 覚えた＝最後に答えたとき正解（v0.36.0〜）：1 回の正解で数える
+    expect(summarizeStudies([a, b], () => 0, record)).toEqual({ total: 3, unseen: 1, wrong: 1, learned: 1 });
     record = recordAnswer(record, qa[1].recordKey, true, 3);
     expect(summarizeStudies([a, b], () => 0, record)).toEqual({ total: 3, unseen: 1, wrong: 1, learned: 1 });
+    // すべて正解すれば 100%
+    record = recordAnswer(record, qa[0].recordKey, true, 4);
+    record = recordAnswer(record, qa[2].recordKey, true, 5);
+    expect(summarizeStudies([a, b], () => 0, record)).toEqual({ total: 3, unseen: 0, wrong: 0, learned: 3 });
   });
 
   it('同じ局面でも正解の手が違えば別の問題', () => {

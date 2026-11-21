@@ -54,9 +54,6 @@ export function replyKey(from: string, move: string): string {
   return `${from}>${move}`;
 }
 
-/** 「覚えた」とみなす連続正解の回数 */
-export const LEARNED_STREAK = 2;
-
 /** 1 つの問題の「出したさ」：まだ出していない 1、前回間違えた 2、正解が続くほど小さく */
 export function questionNeed(rec: NodeRecord | undefined): number {
   if (!rec) return 1;
@@ -145,7 +142,8 @@ export interface ReviewSummary {
   unseen: number;
   /** 前回間違えた */
   wrong: number;
-  /** 続けて正解している（LEARNED_STREAK 回以上） */
+  /** 覚えた＝最後に答えたとき 1 回目で正解（lastOk。持ち主の判断 2026-11-21。前は 2 回続けて正解）。
+   *  一度すべて正解すれば 100%、あとでまちがえた問題は「前回まちがい」に移る。total＝unseen＋wrong＋learned */
   learned: number;
 }
 
@@ -175,7 +173,7 @@ export function summarize(tree: TreeData, record: ReviewRecord, thresholds: Labe
       const rec = record.nodes[key];
       if (!rec) summary.unseen++;
       else if (!rec.lastOk) summary.wrong++;
-      else if (rec.streak >= LEARNED_STREAK) summary.learned++;
+      else summary.learned++;
     }
     if (questionOnly || expanded.has(key)) continue;
     expanded.add(key);

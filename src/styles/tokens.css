@@ -28,7 +28,7 @@
   --color-text: #1d2333;
   --color-text-muted: #595e6d;
   --color-border: #e2dbcc;
-  --color-accent: #7a5c1a;
+  --color-accent: #745d2a;
   --color-accent-text: #fffdf8;
   --color-danger: #b3311f;
   --color-ok: #1e6b37;
@@ -40,7 +40,9 @@
   --ink-muted: #b3bacb;
   --ink-line: rgba(243, 236, 220, 0.16);
   --ink-button-line: rgba(243, 236, 220, 0.3);
-  --ink-accent: #e2c77d;
+  --ink-accent: #d8c290;
+  /* 見出しの行のボタン（復習・⋯）の地：生成りをごく薄く重ねる（段階13-2。枠の線はやめた） */
+  --ink-button-bg: rgba(243, 236, 220, 0.08);
   --ink-danger: #f2a093;
   --ink-ok: #9bd6a9;
   --color-bg-deep: var(--ink-deep);
@@ -52,7 +54,7 @@
   --paper-text: #1d2333;
   --paper-muted: #595e6d;
   --paper-border: #e2dbcc;
-  --paper-accent: #7a5c1a;
+  --paper-accent: #745d2a;
   --paper-accent-text: #fffdf8;
   --paper-danger: #b3311f;
   --paper-ok: #1e6b37;
@@ -60,11 +62,12 @@
   /* 普通のボタンの縁（薄い灰） */
   --line-strong: #d4ccbb;
 
-  /* 金（明るい金は藍の上だけ。生成りの上の金の文字は --paper-accent）。塗りは平らな金 1 色（段階13） */
-  --gold: #c9a54c;
-  --gold-light: #e2c77d;
-  --gold-dark: #8f6f24;
-  --gold-line: rgba(201, 165, 76, 0.5);
+  /* 金（明るい金は藍の上だけ。生成りの上の金の文字は --paper-accent）。塗りは平らな金 1 色（段階13）。
+     段階13-2：少し落ち着いた色味に（黄みと鮮やかさを下げた。前は #c9a54c・#e2c77d・#8f6f24） */
+  --gold: #bfa063;
+  --gold-light: #d8c290;
+  --gold-dark: #84693a;
+  --gold-line: rgba(191, 160, 99, 0.5);
   --gold-fill: var(--gold);
   --gold-fill-text: #1c2740;
 
@@ -74,11 +77,12 @@
   --color-track: #e6dfd0;
   --color-track-ink: rgba(243, 236, 220, 0.18);
 
-  /* 和の模様（段階12-3）：青海波。段階13 から藍の部分だけに、ごく薄く（線の濃さ 0.05。円の塗りは藍と同じ色） */
-  --pattern-seigaiha: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='24' viewBox='0 0 48 24'%3E%3Cg stroke='%23e2c77d' stroke-opacity='0.05' fill='none'%3E%3Ccircle cx='0' cy='0' r='23' fill='%231c2740'/%3E%3Ccircle cx='0' cy='0' r='23'/%3E%3Ccircle cx='0' cy='0' r='17'/%3E%3Ccircle cx='0' cy='0' r='11'/%3E%3Ccircle cx='0' cy='0' r='5'/%3E%3Ccircle cx='48' cy='0' r='23' fill='%231c2740'/%3E%3Ccircle cx='48' cy='0' r='23'/%3E%3Ccircle cx='48' cy='0' r='17'/%3E%3Ccircle cx='48' cy='0' r='11'/%3E%3Ccircle cx='48' cy='0' r='5'/%3E%3Ccircle cx='24' cy='12' r='23' fill='%231c2740'/%3E%3Ccircle cx='24' cy='12' r='23'/%3E%3Ccircle cx='24' cy='12' r='17'/%3E%3Ccircle cx='24' cy='12' r='11'/%3E%3Ccircle cx='24' cy='12' r='5'/%3E%3Ccircle cx='0' cy='24' r='23' fill='%231c2740'/%3E%3Ccircle cx='0' cy='24' r='23'/%3E%3Ccircle cx='0' cy='24' r='17'/%3E%3Ccircle cx='0' cy='24' r='11'/%3E%3Ccircle cx='0' cy='24' r='5'/%3E%3Ccircle cx='48' cy='24' r='23' fill='%231c2740'/%3E%3Ccircle cx='48' cy='24' r='23'/%3E%3Ccircle cx='48' cy='24' r='17'/%3E%3Ccircle cx='48' cy='24' r='11'/%3E%3Ccircle cx='48' cy='24' r='5'/%3E%3C/g%3E%3C/svg%3E");
+  /* 和の模様（段階12-3）：青海波。段階13 から藍の部分だけに、ごく薄く（段階13-2 で線の濃さ 0.03。円の塗りは藍と同じ色） */
+  --pattern-seigaiha: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='48' height='24' viewBox='0 0 48 24'%3E%3Cg stroke='%23d8c290' stroke-opacity='0.03' fill='none'%3E%3Ccircle cx='0' cy='0' r='23' fill='%231c2740'/%3E%3Ccircle cx='0' cy='0' r='23'/%3E%3Ccircle cx='0' cy='0' r='17'/%3E%3Ccircle cx='0' cy='0' r='11'/%3E%3Ccircle cx='0' cy='0' r='5'/%3E%3Ccircle cx='48' cy='0' r='23' fill='%231c2740'/%3E%3Ccircle cx='48' cy='0' r='23'/%3E%3Ccircle cx='48' cy='0' r='17'/%3E%3Ccircle cx='48' cy='0' r='11'/%3E%3Ccircle cx='48' cy='0' r='5'/%3E%3Ccircle cx='24' cy='12' r='23' fill='%231c2740'/%3E%3Ccircle cx='24' cy='12' r='23'/%3E%3Ccircle cx='24' cy='12' r='17'/%3E%3Ccircle cx='24' cy='12' r='11'/%3E%3Ccircle cx='24' cy='12' r='5'/%3E%3Ccircle cx='0' cy='24' r='23' fill='%231c2740'/%3E%3Ccircle cx='0' cy='24' r='23'/%3E%3Ccircle cx='0' cy='24' r='17'/%3E%3Ccircle cx='0' cy='24' r='11'/%3E%3Ccircle cx='0' cy='24' r='5'/%3E%3Ccircle cx='48' cy='24' r='23' fill='%231c2740'/%3E%3Ccircle cx='48' cy='24' r='23'/%3E%3Ccircle cx='48' cy='24' r='17'/%3E%3Ccircle cx='48' cy='24' r='11'/%3E%3Ccircle cx='48' cy='24' r='5'/%3E%3C/g%3E%3C/svg%3E");
 
-  /* 模様を下へ消していくための形（mask。色ではなく濃さとして使う） */
-  --fade-down: linear-gradient(to bottom, #000 0%, transparent 100%);
+  /* 模様を下へ消していくための形（mask。色ではなく濃さとして使う）。
+     段階13-2：見出しの文字の後ろ（上の 64px）はさらに 3 割に抑え、その下で少し出して消す */
+  --fade-down: linear-gradient(to bottom, rgba(0, 0, 0, 0.3) 0, rgba(0, 0, 0, 0.3) 64px, #000 96px, transparent 100%);
 
   /* 影（段階13：ごく薄く。ボタンは影なし。窓・知らせだけ少し浮かせる） */
   --shadow-card: 0 1px 2px rgba(28, 39, 64, 0.06);
@@ -92,7 +96,9 @@
   --color-board-frame: #3d2a0e;
   --color-board-coord: #4a3414;
   /* 盤のまわりは金の細い線 1 本と柔らかい影（段階13。前は金 2px＋濃い茶の二重の縁） */
-  --shadow-board: 0 0 0 1px rgba(201, 165, 76, 0.55), 0 8px 20px rgba(5, 8, 20, 0.45);
+  /* 段階13-2：盤と駒台をひとつの板として囲む（.board-wrap）。影は控えめに */
+  --shadow-board: 0 0 0 1px rgba(191, 160, 99, 0.5), 0 6px 16px rgba(5, 8, 20, 0.35);
+  --shadow-board-mini: 0 0 0 1px rgba(191, 160, 99, 0.5), 0 2px 6px rgba(5, 8, 20, 0.25);
   --color-piece-top: #fbe9bf;
   --color-piece: #efce8e;
   --color-piece-bottom: #dcb06a;
@@ -100,25 +106,28 @@
   --color-piece-side: #a87a3e;
   --color-piece-side-edge: #6e4a1c;
   --color-piece-rim: rgba(255, 249, 230, 0.75);
-  --color-piece-shadow: rgba(36, 18, 0, 0.5);
-  --color-piece-shadow-far: rgba(36, 18, 0, 0.18);
+  --color-piece-shadow: rgba(36, 18, 0, 0.42);
+  --color-piece-shadow-far: rgba(36, 18, 0, 0.1);
   --color-piece-text: #120c06;
   --color-piece-promoted: #a8150e;
   /* 駒台（持ち駒の列） */
-  --stand-shade: linear-gradient(180deg, rgba(70, 40, 12, 0.72), rgba(48, 27, 8, 0.82));
+  /* 段階13-2：盤と同じ木目を少し濃くしただけの色（盤とひと続きに見せる。前は 0.72〜0.82 の濃い茶） */
+  --stand-shade: linear-gradient(180deg, rgba(66, 38, 12, 0.64), rgba(52, 30, 9, 0.7));
   --stand-base: #3b240c;
   --stand-tag: rgba(20, 28, 48, 0.8);
   --stand-line: rgba(201, 165, 76, 0.3);
   --stand-text: #f3ecdc;
-  --stand-muted: #d8c8a4;
-  --stand-selected: rgba(226, 199, 125, 0.5);
+  --stand-muted: #e6dcc4;
+  /* 駒台と盤の境の細い線 */
+  --stand-seam: rgba(40, 24, 8, 0.45);
+  --stand-selected: rgba(216, 194, 144, 0.5);
   --stand-count-shadow: 0 0 2px #1c1206, 0 0 2px #1c1206;
   --shadow-stand: 0 2px 6px rgba(5, 8, 20, 0.3);
   --color-last-move: rgba(176, 58, 28, 0.3);
   --color-last-move-from: rgba(176, 58, 28, 0.12);
   --color-selected: rgba(28, 39, 64, 0.42);
   /* 正解の演出の光（段階12-4） */
-  --color-flash: rgba(226, 199, 125, 0.4);
+  --color-flash: rgba(216, 194, 144, 0.4);
   --color-backdrop: rgba(5, 8, 20, 0.6);
 
   --color-eval-good: #1f5fae;
