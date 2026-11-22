@@ -480,8 +480,8 @@ src/isolation.ts            service worker の登録と cross-origin isolated �
 src/sw.ts                   service worker
 src/styles/                 CSS（tokens.css に色などの変数・明朝体の読み込み。base.css に「紙」＝生成りのカードの部品の並び）
 src/assets/fonts/           見出しの明朝体（段階12-1。scripts/make-font.py で作る）・駒の文字の字体（v0.34.0。scripts/make-koma-font.py で作る）
-src/assets/board/           盤の木目（段階12-2。scripts/make-wood.py で作る）
-docs/design/                見た目の見本（段階12 の C 案）
+src/assets/board/           盤の地・駒の面・駒台の地の素材（段階15。scripts/make-board-assets.py で docs/design/stage15-sheet.png から作る）
+docs/design/                見た目の見本（段階12 の C 案、段階15 の素材を当てた案と素材シート）
 public/manifest.webmanifest ホーム画面用の設定（アイコンは public/*.png。scripts/make-icons.mjs で icon.svg から作る）
 public/eval/                評価関数（nn.bin・progress.bin・ライセンス。リポジトリに含める）
 public/trees/               同梱ツリー（<id>.v<版>.json。開くときに取りに行く。段階6-3）

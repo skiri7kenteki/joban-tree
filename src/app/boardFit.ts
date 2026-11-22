@@ -35,6 +35,12 @@ export function measureFitFrame(board: HTMLElement, frame: HTMLElement | null, n
   if (!svg || !screen) return null;
   const svgRect = svg.getBoundingClientRect();
   if (svgRect.width === 0 || svgRect.height === 0) return null;
+  // 段階15：盤の外の縁（border）は盤の要素の内側に取るので、縁を除いた中身の縦横比で幅を決める
+  const st = getComputedStyle(svg);
+  const edgeX = parseFloat(st.borderLeftWidth) + parseFloat(st.borderRightWidth) || 0;
+  const edgeY = parseFloat(st.borderTopWidth) + parseFloat(st.borderBottomWidth) || 0;
+  const innerW = svgRect.width - edgeX;
+  const innerH = svgRect.height - edgeY;
   let extra: number;
   if (window.matchMedia(SIDE_BY_SIDE).matches) {
     // 盤の列の中身（盤と操作バー）の下端から画面の下端まで（列そのものは画面の高さまで伸びているので、最後の要素で測る）
@@ -46,8 +52,8 @@ export function measureFitFrame(board: HTMLElement, frame: HTMLElement | null, n
     extra = frame.clientHeight - need;
   }
   // 枠の中は下の余白をほとんど取らない（枠の下端が画面の下端。盤を今より小さくしないため。0.5px は小数点以下の端数の分）
-  const availH = svgRect.height + extra - (window.matchMedia(SIDE_BY_SIDE).matches ? BOTTOM_MARGIN : FRAME_MARGIN);
-  return Math.max(MIN_BOARD_W, Math.floor((availH * svgRect.width) / svgRect.height));
+  const availH = innerH + extra - (window.matchMedia(SIDE_BY_SIDE).matches ? BOTTOM_MARGIN : FRAME_MARGIN);
+  return Math.max(MIN_BOARD_W, Math.floor((availH * innerW) / innerH + edgeX));
 }
 
 /** 一覧の枠（frame）の中身の先頭から、el の下端までの高さ（枠がスクロールしていても同じ値） */

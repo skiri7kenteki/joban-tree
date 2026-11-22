@@ -92,28 +92,33 @@
 
   /* 盤と駒（段階12-2）。盤の地は木目の画像（board.css）なので塗らない */
   --color-board: transparent;
-  --color-board-line: rgba(58, 38, 10, 0.78);
-  --color-board-frame: #3d2a0e;
+  /* 段階15：盤の地は素材の画像 board-wood.webp。読めないときの色・盤の外の縁・罫線・星 */
+  --color-board-fallback: #c9aa87;
+  --color-board-edge: #8b6b4f;
+  --board-edge-w: 5px;
+  --color-board-line: rgba(58, 58, 58, 0.7);
+  --color-board-frame: rgba(58, 58, 58, 0.85);
+  --color-board-star: #3a3a3a;
   --color-board-coord: #4a3414;
   /* 盤のまわりは金の細い線 1 本と柔らかい影（段階13。前は金 2px＋濃い茶の二重の縁） */
   /* 段階13-2：盤と駒台をひとつの板として囲む（.board-wrap）。影は控えめに */
-  --shadow-board: 0 0 0 1px rgba(191, 160, 99, 0.5), 0 6px 16px rgba(5, 8, 20, 0.35);
-  --shadow-board-mini: 0 0 0 1px rgba(191, 160, 99, 0.5), 0 2px 6px rgba(5, 8, 20, 0.25);
-  /* 駒（v0.38.1）：面は縦の濃淡、ふちは 1 本（上は明るく・下は暗く）、下に柔らかい影 */
-  --color-piece-top: #f9f2dd;
-  --color-piece: #f3e7c5;
-  --color-piece-bottom: #eedcae;
-  --color-piece-edge: #9a7438;
-  --color-piece-edge-top: #c9a865;
-  --color-piece-edge-bottom: #7a5522;
-  --color-piece-side: #a87a3e;
-  --color-piece-drop: rgba(60, 40, 10, 0.35);
-  --color-piece-text: #120c06;
-  --color-piece-promoted: #a62b1a;
+  /* 段階15：盤（縁の外）の影。金の細い縁取りはやめた */
+  --shadow-board: 0 6px 14px rgba(0, 0, 0, 0.35);
+  --shadow-board-mini: 0 2px 5px rgba(0, 0, 0, 0.3);
+  /* 段階15：駒の面は素材の画像 piece-face.webp（読めないときは縦の濃淡）、ふち 1 本、側面、下に影 */
+  --color-piece-top: #f4e6d2;
+  --color-piece: #eddac0;
+  --color-piece-bottom: #e6ccad;
+  --color-piece-edge: #9e784d;
+  --color-piece-side: #a8804f;
+  --color-piece-drop-near: rgba(51, 33, 13, 0.24);
+  --color-piece-drop-far: rgba(51, 33, 13, 0.13);
+  --color-piece-text: #1f1f1f;
+  --color-piece-promoted: #c62828;
   /* 駒台（持ち駒の列） */
   /* 段階13-2：盤と同じ木目を少し濃くしただけの色（盤とひと続きに見せる。前は 0.72〜0.82 の濃い茶） */
-  --stand-shade: linear-gradient(180deg, rgba(66, 38, 12, 0.64), rgba(52, 30, 9, 0.7));
-  --stand-base: #3b240c;
+  /* 段階15：駒台の地は素材の画像 stand-wood.webp（暗い重ねは焼き込み済み）。読めないときの色 */
+  --stand-base: #4a3320;
   --stand-tag: rgba(20, 28, 48, 0.8);
   --stand-line: rgba(201, 165, 76, 0.3);
   --stand-text: #f3ecdc;

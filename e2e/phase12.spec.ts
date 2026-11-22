@@ -252,16 +252,22 @@ test.describe('12-2 盤と駒', () => {
     await expect(board).toBeVisible();
     const css = (sel: string, prop: string) => page.locator(sel).first().evaluate((e, p) => getComputedStyle(e).getPropertyValue(p), prop);
     expect(await css('svg.board', 'background-image')).toContain('wood');
-    // 盤と駒台をひとつの板として、まわりに金の細い線 1 本（段階13、段階13-2 で盤と駒台をまとめた）
-    expect(await css('.board-wrap', 'box-shadow')).toContain('rgba(191, 160, 99, 0.5) 0px 0px 0px 1px');
-    expect(await css('svg.board', 'box-shadow')).toBe('none');
+    // 段階15：盤は素材の木目に #8B6B4F の 5px の縁と影（金の細い縁取りはやめた）。駒台の地も素材の画像
+    expect(await css('svg.board', 'background-image')).toContain('board-wood');
+    expect(await css('svg.board', 'border-top-width')).toBe('5px');
+    expect(await css('svg.board', 'border-top-color')).toBe('rgb(139, 107, 79)');
+    expect(await css('svg.board', 'box-shadow')).toBe('rgba(0, 0, 0, 0.35) 0px 6px 14px 0px');
+    expect(await css('.board-wrap', 'box-shadow')).toBe('none');
     expect(await css('[data-testid="hand-black"]', 'box-shadow')).toBe('none');
+    expect(await css('[data-testid="hand-black"]', 'background-image')).toContain('stand-wood');
     expect(await css('.piece-text', 'font-family')).toContain('Joban Koma');
     expect(await css('.board-coord', 'font-family')).toContain('Joban Mincho');
-    // 駒は 40 枚。v0.38.1 から影は駒ごとの柔らかい影（SVG の feDropShadow を駒の g に付ける。面そのものには付けない）
+    // 駒は 40 枚。影は形を下へずらした 2 段（段階15。filter は使わない）
     await expect(page.locator('svg.board .piece-body')).toHaveCount(40);
-    await expect(page.locator('svg.board g.piece[filter="url(#piece-drop)"]')).toHaveCount(40);
+    await expect(page.locator('svg.board .piece-drop-near')).toHaveCount(40);
+    await expect(page.locator('svg.board [filter]')).toHaveCount(0);
     expect(await css('.piece-body', 'filter')).toBe('none');
+    expect(await css('g.piece', 'filter')).toBe('none');
     // 360×740 の新しいツリーの盤の幅は v0.29.0 で 352px。段階14 で 1 画面に収めるため「自分は」の行を見せる分だけ小さく（持ち主の了承 2026-11-22）
     expect(Math.round((await board.boundingBox())!.width)).toBeGreaterThanOrEqual(290);
 
@@ -476,22 +482,42 @@ test.describe('段階12 の追加：駒と駒台（v0.34.0）', () => {
     await expect(board).toBeVisible();
     // 駒の字体がアプリの中から読み込まれる（オフラインでも出る）
     expect(await page.evaluate(async () => (await document.fonts.load('28px "Joban Koma"', '歩龍')).length)).toBeGreaterThan(0);
-    // 盤の上の駒 34 枚それぞれに 側面・面（ふち 1 本）。内側の光るふち・形を描く影はやめた（v0.38.1、持ち主の依頼 2026-11-22）
-    for (const cls of ['piece-side', 'piece-body']) {
+    // 段階15：盤の上の駒 34 枚それぞれに 遠い影・近い影・側面・面（ふち 1 本）。filter は使わない
+    for (const cls of ['piece-drop-far', 'piece-drop-near', 'piece-side', 'piece-body']) {
       await expect(board.locator(`polygon.${cls}`)).toHaveCount(34);
     }
     for (const cls of ['piece-shadow-far', 'piece-shadow', 'piece-rim']) {
       await expect(board.locator(`.${cls}`)).toHaveCount(0);
     }
-    // 面は縦の濃淡 #f9f2dd → #eedcae、ふちは上が明るく下が暗い 1 本、駒全体の下に柔らかい影
+    await expect(board.locator('[filter]')).toHaveCount(0);
+    // 駒の面は素材の画像：pattern は盤に 1 つだけ（駒ごとに画像を増やさない）。読めないときの縦の濃淡 #F4E6D2 → #E6CCAD
+    await expect(board.locator('pattern#piece-face')).toHaveCount(1);
+    await expect(board.locator('image')).toHaveCount(1);
+    // 駒の面の画像は 1KB と小さいので、ビルドでプログラムの中に埋め込まれる（別のファイルを読まない）
+    expect(await board.locator('pattern#piece-face image').getAttribute('href')).toMatch(/^data:image\/webp;base64,|piece-face/);
+    expect(await board.locator('.piece-body').first().evaluate((e) => getComputedStyle(e).fill)).toContain('piece-face');
     const stop = (sel: string) => page.locator(sel).first().evaluate((e) => getComputedStyle(e).stopColor);
-    expect(await stop('.piece-grad-top')).toBe('rgb(249, 242, 221)');
-    expect(await stop('.piece-grad-bottom')).toBe('rgb(238, 220, 174)');
-    expect(await board.locator('.piece-body').first().evaluate((e) => getComputedStyle(e).stroke)).toContain('piece-edge');
-    await expect(board.locator('g.piece[filter="url(#piece-drop)"]')).toHaveCount(34);
-    // 成った駒（龍）は赤い字（#a62b1a）
+    expect(await stop('.piece-grad-top')).toBe('rgb(244, 230, 210)');
+    expect(await stop('.piece-grad-bottom')).toBe('rgb(230, 204, 173)');
+    // ふち #9E784D・0.6、字 #1F1F1F・23px
+    const body = board.locator('.piece-body').first();
+    expect(await body.evaluate((e) => getComputedStyle(e).stroke)).toBe('rgb(158, 120, 77)');
+    expect(await body.evaluate((e) => getComputedStyle(e).strokeWidth)).toBe('0.6px');
+    expect(await board.locator('.piece-text').first().evaluate((e) => getComputedStyle(e).fill)).toBe('rgb(31, 31, 31)');
+    expect(await board.locator('.piece-text').first().evaluate((e) => getComputedStyle(e).fontSize)).toBe('23px');
+    // 成った駒（龍）は赤い字（#C62828）
     await expect(board.locator('.piece-text.promoted')).toHaveCount(2);
-    expect(await board.locator('.piece-text.promoted').first().evaluate((e) => getComputedStyle(e).fill)).toBe('rgb(166, 43, 26)');
+    expect(await board.locator('.piece-text.promoted').first().evaluate((e) => getComputedStyle(e).fill)).toBe('rgb(198, 40, 40)');
+    // 盤の地・駒台の地の画像はオフライン用の保存に入っている（service worker の事前キャッシュ。駒の面はプログラムの中）
+    const cached = await page.evaluate(async () => {
+      const names = await caches.keys();
+      const urls: string[] = [];
+      for (const n of names) for (const r of await (await caches.open(n)).keys()) urls.push(r.url);
+      return urls;
+    });
+    for (const f of ['board-wood', 'stand-wood']) {
+      expect(cached.some((u) => u.includes(f) && u.endsWith('.webp')), f).toBe(true);
+    }
 
     // 先手の駒台：「☗ 先手」の札・角・歩（2 枚なので数字 2）。行の高さは前と同じ 32px
     const black = page.getByTestId('hand-black');

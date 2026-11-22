@@ -5,22 +5,23 @@
   margin: 0 auto;
 }
 
-/* 段階13-2：盤と上下の駒台をひとつの板として、まわりに金の細い線 1 本と控えめな影 */
-.board-wrap {
-  border-radius: 4px;
-  box-shadow: var(--shadow-board);
-}
-
-/* 段階12-2：盤は木目の画像（scripts/make-wood.py で作った約 6KB の 1 枚）を敷き、外に金の縁と影。
-   縁と影は box-shadow なので場所を取らない（盤の大きさは変わらない） */
+/* 段階15：盤は素材の木目（board-wood.webp）を 1 枚引き伸ばし、外に 5px の縁（盤の要素の内側に取るので、盤の要素の大きさは変わらない）と影。
+   影は下の駒台に落ちるので、盤を駒台より手前に置く */
 .board {
   display: block;
+  position: relative;
+  z-index: 1;
+  box-sizing: border-box;
   width: 100%;
   height: auto;
+  border: var(--board-edge-w) solid var(--color-board-edge);
+  border-radius: 2px;
+  box-shadow: var(--shadow-board);
   user-select: none;
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
-  background: url('../assets/board/wood.webp') center / 100% 100% no-repeat;
+  background: url('../assets/board/board-wood.webp') center / 100% 100% no-repeat;
+  background-color: var(--color-board-fallback);
 }
 
 .board-bg {
@@ -59,7 +60,7 @@
 }
 
 .board-star {
-  fill: var(--color-board-line);
+  fill: var(--color-board-star);
 }
 
 /* 筋・段の数字：木目の上に焦げ茶の明朝体 */
@@ -75,12 +76,12 @@
   cursor: pointer;
 }
 
-/* 駒（v0.38.1）：面は縦の濃淡（Board.tsx の linearGradient。無ければ単色）。ふちは 1 本だけで、上は明るく・下は暗く。
-   下に側面（厚み。線は引かない）。駒全体の下に柔らかい影（SVG の feDropShadow。後手の駒は駒と一緒に回る） */
+/* 駒（段階15）：面は素材の画像（Board.tsx の pattern。読めないときは縦の濃淡、それも無ければ単色）。ふちは 1 本。
+   下に側面（厚み。線は引かない）。影は形を下へずらした 2 段（filter は使わない。後手の駒は駒と一緒に回る） */
 .piece-body {
-  fill: url(#piece-grad) var(--color-piece);
-  stroke: url(#piece-edge) var(--color-piece-edge);
-  stroke-width: 1;
+  fill: url(#piece-face) var(--color-piece);
+  stroke: var(--color-piece-edge);
+  stroke-width: 0.6;
 }
 
 .piece-grad-top {
@@ -91,28 +92,24 @@
   stop-color: var(--color-piece-bottom);
 }
 
-.piece-edge-top {
-  stop-color: var(--color-piece-edge-top);
-}
-
-.piece-edge-bottom {
-  stop-color: var(--color-piece-edge-bottom);
-}
-
 .piece-side {
   fill: var(--color-piece-side);
 }
 
-.piece-drop {
-  flood-color: var(--color-piece-drop);
+.piece-drop-near {
+  fill: var(--color-piece-drop-near);
 }
 
-/* 駒の文字は駒専用の太い字体（駒の 15 字ほどだけに削ったもの）。駒の高さの約 75%（v0.38.2。v0.38.1 の 80% から少し小さく）、横を少し縮めて面の重心に置く */
+.piece-drop-far {
+  fill: var(--color-piece-drop-far);
+}
+
+/* 駒の文字は駒専用の太い字体（駒の 15 字ほどだけに削ったもの）。段階15：駒の高さの約 60%（23px）、字の中心は駒の上から 54%（Board.tsx の TEXT_DY）。横を少し縮める */
 .piece-text {
   fill: var(--color-piece-text);
   font-family: var(--font-piece);
   font-weight: 400;
-  font-size: 29px;
+  font-size: 23px;
   text-anchor: middle;
 }
 
@@ -120,7 +117,7 @@
   fill: var(--color-piece-promoted);
 }
 
-/* 持ち駒＝駒台：濃い木の色（盤の木目を暗く重ねる）に金の細い縁。盤と同じ形の駒を小さく並べる */
+/* 持ち駒＝駒台：段階15 から素材の画像（stand-wood.webp。暗い重ねは焼き込み済み）を 1 枚引き伸ばす。盤と同じ形の駒を小さく並べる */
 .hand {
   display: flex;
   flex-wrap: wrap;
@@ -129,7 +126,7 @@
   min-height: 36px;
   padding: var(--space-1) var(--space-1);
   font-size: var(--font-size-body);
-  background: var(--stand-shade), url('../assets/board/wood.webp') center / 100% 600% no-repeat;
+  background: url('../assets/board/stand-wood.webp') center / 100% 100% no-repeat;
   background-color: var(--stand-base);
   color: var(--stand-text);
 }

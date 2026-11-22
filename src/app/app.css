@@ -2314,9 +2314,14 @@ div.move-bar-center {
   height: calc(var(--movebar-h) + var(--space-3) + env(safe-area-inset-bottom));
 }
 
-/* 小さな盤（復習の結果）は影を小さく */
-.mini-board .board-wrap {
+/* 小さな盤（復習の結果）は縁と影を小さく。駒の字は v0.38.2 の大きさのまま（段階15 の 23px だと小さな盤ではつぶれるため。持ち主の了承 2026-11-22） */
+.mini-board .board {
+  --board-edge-w: 2px;
   box-shadow: var(--shadow-board-mini);
+}
+
+.mini-board .piece-text {
+  font-size: 29px;
 }
 
 /* ---- 段階14：盤の画面を 1 画面に収める（ページ全体はスクロールしない）----
