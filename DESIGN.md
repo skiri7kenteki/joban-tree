@@ -73,7 +73,7 @@
 | `--color-backdrop` | 窓の後ろを暗くする | `rgba(5, 8, 20, 0.6)` |
 | `--color-board` | 盤（段階12-2 で木目にする） | `#e8c98a` |
 | `--color-board-line` | 盤の罫線・星 | `#5a4320` |
-| `--color-board-fallback` / `--color-board-edge` / `--board-edge-w` | 盤の地の画像が読めないときの色・盤の外の縁（段階15） | `#c9aa87` / `#8b6b4f` / 5px（小さな盤 2px） |
+| `--color-board-fallback` / `--color-board-edge` / `--board-edge-w` | 盤の地の画像が読めないときの色（画像の平均。v0.39.1）・盤の外の縁（段階15） | `#e2caa6` / `#8b6b4f` / 5px（小さな盤 2px） |
 | `--color-board-frame` / `--color-board-star` | 9×9 の外枠・星（段階15。罫線は `--color-board-line` `rgba(58, 58, 58, 0.7)`） | `rgba(58, 58, 58, 0.85)` / `#3a3a3a` |
 | `--color-piece-top` / `--color-piece-bottom` | 駒の面の画像が読めないときの縦の濃淡（段階15） | `#f4e6d2` → `#e6ccad` |
 | `--color-piece` | 駒の面（濃淡も描けないときの単色） | `#eddac0` |
@@ -120,7 +120,9 @@
   下の段階12〜v0.38.2 の盤の地・縁・駒の面・影・字の大きさと位置・成駒の赤・駒台の地は、ここに書いたものに変わった
   - 素材は 3 枚（`src/assets/board/`。`scripts/make-board-assets.py` で素材シート `docs/design/stage15-sheet.png` から作る。色の重ねは画像に焼き込み済みなので、上に色を重ねない）：
     盤の地 `board-wood.webp`（盤全体に 1 枚を引き伸ばす）、駒の面 `piece-face.webp`（駒 1 枚に 1 枚を引き伸ばす。SVG の pattern を盤に 1 つだけ定義して全部の駒と駒台の駒で使う）、
-    駒台の地 `stand-wood.webp`（駒台 1 つに 1 枚を引き伸ばす）。合わせて約 27KB。盤と駒台の地は事前キャッシュに入り、駒の面（1KB）はビルドでプログラムの中に埋め込まれるので、どれもオフラインで出る
+    駒台の地 `stand-wood.webp`（駒台 1 つに 1 枚を引き伸ばす）。
+    **v0.39.1：盤の地は「明るい柾目」に差し替えた**（持ち主の判断 2026-11-22。Figma の案の木目は斜めの筋が目立つため。`scripts/make-board-options.py` がプログラムで描く 6 案のうち C_shinkaya、平均 `#e2caa6`、約 33KB。
+    `make-board-assets.py` の盤の地は `board-wood-figma.webp` として出すだけでアプリでは使わない）。合わせて約 27KB。盤と駒台の地は事前キャッシュに入り、駒の面（1KB）はビルドでプログラムの中に埋め込まれるので、どれもオフラインで出る
   - 盤：外に `#8b6b4f` の 5px の縁（盤の要素の内側に取る＝盤の要素の大きさは前と同じで、マス目が縁の分だけ小さくなる。`boardFit.ts` は縁を除いて測る）、角の丸み 2px、
     影 `0 6px 14px rgba(0, 0, 0, 0.35)`（盤を駒台より手前に置き、影が下の駒台に落ちる）。金の細い縁取りはやめた。罫線 `#3a3a3a` の 70%、外枠は少し太く、星は直径 4px の `#3a3a3a`
   - 駒：形・大きさ・側面の描き方は v0.38.1 のまま。ふち `#9e784d`・0.6、側面 `#a8804f`。影は形を下へ 2（濃さ 24%）と 3.4（13%）ずらした 2 段（filter は使わない。v0.38.1 の feDropShadow はやめた）

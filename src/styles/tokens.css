@@ -92,8 +92,8 @@
 
   /* 盤と駒（段階12-2）。盤の地は木目の画像（board.css）なので塗らない */
   --color-board: transparent;
-  /* 段階15：盤の地は素材の画像 board-wood.webp。読めないときの色・盤の外の縁・罫線・星 */
-  --color-board-fallback: #c9aa87;
+  /* 段階15：盤の地は素材の画像 board-wood.webp（v0.39.1 から明るい柾目）。読めないときの色（画像の平均）・盤の外の縁・罫線・星 */
+  --color-board-fallback: #e2caa6;
   --color-board-edge: #8b6b4f;
   --board-edge-w: 5px;
   --color-board-line: rgba(58, 58, 58, 0.7);

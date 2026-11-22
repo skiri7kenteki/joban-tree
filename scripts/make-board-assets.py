@@ -1,4 +1,6 @@
 # 使い方: リポジトリのいちばん上で python3 scripts/make-board-assets.py （numpy と Pillow が必要。出力は今いるフォルダ）
+# v0.39.1〜：盤の地（board-wood.webp）は scripts/make-board-options.py の「明るい柾目」（C_shinkaya）に差し替えた（持ち主の判断 2026-11-22）。
+#   ここで作る Figma の案の盤の地は board-wood-figma.webp として出す（アプリでは使わない）。駒の面・駒台の地は今もここで作る
 # Figma の案（node 15:125）と同じ切り抜き・同じ重ね方で、盤・駒の面・駒台の素材を作る
 import glob, numpy as np
 from PIL import Image
@@ -11,7 +13,7 @@ A = lambda im: np.asarray(im, float)
 board = crop(0.318, 0.402, 0.414, 0.523, (1122, 1194))
 base = np.array([0xdb, 0xc3, 0xa5], float)
 out = base * 0.6 + A(board) * 0.4
-Image.fromarray(out.clip(0,255).astype(np.uint8)).save('board-wood.webp', quality=90)
+Image.fromarray(out.clip(0,255).astype(np.uint8)).save('board-wood-figma.webp', quality=90)
 # 駒の面：シートの木目の見本の切り抜きに、上 rgba(255,250,240,.55) → 下 rgba(255,245,224,.25) を重ねる（駒 34×38 の 4 倍）
 face = A(crop(0.026, 0.848, 0.078, 0.93, (136, 152)))
 t = np.linspace(0, 1, 152)[:, None, None]
@@ -24,5 +26,5 @@ stand = A(crop(0.318, 0.115, 0.414, 0.2, (1122, 90)))
 out = stand * 0.65 + np.array([51, 31, 13]) * 0.35
 Image.fromarray(out.clip(0,255).astype(np.uint8)).save('stand-wood.webp', quality=90)
 import os
-for f in ['board-wood.webp','piece-face.webp','stand-wood.webp']:
+for f in ['board-wood-figma.webp','piece-face.webp','stand-wood.webp']:
     im = Image.open(f); print(f, im.size, os.path.getsize(f)//1024, 'KB', '平均 #%02x%02x%02x' % tuple(np.asarray(im).reshape(-1,3).mean(0).astype(int)))
