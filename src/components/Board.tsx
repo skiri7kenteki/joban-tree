@@ -29,25 +29,25 @@ const VIEW_H = MARGIN_TOP + BOARD_H + 4;
 
 const RANK_KANJI = ['一', '二', '三', '四', '五', '六', '七', '八', '九'];
 
-/** 駒の面の濃淡の定義の id（盤が画面に複数あっても中身は同じなので、どれを指してもよい） */
+/** 駒の面の濃淡・ふち・影の定義の id（盤が画面に複数あっても中身は同じなので、どれを指してもよい） */
 const PIECE_GRADIENT = 'piece-grad';
-/** 駒の形（上がとがった五角形。中心からのずれ、SVG の単位） */
+const PIECE_EDGE = 'piece-edge';
+const PIECE_DROP = 'piece-drop';
+/** 駒の形（上がとがった五角形。中心からのずれ、SVG の単位）。
+ *  v0.38.1：頂点を少しとがらせ（頂点の角 138°→121°）、肩の角をなだらかに（116°→126°）。持ち主の依頼 2026-11-22 */
 const PIECE_POINTS = [
-  [0, -19],
-  [13, -14],
+  [0, -19.5],
+  [12.5, -12.5],
   [16, 19],
   [-16, 19],
-  [-13, -14],
+  [-12.5, -12.5],
 ];
-/** 駒の側面（厚み）：同じ形を下へずらして濃い木の色で描く */
+/** 駒の側面（厚み）：同じ形を下へずらして濃い木の色で描く（線は引かない。ふちは面の 1 本だけ） */
 const SIDE_DY = 2.4;
-/** 影は 2 段：近くに濃い影、少し遠くに薄い影（filter は使わない） */
-const SHADOW_NEAR = { dx: 0.7, dy: 3.4 };
-const SHADOW_FAR = { dx: 1.8, dy: 5.2 };
-/** 面のふちの少し内側の明るい線（光の当たったふち）の大きさ */
-const RIM_SCALE = 0.84;
 /** 駒の文字の横の縮め（面いっぱいに見せる） */
 const TEXT_SCALE_X = 0.92;
+/** 駒の文字の中心：面（五角形）の重心の高さ（中心から下へ） */
+const TEXT_DY = 2.2;
 
 /** 持ち駒を並べる順 */
 const HAND_ORDER: PieceType[] = [
@@ -162,12 +162,18 @@ export function Board({ sfen, lastMove, selection, onSquare, onHand, flash }: Bo
       <HandRow position={position} side="white" selection={turn === 'white' ? (selection ?? null) : null} onHand={onHand} compact={compact} />
       <svg class="board" viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} role="img" aria-label="将棋盤" data-testid="board" data-sfen={sfen}>
         <defs>
-          {/* 駒の面の濃淡（色は board.css の stop-color） */}
-          <linearGradient id={PIECE_GRADIENT} x1="0.2" y1="0" x2="0.8" y2="1">
+          {/* 駒の面の縦の濃淡、ふち（上は明るく・下は暗く）、下への柔らかい影（色は board.css） */}
+          <linearGradient id={PIECE_GRADIENT} x1="0" y1="0" x2="0" y2="1">
             <stop offset="0" class="piece-grad-top" />
-            <stop offset="0.55" class="piece-grad-mid" />
             <stop offset="1" class="piece-grad-bottom" />
           </linearGradient>
+          <linearGradient id={PIECE_EDGE} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" class="piece-edge-top" />
+            <stop offset="1" class="piece-edge-bottom" />
+          </linearGradient>
+          <filter id={PIECE_DROP} x="-20%" y="-20%" width="140%" height="150%">
+            <feDropShadow dx="0" dy="2" stdDeviation="1" class="piece-drop" />
+          </filter>
         </defs>
         <rect x={MARGIN_LEFT} y={MARGIN_TOP} width={BOARD_W} height={BOARD_H} class="board-bg" />
         {squares}
@@ -197,23 +203,19 @@ function piecePoints(cx: number, cy: number, s = 1) {
   return PIECE_POINTS.map(([x, y]) => `${cx + x * s},${cy + y * s}`).join(' ');
 }
 
-/** 五角形の駒。下から 遠い影・近い影・側面（厚み）・面・光のふち・文字 */
+/** 五角形の駒。下から 側面（厚み）・面（ふち 1 本）・文字。全体の下に柔らかい影（v0.38.1） */
 function PieceShape({ cx, cy, type, upsideDown }: { cx: number; cy: number; type: PieceType; upsideDown: boolean }) {
   // 側面の分だけ少し上に描いて、マスの真ん中に見せる
   const y = cy - 1;
   const points = piecePoints(cx, y);
   // 後手の駒は、影・側面も含めて駒全体をマスの真ん中で 180 度回す（v0.36.1。影と側面は駒の向きの手前側＝画面の上に出る）
   const rotate = upsideDown ? `rotate(180 ${cx} ${cy})` : undefined;
-  const shift = (dx: number, dy: number) => `translate(${dx} ${dy})`;
   return (
-    <g class="piece" transform={rotate}>
-      <polygon points={points} class="piece-shadow-far" transform={shift(SHADOW_FAR.dx, SHADOW_FAR.dy)} />
-      <polygon points={points} class="piece-shadow" transform={shift(SHADOW_NEAR.dx, SHADOW_NEAR.dy)} />
-      <polygon points={points} class="piece-side" transform={shift(0, SIDE_DY)} />
+    <g class="piece" transform={rotate} filter={`url(#${PIECE_DROP})`}>
+      <polygon points={points} class="piece-side" transform={`translate(0 ${SIDE_DY})`} />
       <polygon points={points} class="piece-body" />
-      <polygon points={piecePoints(cx, y + 1.2, RIM_SCALE)} class="piece-rim" />
       <text
-        transform={`translate(${cx} ${y + 2.5}) scale(${TEXT_SCALE_X} 1)`}
+        transform={`translate(${cx} ${y + TEXT_DY}) scale(${TEXT_SCALE_X} 1)`}
         class={PROMOTED.has(type) ? 'piece-text promoted' : 'piece-text'}
         dominant-baseline="central"
       >
@@ -223,17 +225,17 @@ function PieceShape({ cx, cy, type, upsideDown }: { cx: number; cy: number; type
   );
 }
 
-/** 駒台の駒（盤と同じ形を小さく。影は近い 1 段だけ） */
+/** 駒台の駒（盤と同じ形・同じ影を小さく。濃淡・ふち・影の定義は同じ画面の盤のものを使う） */
 function HandPiece({ type }: { type: PieceType }) {
   return (
     <svg class="hand-piece" viewBox="-17.5 -20.5 36 43">
-      <polygon points={piecePoints(0, 0)} class="piece-shadow" transform={`translate(${SHADOW_NEAR.dx} ${SHADOW_NEAR.dy})`} />
-      <polygon points={piecePoints(0, 0)} class="piece-side" transform={`translate(0 ${SIDE_DY})`} />
-      <polygon points={piecePoints(0, 0)} class="piece-body" />
-      <polygon points={piecePoints(0, 1.2, RIM_SCALE)} class="piece-rim" />
-      <text transform={`translate(0 2.5) scale(${TEXT_SCALE_X} 1)`} class="piece-text" dominant-baseline="central">
-        {pieceTypeToStringForBoard(type)}
-      </text>
+      <g class="piece" filter={`url(#${PIECE_DROP})`}>
+        <polygon points={piecePoints(0, 0)} class="piece-side" transform={`translate(0 ${SIDE_DY})`} />
+        <polygon points={piecePoints(0, 0)} class="piece-body" />
+        <text transform={`translate(0 ${TEXT_DY}) scale(${TEXT_SCALE_X} 1)`} class="piece-text" dominant-baseline="central">
+          {pieceTypeToStringForBoard(type)}
+        </text>
+      </g>
     </svg>
   );
 }

@@ -75,52 +75,44 @@
   cursor: pointer;
 }
 
-/* 駒：面は斜めの濃淡（Board.tsx の linearGradient。無ければ単色）、縁は濃い黄土。
-   下に側面（厚み）、影は 2 段（近く濃く・遠く薄く）、面のふちの内側に明るい線 */
+/* 駒（v0.38.1）：面は縦の濃淡（Board.tsx の linearGradient。無ければ単色）。ふちは 1 本だけで、上は明るく・下は暗く。
+   下に側面（厚み。線は引かない）。駒全体の下に柔らかい影（SVG の feDropShadow。後手の駒は駒と一緒に回る） */
 .piece-body {
   fill: url(#piece-grad) var(--color-piece);
-  stroke: var(--color-piece-edge);
-  stroke-width: 0.9;
+  stroke: url(#piece-edge) var(--color-piece-edge);
+  stroke-width: 1;
 }
 
 .piece-grad-top {
   stop-color: var(--color-piece-top);
 }
 
-.piece-grad-mid {
-  stop-color: var(--color-piece);
-}
-
 .piece-grad-bottom {
   stop-color: var(--color-piece-bottom);
 }
 
+.piece-edge-top {
+  stop-color: var(--color-piece-edge-top);
+}
+
+.piece-edge-bottom {
+  stop-color: var(--color-piece-edge-bottom);
+}
+
 .piece-side {
   fill: var(--color-piece-side);
-  stroke: var(--color-piece-side-edge);
-  stroke-width: 0.8;
 }
 
-.piece-shadow {
-  fill: var(--color-piece-shadow);
+.piece-drop {
+  flood-color: var(--color-piece-drop);
 }
 
-.piece-shadow-far {
-  fill: var(--color-piece-shadow-far);
-}
-
-.piece-rim {
-  fill: none;
-  stroke: var(--color-piece-rim);
-  stroke-width: 0.9;
-}
-
-/* 駒の文字は駒専用の太い字体（駒の 15 字ほどだけに削ったもの）。横を少し縮めて面いっぱいに */
+/* 駒の文字は駒専用の太い字体（駒の 15 字ほどだけに削ったもの）。駒の高さの約 80%、横を少し縮めて面の重心に置く */
 .piece-text {
   fill: var(--color-piece-text);
   font-family: var(--font-piece);
   font-weight: 400;
-  font-size: 28.5px;
+  font-size: 30.5px;
   text-anchor: middle;
 }
 

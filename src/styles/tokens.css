@@ -99,17 +99,17 @@
   /* 段階13-2：盤と駒台をひとつの板として囲む（.board-wrap）。影は控えめに */
   --shadow-board: 0 0 0 1px rgba(191, 160, 99, 0.5), 0 6px 16px rgba(5, 8, 20, 0.35);
   --shadow-board-mini: 0 0 0 1px rgba(191, 160, 99, 0.5), 0 2px 6px rgba(5, 8, 20, 0.25);
-  --color-piece-top: #fbe9bf;
-  --color-piece: #efce8e;
-  --color-piece-bottom: #dcb06a;
-  --color-piece-edge: #8a6326;
+  /* 駒（v0.38.1）：面は縦の濃淡、ふちは 1 本（上は明るく・下は暗く）、下に柔らかい影 */
+  --color-piece-top: #f9f2dd;
+  --color-piece: #f3e7c5;
+  --color-piece-bottom: #eedcae;
+  --color-piece-edge: #9a7438;
+  --color-piece-edge-top: #c9a865;
+  --color-piece-edge-bottom: #7a5522;
   --color-piece-side: #a87a3e;
-  --color-piece-side-edge: #6e4a1c;
-  --color-piece-rim: rgba(255, 249, 230, 0.75);
-  --color-piece-shadow: rgba(36, 18, 0, 0.42);
-  --color-piece-shadow-far: rgba(36, 18, 0, 0.1);
+  --color-piece-drop: rgba(60, 40, 10, 0.35);
   --color-piece-text: #120c06;
-  --color-piece-promoted: #a8150e;
+  --color-piece-promoted: #a62b1a;
   /* 駒台（持ち駒の列） */
   /* 段階13-2：盤と同じ木目を少し濃くしただけの色（盤とひと続きに見せる。前は 0.72〜0.82 の濃い茶） */
   --stand-shade: linear-gradient(180deg, rgba(66, 38, 12, 0.64), rgba(52, 30, 9, 0.7));

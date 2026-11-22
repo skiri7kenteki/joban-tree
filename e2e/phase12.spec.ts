@@ -258,9 +258,9 @@ test.describe('12-2 盤と駒', () => {
     expect(await css('[data-testid="hand-black"]', 'box-shadow')).toBe('none');
     expect(await css('.piece-text', 'font-family')).toContain('Joban Koma');
     expect(await css('.board-coord', 'font-family')).toContain('Joban Mincho');
-    // 影は駒と同じ数（初期配置は 40 枚）。CSS の filter は使わない
+    // 駒は 40 枚。v0.38.1 から影は駒ごとの柔らかい影（SVG の feDropShadow を駒の g に付ける。面そのものには付けない）
     await expect(page.locator('svg.board .piece-body')).toHaveCount(40);
-    await expect(page.locator('svg.board .piece-shadow')).toHaveCount(40);
+    await expect(page.locator('svg.board g.piece[filter="url(#piece-drop)"]')).toHaveCount(40);
     expect(await css('.piece-body', 'filter')).toBe('none');
     // 360×740 の新しいツリーの盤の幅は v0.29.0 で 352px。段階14 で 1 画面に収めるため「自分は」の行を見せる分だけ小さく（持ち主の了承 2026-11-22）
     expect(Math.round((await board.boundingBox())!.width)).toBeGreaterThanOrEqual(290);
@@ -476,13 +476,22 @@ test.describe('段階12 の追加：駒と駒台（v0.34.0）', () => {
     await expect(board).toBeVisible();
     // 駒の字体がアプリの中から読み込まれる（オフラインでも出る）
     expect(await page.evaluate(async () => (await document.fonts.load('28px "Joban Koma"', '歩龍')).length)).toBeGreaterThan(0);
-    // 盤の上の駒 34 枚それぞれに 遠い影・近い影・側面・面・光のふち。filter は使わない
-    for (const cls of ['piece-shadow-far', 'piece-shadow', 'piece-side', 'piece-body', 'piece-rim']) {
+    // 盤の上の駒 34 枚それぞれに 側面・面（ふち 1 本）。内側の光るふち・形を描く影はやめた（v0.38.1、持ち主の依頼 2026-11-22）
+    for (const cls of ['piece-side', 'piece-body']) {
       await expect(board.locator(`polygon.${cls}`)).toHaveCount(34);
     }
-    expect(await board.locator('.piece-side').first().evaluate((e) => getComputedStyle(e).filter)).toBe('none');
-    // 成った駒（龍）は赤い字
+    for (const cls of ['piece-shadow-far', 'piece-shadow', 'piece-rim']) {
+      await expect(board.locator(`.${cls}`)).toHaveCount(0);
+    }
+    // 面は縦の濃淡 #f9f2dd → #eedcae、ふちは上が明るく下が暗い 1 本、駒全体の下に柔らかい影
+    const stop = (sel: string) => page.locator(sel).first().evaluate((e) => getComputedStyle(e).stopColor);
+    expect(await stop('.piece-grad-top')).toBe('rgb(249, 242, 221)');
+    expect(await stop('.piece-grad-bottom')).toBe('rgb(238, 220, 174)');
+    expect(await board.locator('.piece-body').first().evaluate((e) => getComputedStyle(e).stroke)).toContain('piece-edge');
+    await expect(board.locator('g.piece[filter="url(#piece-drop)"]')).toHaveCount(34);
+    // 成った駒（龍）は赤い字（#a62b1a）
     await expect(board.locator('.piece-text.promoted')).toHaveCount(2);
+    expect(await board.locator('.piece-text.promoted').first().evaluate((e) => getComputedStyle(e).fill)).toBe('rgb(166, 43, 26)');
 
     // 先手の駒台：「☗ 先手」の札・角・歩（2 枚なので数字 2）。行の高さは前と同じ 32px
     const black = page.getByTestId('hand-black');
