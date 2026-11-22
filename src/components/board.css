@@ -5,18 +5,21 @@
   margin: 0 auto;
 }
 
-/* 段階15：盤は素材の木目（board-wood.webp）を 1 枚引き伸ばし、外に 5px の縁（盤の要素の内側に取るので、盤の要素の大きさは変わらない）と影。
-   影は下の駒台に落ちるので、盤を駒台より手前に置く */
+/* 段階16：盤と上下の駒台をひとつの道具として、まわりの影で浮かせる（地に色を敷かない） */
+.board-wrap {
+  border-radius: 6px;
+  box-shadow: var(--shadow-board);
+}
+
+/* 段階15：盤は素材の木目（board-wood.webp）を 1 枚引き伸ばし、外に 5px の縁（盤の要素の内側に取るので、盤の要素の大きさは変わらない）。
+   段階16：影は盤と駒台をまとめた .board-wrap に。盤の縁が駒台との境目になる */
 .board {
   display: block;
-  position: relative;
-  z-index: 1;
   box-sizing: border-box;
   width: 100%;
   height: auto;
   border: var(--board-edge-w) solid var(--color-board-edge);
   border-radius: 2px;
-  box-shadow: var(--shadow-board);
   user-select: none;
   -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
@@ -50,7 +53,7 @@
 /* 選んだマス：藍を重ねて、内側に金の線（段階12-2。最終手の朱と見分ける） */
 .sq-selected {
   fill: var(--color-selected);
-  stroke: var(--gold);
+  stroke: var(--color-primary);
   stroke-width: 2.5;
 }
 
@@ -117,7 +120,7 @@
   fill: var(--color-piece-promoted);
 }
 
-/* 持ち駒＝駒台：段階15 から素材の画像（stand-wood.webp。暗い重ねは焼き込み済み）を 1 枚引き伸ばす。盤と同じ形の駒を小さく並べる */
+/* 持ち駒＝駒台：段階16 から盤と同じ明るい木目（board-wood.webp。縦の柾目なので縦に縮めても筋は乱れない）。盤と同じ形の駒を小さく並べる */
 .hand {
   display: flex;
   flex-wrap: wrap;
@@ -126,31 +129,29 @@
   min-height: 36px;
   padding: var(--space-1) var(--space-1);
   font-size: var(--font-size-body);
-  background: url('../assets/board/stand-wood.webp') center / 100% 100% no-repeat;
+  background: url('../assets/board/board-wood.webp') center / 100% 100% no-repeat;
   background-color: var(--stand-base);
   color: var(--stand-text);
 }
 
-/* 駒台は盤とひと続き：盤の側にだけ細い境の線、外側の角だけ丸める（段階13-2。前は金の縁と影の付いた別の板） */
+/* 駒台は盤とひと続き：境目は盤の枠（#8B6B4F の 5px）だけ。外側の角だけ丸める（段階16。前は細い境の線） */
 .hand:first-child {
-  border-bottom: 1px solid var(--stand-seam);
-  border-radius: 4px 4px 0 0;
+  border-radius: 6px 6px 0 0;
 }
 
 .hand:last-child {
-  border-top: 1px solid var(--stand-seam);
-  border-radius: 0 0 4px 4px;
+  border-radius: 0 0 6px 6px;
 }
 
-/* 「☗ 先手」「☖ 後手」：札の地はやめて文字だけ（段階13-2） */
+/* 「☗ 先手」「☖ 後手」：墨の地に白い文字の札（段階16） */
 .hand-mark {
   flex: none;
   margin-right: var(--space-1);
-  padding: 0 4px;
+  padding: 0 6px;
   border: 0;
-  border-radius: 3px;
-  background: transparent;
-  color: var(--stand-text);
+  border-radius: 4px;
+  background: var(--stand-tag);
+  color: var(--stand-tag-text);
   font-family: var(--font-serif);
   font-weight: 600;
   font-size: 11px;
@@ -163,7 +164,7 @@
   font-size: var(--font-size-small);
 }
 
-/* 駒台の駒（盤の駒の 8 割ほど）と、右下の金の枚数 */
+/* 駒台の駒（盤の駒の 8 割ほど）と、右下の木の茶の枚数 */
 .hand-slot,
 button.hand-tap {
   position: relative;
@@ -179,13 +180,12 @@ button.hand-tap {
 .hand-count {
   align-self: flex-end;
   margin-left: 1px;
-  color: var(--gold-light);
+  color: var(--stand-count);
   font-family: var(--font-serif);
   font-weight: 700;
   font-size: 13px;
   line-height: 1.1;
   font-variant-numeric: tabular-nums;
-  text-shadow: var(--stand-count-shadow);
 }
 
 .hand-slot {
@@ -210,10 +210,10 @@ button.hand-tap {
   cursor: pointer;
 }
 
-/* 選んだ持ち駒：駒のまわりに明るい金の地と金の縁 */
+/* 選んだ持ち駒：駒のまわりに薄い墨の地と墨の縁（段階16） */
 button.hand-tap.selected {
   background: var(--stand-selected);
-  box-shadow: inset 0 0 0 2px var(--gold-light);
+  box-shadow: inset 0 0 0 2px var(--color-primary);
   border-radius: 4px;
 }
 
@@ -266,7 +266,7 @@ button.hand-tap.selected {
 /* 正解の演出（段階12-4）：最終手の行き先のマスに金の光の輪を一瞬（0.6 秒）。動きを減らす設定の端末では出さない */
 .sq-flash {
   fill: var(--color-flash);
-  stroke: var(--gold-light);
+  stroke: var(--color-mark);
   stroke-width: 3;
   pointer-events: none;
   opacity: 0;

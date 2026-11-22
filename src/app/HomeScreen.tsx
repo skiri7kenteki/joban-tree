@@ -611,7 +611,14 @@ function StudyRow({ study, bookKey, summary, onMenu }: { study: Study; bookKey: 
           {study.moves.length} 手・{formatShortDate(study.updatedAt)}
         </span>
         </span>
-        {summary && <LearnRing learned={summary.learned} total={summary.total} testId="study-ring" />}
+        {summary && summary.total > 0 && (
+          <span class="study-ring">
+            <LearnRing learned={summary.learned} total={summary.total} testId="study-ring" />
+            <span class="study-ring-label" aria-hidden="true">
+              覚えた
+            </span>
+          </span>
+        )}
       </button>
       <button type="button" class="btn tree-menu-btn" aria-label={`「${study.name}」の操作`} data-testid="study-menu" onClick={onMenu}>
         ⋯

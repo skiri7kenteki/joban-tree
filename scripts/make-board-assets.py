@@ -1,6 +1,7 @@
 # 使い方: リポジトリのいちばん上で python3 scripts/make-board-assets.py （numpy と Pillow が必要。出力は今いるフォルダ）
 # v0.39.1〜：盤の地（board-wood.webp）は scripts/make-board-options.py の「明るい柾目」（C_shinkaya）に差し替えた（持ち主の判断 2026-11-22）。
-#   ここで作る Figma の案の盤の地は board-wood-figma.webp として出す（アプリでは使わない）。駒の面・駒台の地は今もここで作る
+#   ここで作る Figma の案の盤の地は board-wood-figma.webp として出す（アプリでは使わない）。駒の面は今もここで作る
+# v0.40.0〜（段階16）：駒台の地も盤の木目（board-wood.webp）にしたので、ここで作る stand-wood.webp はアプリでは使わない（リポジトリから消した）
 # Figma の案（node 15:125）と同じ切り抜き・同じ重ね方で、盤・駒の面・駒台の素材を作る
 import glob, numpy as np
 from PIL import Image

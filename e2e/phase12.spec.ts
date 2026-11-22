@@ -1,5 +1,5 @@
-// 段階12：デザインの刷新（C 案「対局室」）
-// 12-1 色・文字・部品の土台：藍の地・生成りのカード・金の主なボタン・明朝体の見出し。全画面で文字と地の色の差を確かめる
+// 段階12：デザインの刷新（C 案「対局室」）。段階16（v0.40.0）で「明るい対局室」に（藍と金をやめた）
+// 12-1 色・文字・部品の土台：明るい地・白いカード・墨の主なボタン・明朝体の見出し。全画面で文字と地の色の差と、藍・金が残っていないことを確かめる
 import { expect, test, type Page } from '@playwright/test';
 import { STARTPOS_SFEN, applyUsiMove, sfenKey } from '../src/shogi/position';
 import { TREE_APP, TREE_FORMAT_VERSION, type Study, type TreeData, type TreeNode } from '../src/tree/types';
@@ -138,8 +138,23 @@ async function lowContrast(page: Page): Promise<string[]> {
   });
 }
 
-test.describe('12-1 色・文字・部品の土台（段階13 で洗練）', () => {
-  test('一覧は生成りの地に藍の見出しの帯、グループは 1 枚のカード、主なボタンは平らな金。盤の画面は藍の地で盤の下は生成り。下のタブと操作バーは濃い藍', async ({ page }) => {
+/** 段階16：藍と金の色（段階12〜15）が、画面のどこかの文字・地・縁・影に残っていれば、その要素を返す */
+async function oldColors(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const old = ['191, 160, 99', '216, 194, 144', '132, 105, 58', '28, 39, 64', '21, 29, 49', '243, 238, 227', '255, 253, 248'];
+    const out: string[] = [];
+    for (const el of Array.from(document.querySelectorAll('body *'))) {
+      const cs = getComputedStyle(el);
+      const all = [cs.color, cs.backgroundColor, cs.borderTopColor, cs.borderLeftColor, cs.boxShadow, cs.outlineColor, cs.fill, cs.stroke].join(' ');
+      const hit = old.find((c) => all.includes(`rgb(${c})`) || all.includes(`rgba(${c},`));
+      if (hit) out.push(`${el.tagName.toLowerCase()}.${typeof (el as HTMLElement).className === 'string' ? (el as HTMLElement).className : ''} ${hit}`);
+    }
+    return out;
+  });
+}
+
+test.describe('12-1 色・文字・部品の土台（段階16 で明るい対局室）', () => {
+  test('どの画面も明るい地に白いカード。見出しは帯なし、主なボタン・操作バー・選んでいる切り替えは墨、下のタブは白。藍と金はどこにも残らない', async ({ page }) => {
     await openHome(page);
     await page.getByTestId('study-import-file').setInputFiles({
       name: 's.json',
@@ -148,34 +163,59 @@ test.describe('12-1 色・文字・部品の土台（段階13 で洗練）', () 
     });
     await expect(page.getByTestId('study-item')).toHaveCount(2);
     const style = (sel: string, prop: string) => page.locator(sel).first().evaluate((e, p) => getComputedStyle(e).getPropertyValue(p), prop);
-    // 一覧の画面：本文の地は明るい生成り、見出しの帯と集計は藍
-    expect(await style('.app', 'background-color')).toBe('rgb(243, 238, 227)');
-    expect(await style('.list-header', 'background-color')).toBe('rgb(28, 39, 64)');
-    expect(await style('.list-header h1', 'color')).toBe('rgb(243, 236, 220)');
-    // グループは 1 枚のアイボリーのカード（行はカードの中で細い線で区切る。行に影は付けない）
-    expect(await style('.tree-group', 'background-color')).toBe('rgb(255, 253, 248)');
+    // 一覧の画面：地は #F7F5F1、見出しは帯なし（地と同じ）で墨の明朝、「書き出し」は木の茶の文字
+    expect(await style('.app', 'background-color')).toBe('rgb(247, 245, 241)');
+    expect(await style('.list-header', 'background-color')).toBe('rgba(0, 0, 0, 0)');
+    expect(await style('.list-header h1', 'color')).toBe('rgb(45, 45, 45)');
+    expect(await style('[data-testid="study-export-open"]', 'color')).toBe('rgb(122, 92, 66)');
+    // 集計は白いカード 1 枚。グループの見出しはカードの外、行はグループごとに白いカード 1 枚の中（行に影は付けない）
+    expect(await style('.book-summary', 'background-color')).toBe('rgb(255, 255, 255)');
+    expect(await style('.tree-group', 'background-color')).toBe('rgba(0, 0, 0, 0)');
+    expect(await style('.tree-group .tree-list', 'background-color')).toBe('rgb(255, 255, 255)');
     expect(await style('.tree-group .tree-row', 'box-shadow')).toBe('none');
-    // 主なボタンは平らな金（グラデーション・影なし）
-    expect(await style('[data-testid="study-register"]', 'background-color')).toBe('rgb(191, 160, 99)');
+    // 行の輪の下に小さく「覚えた」、輪と ⋯ の間の縦線はなし
+    expect(await style('[data-testid="study-menu"]', 'border-left-width')).toBe('0px');
+    // 主なボタンは墨の塗りに白い文字と少しの影（グラデーションなし）
+    expect(await style('[data-testid="study-register"]', 'background-color')).toBe('rgb(45, 45, 45)');
+    expect(await style('[data-testid="study-register"]', 'color')).toBe('rgb(255, 255, 255)');
     expect(await style('[data-testid="study-register"]', 'background-image')).toBe('none');
-    expect(await style('[data-testid="study-register"]', 'box-shadow')).toBe('none');
+    expect(await style('[data-testid="study-register"]', 'box-shadow')).toBe('rgba(0, 0, 0, 0.15) 0px 4px 12px 0px');
     expect(await style('h1', 'font-family')).toContain('Joban Mincho');
-    expect(await style('.tabbar', 'background-color')).toBe('rgb(21, 29, 49)');
-    expect(await style('.tabbar-tab.on', 'color')).toBe('rgb(216, 194, 144)');
-    // 生成りの地には青海波を敷かない
+    // 下のタブ：白い地に上の 1px の線。選んでいるタブは墨の太い文字、ほかは補助の文字の色
+    expect(await style('.tabbar', 'background-color')).toBe('rgb(255, 255, 255)');
+    expect(await style('.tabbar', 'border-top-color')).toBe('rgb(232, 227, 218)');
+    expect(await style('.tabbar-tab.on', 'color')).toBe('rgb(45, 45, 45)');
+    expect(await style('.tabbar-tab:not(.on)', 'color')).toBe('rgb(102, 99, 94)');
+    // 青海波は敷かない
     expect(await page.locator('.app').evaluate((e) => getComputedStyle(e, '::before').backgroundImage)).toBe('none');
+    expect(await oldColors(page)).toEqual([]);
     // 明朝体はアプリに入っている（端末に無くても出る）
     expect(await page.evaluate(() => document.fonts.check('600 21px "Joban Mincho"', '定跡帳'))).toBe(true);
 
     await page.getByTestId('study-item').first().click();
     await expect(page.getByTestId('study-position')).toBeVisible();
-    // 盤の画面：藍の地（上に青海波をごく薄く）、盤の下の一覧は生成りの地
-    expect(await style('.app', 'background-color')).toBe('rgb(28, 39, 64)');
-    expect(await page.locator('.app').evaluate((e) => getComputedStyle(e, '::before').backgroundImage)).toContain("stroke-opacity='0.03'");
-    expect(await style('.tree-side', 'background-color')).toBe('rgb(243, 238, 227)');
-    // 段階14：操作バーは盤のすぐ下（画面の下に固定しない）。色は同じ濃い藍
-    expect(await style('.move-bar', 'background-color')).toBe('rgb(21, 29, 49)');
-    expect(await style('.move-bar-btn', 'color')).toBe('rgb(243, 236, 220)');
+    // 盤の画面：地は一覧と同じ #F7F5F1（盤のまわりに色の地を敷かない）。盤と駒台は影で浮かせる
+    expect(await style('.app', 'background-color')).toBe('rgb(247, 245, 241)');
+    expect(await page.locator('.app').evaluate((e) => getComputedStyle(e, '::before').backgroundImage)).toBe('none');
+    expect(await style('.board-wrap', 'box-shadow')).toBe('rgba(60, 45, 25, 0.22) 0px 6px 20px 0px, rgba(60, 45, 25, 0.2) 0px 1px 3px 0px');
+    // 見出し：小さい文字で「定跡帳」、その下に大きい明朝で名前（帯なし）
+    expect(await style('[data-testid="book-kicker"]', 'display')).toBe('block');
+    // 段階14：操作バーは盤のすぐ下。段階16 から墨の塗りに白い文字
+    expect(await style('.move-bar', 'background-color')).toBe('rgb(45, 45, 45)');
+    expect(await style('.move-bar-btn', 'color')).toBe('rgb(255, 255, 255)');
+    expect(await oldColors(page)).toEqual([]);
+    // 復習の切り替え（全部／研究手順だけ）：選んでいる方は墨に白い文字、選んでいない方は白い地に墨の文字（前は白い地に白に近い文字で読めなかった）
+    await page.goto('./#/trees');
+    await page.getByTestId('import-file').setInputFiles({ name: 't.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(sampleTree())) });
+    await page.getByTestId('tree-item').click();
+    await page.getByTestId('review-open').click();
+    await expect(page.getByTestId('review-prompt')).toBeVisible();
+    const modes = page.locator('.review-modes .home-tab');
+    await expect(modes).toHaveCount(2);
+    expect(await modes.nth(0).evaluate((e) => [getComputedStyle(e).backgroundColor, getComputedStyle(e).color])).toEqual(['rgb(45, 45, 45)', 'rgb(255, 255, 255)']);
+    expect(await modes.nth(1).evaluate((e) => [getComputedStyle(e).backgroundColor, getComputedStyle(e).color])).toEqual(['rgb(255, 255, 255)', 'rgb(45, 45, 45)']);
+    expect(await lowContrast(page)).toEqual([]);
+    expect(await oldColors(page)).toEqual([]);
   });
 
   test('全画面で、文字と地の色の差が足りる（本文 4.5:1、大きな文字 3:1）', async ({ page }) => {
@@ -238,13 +278,15 @@ test.describe('12-1 色・文字・部品の土台（段階13 で洗練）', () 
     await check('復習のタブ');
     await page.goto('./#/settings');
     await check('設定');
+    // 段階16：藍と金がどの画面にも残っていない（設定のタブ）
+    expect(await oldColors(page)).toEqual([]);
 
     expect(found).toEqual([]);
   });
 });
 
 test.describe('12-2 盤と駒', () => {
-  test('盤は木目と金の縁、駒は明朝体で影付き。選んだマスは藍に金の線。新しいツリーの盤は段階14 の大きさ', async ({ page }) => {
+  test('盤は木目と木の茶の縁、駒は明朝体で影付き。駒台も盤と同じ木目。選んだマスは墨の線。新しいツリーの盤は段階14 の大きさ', async ({ page }) => {
     await openHome(page);
     await page.goto('./#/trees');
     await page.getByTestId('new-tree').click();
@@ -252,14 +294,18 @@ test.describe('12-2 盤と駒', () => {
     await expect(board).toBeVisible();
     const css = (sel: string, prop: string) => page.locator(sel).first().evaluate((e, p) => getComputedStyle(e).getPropertyValue(p), prop);
     expect(await css('svg.board', 'background-image')).toContain('wood');
-    // 段階15：盤は素材の木目に #8B6B4F の 5px の縁と影（金の細い縁取りはやめた）。駒台の地も素材の画像
+    // 段階15：盤は素材の木目に #8B6B4F の 5px の縁。段階16：影は盤と駒台をまとめた .board-wrap に、駒台も盤と同じ木目（境目は盤の枠だけ）
     expect(await css('svg.board', 'background-image')).toContain('board-wood');
     expect(await css('svg.board', 'border-top-width')).toBe('5px');
     expect(await css('svg.board', 'border-top-color')).toBe('rgb(139, 107, 79)');
-    expect(await css('svg.board', 'box-shadow')).toBe('rgba(0, 0, 0, 0.35) 0px 6px 14px 0px');
-    expect(await css('.board-wrap', 'box-shadow')).toBe('none');
+    expect(await css('svg.board', 'box-shadow')).toBe('none');
+    expect(await css('.board-wrap', 'box-shadow')).toContain('rgba(60, 45, 25, 0.22) 0px 6px 20px 0px');
     expect(await css('[data-testid="hand-black"]', 'box-shadow')).toBe('none');
-    expect(await css('[data-testid="hand-black"]', 'background-image')).toContain('stand-wood');
+    expect(await css('[data-testid="hand-black"]', 'background-image')).toContain('board-wood');
+    expect(await css('[data-testid="hand-black"]', 'border-top-width')).toBe('0px');
+    // 札（☗ 先手）は墨の地に白い文字
+    expect(await css('[data-testid="hand-black"] .hand-mark', 'background-color')).toBe('rgb(45, 45, 45)');
+    expect(await css('[data-testid="hand-black"] .hand-mark', 'color')).toBe('rgb(255, 255, 255)');
     expect(await css('.piece-text', 'font-family')).toContain('Joban Koma');
     expect(await css('.board-coord', 'font-family')).toContain('Joban Mincho');
     // 駒は 40 枚。影は形を下へずらした 2 段（段階15。filter は使わない）
@@ -274,7 +320,7 @@ test.describe('12-2 盤と駒', () => {
     await page.locator('[data-square="77"]').click();
     const sel = page.locator('[data-square="77"] rect');
     await expect(sel).toHaveClass('sq-selected');
-    expect(await sel.evaluate((e) => getComputedStyle(e).stroke)).toBe('rgb(191, 160, 99)');
+    expect(await sel.evaluate((e) => getComputedStyle(e).stroke)).toBe('rgb(45, 45, 45)');
   });
 });
 
@@ -334,7 +380,7 @@ test.describe('12-3 定跡帳', () => {
     expect(Math.round(menu!.height)).toBeGreaterThanOrEqual(44);
   });
 
-  test('定跡帳の盤の画面：［復習］は金、「この局面からの研究」に、その手を通る研究手順の割合の棒（名前の下）', async ({ page }) => {
+  test('定跡帳の盤の画面：［復習］は墨、「この局面からの研究」に、その手を通る研究手順の割合の棒（名前の下）', async ({ page }) => {
     await openHome(page);
     await page.getByTestId('study-import-file').setInputFiles({
       name: 's.json',
@@ -346,7 +392,7 @@ test.describe('12-3 定跡帳', () => {
     // 8 手目（△3二金の後）：次の手は ▲2四歩・▲3八銀 の 2 つ、それぞれ 2 本のうち 1 本
     for (let i = 0; i < 3; i++) await page.getByTestId('study-prev').click();
     await expect(page.getByTestId('study-book-branch')).toHaveCount(2);
-    expect(await page.getByTestId('book-head-review').evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgb(191, 160, 99)');
+    expect(await page.getByTestId('book-head-review').evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgb(45, 45, 45)');
     const bars = page.getByTestId('study-book-bar');
     await expect(bars).toHaveCount(2);
     for (const i of [0, 1]) {
@@ -382,20 +428,24 @@ test.describe('覚えた＝最後に答えたとき正解（v0.36.0）', () => {
 });
 
 test.describe('12-4 残りの画面', () => {
-  test('ツリーのラベルは本線＝藍・有力＝金・疑問手＝オレンジ、文字と地の差も足りる', async ({ page }) => {
+  test('ツリーのラベルは本線＝墨の塗り・有力＝白い地に線・疑問手＝朱、評価値は良い＝緑・悪い＝朱。文字と地の差も足りる', async ({ page }) => {
     await openHome(page);
     await page.goto('./#/trees');
     await page.getByTestId('import-file').setInputFiles({ name: 't.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(sampleTree())) });
     await page.getByTestId('tree-item').click();
     await expect(page.getByTestId('candidate')).toHaveCount(4);
     const color = (sel: string) => page.locator(sel).first().evaluate((e) => getComputedStyle(e).color);
-    expect(await color('.chip-main')).toBe('rgb(28, 39, 64)');
-    expect(await color('.chip-good')).toBe('rgb(107, 79, 18)');
-    expect(await page.locator('.chip-dubious').first().evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgb(185, 82, 12)');
+    const bg = (sel: string) => page.locator(sel).first().evaluate((e) => getComputedStyle(e).backgroundColor);
+    // 本線は墨の塗り（持ち主の判断 2026-11-22）、有力は白い地に線と灰の文字、疑問手は淡い朱の地に朱の文字
+    expect([await bg('.chip-main'), await color('.chip-main')]).toEqual(['rgb(45, 45, 45)', 'rgb(255, 255, 255)']);
+    expect([await bg('.chip-good'), await color('.chip-good')]).toEqual(['rgb(255, 255, 255)', 'rgb(102, 99, 94)']);
+    expect(await color('.chip-dubious')).toBe('rgb(179, 49, 31)');
+    expect(await color('.eval-good')).toBe('rgb(46, 125, 50)');
     expect(await lowContrast(page)).toEqual([]);
+    expect(await oldColors(page)).toEqual([]);
   });
 
-  test('復習で正解すると、指したマスに金の光が一瞬出る。結果は生成りのカード（文字と地の差も足りる）', async ({ page }) => {
+  test('復習で正解すると、指したマスに木の茶の光が一瞬出る。結果は白いカード（文字と地の差も足りる）', async ({ page }) => {
     await openHome(page);
     await page.getByTestId('tab-settings').click();
     await page.getByTestId('review-batch-5').click();
@@ -436,8 +486,9 @@ test.describe('12-4 残りの画面', () => {
     await expect(progress).toHaveText('今日 5／5問');
     await play('25', '24');
     await expect(page.getByTestId('review-result-score')).toBeVisible();
-    expect(await page.getByTestId('review-result').evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgb(255, 253, 248)');
+    expect(await page.getByTestId('review-result').evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgb(255, 255, 255)');
     expect(await lowContrast(page)).toEqual([]);
+    expect(await oldColors(page)).toEqual([]);
   });
 
   test('動きを減らす設定の端末では、正解の光を出さない', async ({ page }) => {
@@ -508,14 +559,14 @@ test.describe('段階12 の追加：駒と駒台（v0.34.0）', () => {
     // 成った駒（龍）は赤い字（#C62828）
     await expect(board.locator('.piece-text.promoted')).toHaveCount(2);
     expect(await board.locator('.piece-text.promoted').first().evaluate((e) => getComputedStyle(e).fill)).toBe('rgb(198, 40, 40)');
-    // 盤の地・駒台の地の画像はオフライン用の保存に入っている（service worker の事前キャッシュ。駒の面はプログラムの中）
+    // 盤の地（段階16 から駒台も同じ）の画像はオフライン用の保存に入っている（service worker の事前キャッシュ。駒の面はプログラムの中）
     const cached = await page.evaluate(async () => {
       const names = await caches.keys();
       const urls: string[] = [];
       for (const n of names) for (const r of await (await caches.open(n)).keys()) urls.push(r.url);
       return urls;
     });
-    for (const f of ['board-wood', 'stand-wood']) {
+    for (const f of ['board-wood']) {
       expect(cached.some((u) => u.includes(f) && u.endsWith('.webp')), f).toBe(true);
     }
 
@@ -534,12 +585,12 @@ test.describe('段階12 の追加：駒と駒台（v0.34.0）', () => {
     expect(small / big).toBeGreaterThan(0.7);
     expect(small / big).toBeLessThan(0.95);
 
-    // 選んだ持ち駒は金の地と金の内枠。押せる範囲は高さ 32px のまま
+    // 選んだ持ち駒は薄い墨の地と墨の内枠（段階16。前は金）。押せる範囲は高さ 32px のまま
     const kaku = black.locator('button.hand-tap').first();
     expect((await kaku.boundingBox())!.height).toBeGreaterThanOrEqual(32);
     await kaku.click();
     await expect(kaku).toHaveAttribute('aria-pressed', 'true');
-    expect(await kaku.evaluate((e) => getComputedStyle(e).boxShadow)).toContain('rgb(216, 194, 144)');
+    expect(await kaku.evaluate((e) => getComputedStyle(e).boxShadow)).toContain('rgb(45, 45, 45)');
   });
 
   test('閲覧の盤（ツリー）の駒台は高さ 24px のまま。小さな盤（復習の結果）の駒台は 1 行で、札は ☗☖ だけ', async ({ page }) => {

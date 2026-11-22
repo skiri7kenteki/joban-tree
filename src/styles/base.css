@@ -7,94 +7,35 @@
   box-sizing: border-box;
 }
 
-/* 画面の外（引っ張ったときに見える所・端末の上の余白）は藍 */
+/* 画面の外（引っ張ったときに見える所・端末の上の余白）も地の色 */
 html {
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
-  background: var(--ink);
+  background: var(--color-bg);
 }
 
 body {
   margin: 0;
-  background: var(--ground);
+  background: var(--color-bg);
   color: var(--color-text);
   font-family: var(--font-sans);
   font-size: var(--font-size-body);
   line-height: 1.5;
 }
 
-/* 段階12：生成りのカード（紙）。中では色の変数を紙の値に入れ替える（文字は墨、補助は灰、金は暗い金）。
-   段階13：藍の地の盤の画面でも、盤の下の一覧（.tree-side・.input-controls）は生成りの地に戻す */
-.card,
-.dialog,
-.notice,
-.tree-side,
-.input-controls,
-select,
-input,
-textarea,
-.tree-item,
-.tree-menu-btn,
-.candidates,
-.book-list,
-.kifu-list,
-.review-entry,
-.template-item,
-.template-menu,
-.review-result,
-.gen-panel {
-  --color-text: var(--paper-text);
-  --color-text-muted: var(--paper-muted);
-  --color-border: var(--paper-border);
-  --color-accent: var(--paper-accent);
-  --color-accent-text: var(--paper-accent-text);
-  --color-danger: var(--paper-danger);
-  --color-ok: var(--paper-ok);
-  --color-bg: var(--paper-sunken);
-}
-
-/* 段階13：藍の帯（盤の画面全体・一覧の見出しの帯と集計・下のタブ・盤の下の操作バー・作るボタンのバー・知らせ）。
-   中では色の変数を藍の値に入れ替える（文字は生成り、補助は明るい灰、金は明るい金）。帯の中のカード・窓は上の並びで紙に戻る */
-.app:not(.has-tabs),
-.list-header,
-.book-summary,
-.tabbar,
-.move-bar-fixed,
-.start-bar,
+/* 段階16：色の変数を入れ替えるのは「墨の上」（盤の下の操作バー・知らせ）だけ。文字は白、補助は白を少し透かす */
+.move-bar,
 .toast {
-  --color-text: var(--ink-text);
-  --color-text-muted: var(--ink-muted);
-  --color-border: var(--ink-line);
-  --color-accent: var(--ink-accent);
-  --color-accent-text: var(--ink);
-  --color-danger: var(--ink-danger);
-  --color-ok: var(--ink-ok);
-  --color-bg: var(--ink);
+  --color-text: var(--color-primary-text);
+  --color-text-muted: var(--color-primary-muted);
+  --color-border: var(--color-primary-line);
+  --color-mark-text: var(--color-mark-on-primary);
   color: var(--color-text);
 }
 
-/* 盤の画面（下のタブの無い画面）は藍の地。いちばん上に青海波をごく薄く敷いて、下へ消えていく */
 .app {
   position: relative;
-  /* 端末の上の余白（ホーム画面アプリの時刻などの帯。文字は白）は藍のまま */
-  background: linear-gradient(var(--ink), var(--ink)) top / 100% env(safe-area-inset-top, 0px) no-repeat, var(--ground);
-}
-
-.app:not(.has-tabs) {
-  background: var(--ink);
-}
-
-.app:not(.has-tabs)::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 180px;
-  background: var(--pattern-seigaiha) top center / 48px 24px repeat;
-  -webkit-mask-image: var(--fade-down);
-  mask-image: var(--fade-down);
-  pointer-events: none;
+  background: var(--color-bg);
 }
 
 .app > * {
@@ -165,10 +106,10 @@ p {
   min-height: var(--touch-min);
   padding: 0 var(--space-4);
   border-radius: var(--radius-button);
-  /* 普通のボタンは白に近いアイボリーに薄い灰の 1px の縁（段階13。影なし） */
-  border: 1px solid var(--line-strong);
-  background: var(--paper);
-  color: var(--paper-text);
+  /* 普通のボタンは白い地に薄い線の 1px の縁と墨の文字（段階16） */
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
   font: inherit;
   text-decoration: none;
   cursor: pointer;
@@ -180,11 +121,12 @@ p {
   cursor: default;
 }
 
-/* いちばん大事な操作は平らな金（段階13。グラデーション・内側の光・影はやめた）。文字は藍・明朝体 */
+/* いちばん大事な操作は墨の塗りに白い文字・明朝体、少しの影（段階16。前は平らな金） */
 .btn-primary {
-  background: var(--gold);
-  border-color: var(--gold);
-  color: var(--gold-fill-text);
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-primary-text);
+  box-shadow: var(--shadow-primary);
   font-family: var(--font-serif);
   font-weight: 600;
   letter-spacing: 0.05em;
