@@ -107,12 +107,12 @@
   flood-color: var(--color-piece-drop);
 }
 
-/* 駒の文字は駒専用の太い字体（駒の 15 字ほどだけに削ったもの）。駒の高さの約 80%、横を少し縮めて面の重心に置く */
+/* 駒の文字は駒専用の太い字体（駒の 15 字ほどだけに削ったもの）。駒の高さの約 75%（v0.38.2。v0.38.1 の 80% から少し小さく）、横を少し縮めて面の重心に置く */
 .piece-text {
   fill: var(--color-piece-text);
   font-family: var(--font-piece);
   font-weight: 400;
-  font-size: 30.5px;
+  font-size: 29px;
   text-anchor: middle;
 }
 

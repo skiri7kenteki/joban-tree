@@ -41,7 +41,7 @@
   5. 復習の結果の画面（盤が無い）は今まで通りページがスクロールする
 - できた（v0.38.0）。持ち主の確認待ち
 - **駒の見直し**（2026-11-22。持ち主の依頼：内側の二重のふちをやめて 1 本に・面を縦の濃淡 #f9f2dd → #eedcae・下に柔らかい影・字を駒の約 80% で真ん中・成駒の赤 #a62b1a・頂点を少しとがらせ肩をなだらかに。盤とレイアウトは変えない）：
-  できた（v0.38.1）。持ち主の確認待ち
+  できた（v0.38.1）。持ち主の依頼「字を少し小さく」で 30.5px → 29px（駒の高さの約 75%。v0.38.2）。持ち主の確認待ち
 
 
 **v0.29.0：絞り込みの欄をやめる・表示名を「将棋定跡帳」に** は持ち主の確認をもらわないまま段階12 へ進んだ（2026-11-21、段階12 の依頼をもって OK とみなす）
@@ -190,7 +190,7 @@
 
 ### 駒の見直し（v0.38.1）
 - `Board.tsx`：駒は 側面・面・字 の 3 つに（遠い影・近い影・光のふちをやめた）。駒の g に `filter="url(#piece-drop)"`（feDropShadow 下へ 2・ぼかし 1）。面の濃淡は縦、ふちも縦の濃淡（`#piece-edge`）。形と字の位置（`TEXT_DY` 2.2）を変えた
-- `board.css`・`tokens.css`：色はすべて tokens（`--color-piece-edge-top/bottom`・`--color-piece-drop` を足し、`--color-piece-rim`・`--color-piece-shadow(-far)`・`--color-piece-side-edge` を消した）。字は 30.5px
+- `board.css`・`tokens.css`：色はすべて tokens（`--color-piece-edge-top/bottom`・`--color-piece-drop` を足し、`--color-piece-rim`・`--color-piece-shadow(-far)`・`--color-piece-side-edge` を消した）。字は 30.5px（v0.38.2 で 29px）
 - 盤の大きさ・並びは変わらない（one-screen.spec がそのまま合格）
 - テスト：phase12（2 項目：影・ふち・濃淡・成駒の赤を確かめる形に）、phase4（1 項目：五角形の数 200 → 80）を直した
 
@@ -825,6 +825,7 @@
   - ビルド時の `ENGINE_OPTIONS "FV_SCALE=24"` は `usi` の default に出ない。必ず `setoption` で 24 を送る
 
 ## テスト結果
+- 2026-11-22 手元（Windows）v0.38.2：型チェック合格、Vitest 254 項目合格、Playwright 123 項目合格（エンジンあり。テストの直しなし。駒の字の大きさだけ）
 - 2026-11-22 手元（Windows）v0.38.1：型チェック合格、Vitest 254 項目合格、Playwright 123 項目合格（エンジンあり。直したもの 3 項目〔phase12 2・phase4 1〕。盤の大きさを確かめる one-screen.spec はそのまま合格）
 - 2026-11-22 手元（Windows）v0.38.0：型チェック合格、Vitest 254 項目合格、Playwright 123 項目合格（エンジンあり。全体を 2 回続けて流して合格。新しく 5〔one-screen.spec〕、直したもの 20 項目。v0.37.0 の studio.spec 6 項目は取り消しで消えた）
 - 2026-11-21 手元（Windows）v0.36.1：型チェック合格、Vitest 254 項目合格、Playwright 118 項目合格（エンジンあり。テストの追加・直しなし。後手の駒の影は前と後の写真で確かめた）
