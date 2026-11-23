@@ -42,6 +42,15 @@ export function parseTreeJson(text: string): ParseResult {
   return { ok: true, tree: raw as unknown as TreeData };
 }
 
+/**
+ * ツリー 1 本（JSON を読んだもの・保存場所のもの）の形を確かめる。問題が無ければ null、あれば理由（段階17：まとめてのバックアップから戻すときに使う）
+ */
+export function treeProblem(raw: unknown): string | null {
+  if (!isObject(raw) || raw.app !== TREE_APP) return '将棋定跡帳のツリーではない';
+  if (!isNumber(raw.version) || raw.version > TREE_FORMAT_VERSION) return 'アプリより新しい形式';
+  return checkV1(raw);
+}
+
 function checkV1(t: Record<string, unknown>): string | null {
   if (!isString(t.id) || !/^[\w-]{1,64}$/.test(t.id)) return 'id';
   if (!isString(t.name)) return 'name';

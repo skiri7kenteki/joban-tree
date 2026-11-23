@@ -9,6 +9,7 @@ import type { PresetId } from '../tree/presets';
 import { availablePresets, defaultPcThreads, defaultThreads, pcEngine } from './engineService';
 import { isGenerating } from './generation';
 import { AppInfo } from '../components/Footer';
+import { DataSection } from './DataSection';
 import { HASH_CHOICES, PC_HASH_CHOICES, REVIEW_BATCH_CHOICES, presetLabel, resetSettings, settings, updateSettings, type AppSettings, type PresetValues } from './settings';
 
 export function SettingsScreen() {
@@ -29,6 +30,9 @@ export function SettingsScreen() {
       </div>
       <p class="muted">変えるとすぐ保存されます（この端末の中だけ）。</p>
       {isGenerating() && <p class="notice">生成中です。エンジンの設定は、次の生成から使われます。</p>}
+
+      {/* 段階17：データの保護とまとめてのバックアップ */}
+      <DataSection />
 
       {/* 段階11-4：復習は決まった数で 1 回が終わる */}
       <section class="card settings-section">

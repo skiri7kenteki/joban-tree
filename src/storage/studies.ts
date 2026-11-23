@@ -2,6 +2,7 @@
 
 import type { Study } from '../tree/types';
 import { STUDIES, done, finished, openDb } from './db';
+import { askPersistOnce } from './persist';
 
 /** 保存してある研究手順（並びは決めない。画面で並べる） */
 export async function listStudies(): Promise<Study[]> {
@@ -16,6 +17,8 @@ export async function putStudies(list: readonly Study[]): Promise<void> {
   const store = tx.objectStore(STUDIES);
   for (const s of list) store.put(structuredClone(s));
   await finished(tx);
+  // 段階17：研究手順を保存したら、ブラウザにデータを消さないよう頼む（開いている間に 1 回だけ）
+  if (list.length > 0) askPersistOnce();
 }
 
 /** 消す（画面で確認を出してから呼ぶ） */
@@ -34,4 +37,5 @@ export async function writeStudies(put: readonly Study[], removeIds: readonly st
   for (const id of removeIds) store.delete(id);
   for (const s of put) store.put(structuredClone(s));
   await finished(tx);
+  if (put.length > 0) askPersistOnce();
 }

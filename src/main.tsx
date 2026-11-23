@@ -19,6 +19,7 @@ import { RegisterRedirect, StudyRedirect } from './app/LegacyRedirect';
 import { StudyReviewScreen } from './app/StudyReviewScreen';
 import { StudyKifImportScreen } from './app/StudyKifImportScreen';
 import { fixStudiesOnStart } from './app/studyFix';
+import { askPersistIfData } from './storage/persist';
 
 function App() {
   const [isolation, setIsolation] = useState<IsolationState | 'checking'>('checking');
@@ -76,5 +77,7 @@ function isolationMessage(state: IsolationState | 'checking'): string | null {
 
 // ずれてしまった研究手順（戦型の側・名前）を直す（段階10 の直し。直すものが無ければ何もしない）
 fixStudiesOnStart();
+// 段階17：研究手順かツリーが 1 つでもあれば、ブラウザにデータを消さないよう頼む（守られていれば何もしない）
+void askPersistIfData();
 
 render(<App />, document.getElementById('root')!);
