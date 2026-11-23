@@ -20,6 +20,8 @@ import { StudyReviewScreen } from './app/StudyReviewScreen';
 import { StudyKifImportScreen } from './app/StudyKifImportScreen';
 import { fixStudiesOnStart } from './app/studyFix';
 import { askPersistIfData } from './storage/persist';
+import { GamesScreen } from './app/GamesScreen';
+import { GameScreen } from './app/GameScreen';
 
 function App() {
   const [isolation, setIsolation] = useState<IsolationState | 'checking'>('checking');
@@ -40,10 +42,14 @@ function App() {
         {r.name === 'home' && <HomeScreen key="studies" list="studies" isolationMessage={isolationMessage(isolation)} />}
         {r.name === 'trees' && <HomeScreen key="trees" list="trees" isolationMessage={isolationMessage(isolation)} />}
         {r.name === 'reviews' && <ReviewsScreen />}
+        {r.name === 'games' && <GamesScreen />}
+        {r.name === 'game' && <GameScreen key={r.id} id={r.id} />}
         {r.name === 'new' && (r.study ? <RegisterRedirect /> : <InputScreen />)}
         {r.name === 'tree' && <TreeScreen id={r.id} studyId={r.study} ply={r.ply} />}
         {r.name === 'study' && <StudyRedirect key={r.id} id={r.id} ply={r.ply} />}
-        {r.name === 'book' && <BookScreen key={`book:${r.key}`} bookKey={r.key} id={r.study} ply={r.ply} template={r.template} />}
+        {r.name === 'book' && (
+          <BookScreen key={`book:${r.key}:${r.line?.join('.') ?? ''}`} bookKey={r.key} id={r.study} ply={r.ply} template={r.template} line={r.line} />
+        )}
         {r.name === 'study-import' && <StudyKifImportScreen />}
         {r.name === 'settings' && <SettingsScreen />}
         {r.name === 'review' && !r.studies && <ReviewScreen key={r.id} id={r.id} />}

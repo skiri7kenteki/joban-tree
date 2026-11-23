@@ -59,6 +59,9 @@ function sample(): BackupData {
     templates: [
       { id: 'my-1', name: '自分の戦型', group: '横歩取り', mySide: 'white', moves: ['7g7f', '3c3d'], note: '', reviewed: true, createdAt: 3, updatedAt: 4 },
     ],
+    games: [
+      { id: 'g-1', kifu: '1 ７六歩(77)', moves: ['7g7f'], black: { name: 'a', rank: '七段' }, white: { name: 'b' }, playedAt: 8, timeLimit: '3分切れ負け', mySide: 'white', winner: 'black', ending: '投了', addedAt: 9 },
+    ],
     prefs: { 'joban-tree.settings': '{"version":1}', 'joban-tree:book-write': 'off' },
   };
 }
@@ -73,24 +76,24 @@ describe('バックアップのファイル', () => {
     expect(parsed.file).toEqual(file);
     expect(parsed.unknownKinds).toEqual([]);
     expect(file).toMatchObject({ app: 'joban-tree', kind: 'backup', version: 1, createdAt: 1700000000000, appVersion: '0.41.0' });
-    expect(backupCounts(parsed.file.data)).toEqual({ studies: 2, trees: 1, reviewProblems: 3, templates: 1, prefs: 2 });
+    expect(backupCounts(parsed.file.data)).toEqual({ studies: 2, trees: 1, reviewProblems: 3, templates: 1, games: 1, prefs: 2 });
   });
 
   it('空のデータも作って読める', () => {
-    const empty: BackupData = { studies: [], trees: [], reviews: [], templates: [], prefs: {} };
+    const empty: BackupData = { studies: [], trees: [], reviews: [], templates: [], games: [], prefs: {} };
     const parsed = parseBackupJson(backupToJson(makeBackup(empty, 1, '0.41.0')));
     expect(parsed.ok && parsed.file.data).toEqual(empty);
   });
 
-  it('この版が知らない種類（段階18 の実戦の棋譜など）は読まずに知らせる。知らない設定の名前は入れない', () => {
-    const file = makeBackup(sample(), 1, '0.42.0') as unknown as { data: Record<string, unknown> };
-    file.data.games = [{ id: 'g-1' }];
+  it('この版が知らない種類（あとの段階の稽古の記録など）は読まずに知らせる。知らない設定の名前は入れない', () => {
+    const file = makeBackup(sample(), 1, '0.43.0') as unknown as { data: Record<string, unknown> };
+    file.data.practice = [{ id: 'p-1' }];
     (file.data.prefs as Record<string, string>)['joban-tree.unknown'] = 'x';
     const parsed = parseBackupJson(JSON.stringify(file));
     expect(parsed.ok).toBe(true);
     if (!parsed.ok) return;
-    expect(parsed.unknownKinds).toEqual(['games']);
-    expect('games' in parsed.file.data).toBe(false);
+    expect(parsed.unknownKinds).toEqual(['practice']);
+    expect('practice' in parsed.file.data).toBe(false);
     expect(Object.keys(parsed.file.data.prefs).sort()).toEqual(['joban-tree.settings', 'joban-tree:book-write']);
   });
 
@@ -108,6 +111,7 @@ describe('バックアップのファイル', () => {
     expect(msg(fileOf((f) => (f.data.trees[0].rootKey = 'none')))).toContain('ツリー 1 本目');
     expect(msg(fileOf((f) => (f.data.reviews[1].nodes.c.seen = 'x')))).toContain('復習の記録 2 つ目');
     expect(msg(fileOf((f) => delete f.data.templates[0].createdAt))).toContain('戦型 1 つ目');
+    expect(msg(fileOf((f) => (f.data.games[0].mySide = 'x')))).toContain('実戦 1 局目');
     expect(msg(fileOf((f) => (f.data.prefs['joban-tree.settings'] = 3)))).toContain('設定');
     expect(msg(fileOf((f) => f.data.studies.push({ ...f.data.studies[0] })))).toContain('同じ id');
   });
@@ -132,5 +136,15 @@ describe('「しばらくバックアップしていません」を出す時機'
     const hidden = nudgeHiddenUntil(now);
     expect(shouldNudge(now + 29 * DAY, [{ createdAt: 0 }], null, hidden)).toBe(false);
     expect(shouldNudge(now + 30 * DAY, [{ createdAt: 0 }], null, hidden)).toBe(true);
+  });
+});
+
+describe('段階17 の版のバックアップ（実戦の棋譜が無い）', () => {
+  it('実戦は 0 局として読む', () => {
+    const f = JSON.parse(backupToJson(makeBackup(sample(), 1, '0.41.0')));
+    delete f.data.games;
+    const parsed = parseBackupJson(JSON.stringify(f));
+    expect(parsed.ok && parsed.file.data.games).toEqual([]);
+    expect(parsed.ok && parsed.unknownKinds).toEqual([]);
   });
 });

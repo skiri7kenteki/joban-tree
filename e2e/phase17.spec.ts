@@ -215,9 +215,10 @@ test.describe('段階17 データを守る', () => {
     await expect(page.getByTestId('backup-error')).toContainText('研究手順 1 本目');
     await expect(page.getByTestId('backup-restore-dialog')).toHaveCount(0);
     expect(await dump(page)).toEqual(before);
-    // 段階18 の実戦の棋譜など、この版が知らない種類があるファイル：戻せるが、それは入らないと知らせる
-    await pick({ app: 'joban-tree', kind: 'backup', version: 1, createdAt: 1, appVersion: '0.42.0', data: { studies: STUDIES, games: [] } });
-    await expect(page.getByTestId('backup-unknown')).toContainText('実戦の棋譜');
+    // あとの段階の稽古の記録など、この版が知らない種類があるファイル：戻せるが、それは入らないと知らせる（段階18 から実戦の棋譜 games は知っている種類）
+    await pick({ app: 'joban-tree', kind: 'backup', version: 1, createdAt: 1, appVersion: '0.43.0', data: { studies: STUDIES, games: [], practice: [] } });
+    await expect(page.getByTestId('backup-unknown')).toContainText('practice');
+    await expect(page.getByTestId('backup-unknown')).not.toContainText('実戦の棋譜');
   });
 
   test('定跡帳の一覧の上の「しばらくバックアップしていません」：30 日以上で出し、閉じたら 30 日は出さない', async ({ page }) => {

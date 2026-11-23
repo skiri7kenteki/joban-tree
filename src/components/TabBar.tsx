@@ -1,7 +1,7 @@
-// 画面の下のタブ（段階11-1）：定跡帳／ツリー／復習／設定。一覧の画面にだけ出す（盤のある画面では出さない）。
+// 画面の下のタブ（段階11-1。段階18 から 定跡帳／復習／実戦／設定。ツリーは設定の「ツリー（以前の機能）」から）。一覧の画面にだけ出す（盤のある画面では出さない）。
 // タブを押すと URL が変わる（履歴に積まれるので、戻るボタンで前のタブに戻れる）。アイコンは手書きの簡単な図形（SVG）。
 
-import { go, TAB_PATHS, type TabName } from '../app/router';
+import { go, route, TAB_PATHS, type TabName } from '../app/router';
 
 interface TabDef {
   name: TabName;
@@ -24,20 +24,6 @@ const TABS: TabDef[] = [
     ),
   },
   {
-    name: 'trees',
-    label: 'ツリー',
-    testId: 'tab-trees',
-    // 枝分かれ
-    icon: (
-      <>
-        <circle cx="6" cy="5" r="2" />
-        <circle cx="6" cy="19" r="2" />
-        <circle cx="18" cy="7" r="2" />
-        <path d="M6 7v10M18 9c0 5-12 3-12 8" />
-      </>
-    ),
-  },
-  {
     name: 'reviews',
     label: '復習',
     testId: 'tab-reviews',
@@ -48,6 +34,13 @@ const TABS: TabDef[] = [
         <path d="M8 12.5l3 3 5-6" />
       </>
     ),
+  },
+  {
+    name: 'games',
+    label: '実戦',
+    testId: 'tab-games',
+    // 駒の形（段階18）
+    icon: <path d="M12 3l6 3 1.5 14h-15L6 6z" />,
   },
   {
     name: 'settings',
@@ -76,7 +69,8 @@ export function TabBar({ current }: { current: TabName }) {
             aria-current={t.name === current ? 'page' : undefined}
             data-testid={t.testId}
             onClick={() => {
-              if (t.name !== current) go(TAB_PATHS[t.name]);
+              // 今のタブをもう一度押しても何もしない（ツリーの一覧で設定を押したときは設定へ）
+              if (t.name !== current || route.value.name !== t.name) go(TAB_PATHS[t.name]);
             }}
           >
             <svg class="tabbar-icon" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">

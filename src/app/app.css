@@ -2492,3 +2492,193 @@ div.move-bar-center {
   color: var(--color-text-muted);
   font-size: 20px;
 }
+
+/* ---- 段階18：実戦（src/app/GamesScreen.tsx・GameScreen.tsx） ---- */
+.list-section-title {
+  margin: var(--space-3) 0 var(--space-2);
+  font-size: var(--font-size-body);
+}
+
+.games-summary {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+/* 次に研究する所（1 行 52px。回数を右に大きく） */
+.next-spots {
+  padding: 0;
+  margin-bottom: var(--space-2);
+  overflow: hidden;
+}
+
+.next-spot,
+.next-spot-more {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: 52px;
+  padding: var(--space-2) var(--space-3);
+  background: none;
+  border: 0;
+  border-top: 1px solid var(--color-border);
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.next-spot:first-child {
+  border-top: 0;
+}
+
+.next-spot-more {
+  justify-content: center;
+  min-height: var(--touch-min);
+  color: var(--color-mark-text);
+  font-size: var(--font-size-small);
+}
+
+.next-spot-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.next-spot-move {
+  font-weight: 600;
+}
+
+.next-spot-meta {
+  font-size: var(--font-size-small);
+  color: var(--color-text-muted);
+}
+
+.next-spot-count {
+  font-family: var(--font-serif);
+  font-weight: 600;
+  font-size: 20px;
+  white-space: nowrap;
+}
+
+.next-spot-count small {
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: normal;
+  color: var(--color-text-muted);
+}
+
+/* 対局の行 */
+.game-item {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+}
+
+.game-item-marks {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: 2px;
+}
+
+.game-side {
+  font-family: var(--font-piece);
+}
+
+.game-result {
+  font-size: var(--font-size-small);
+  color: var(--color-text-muted);
+}
+
+.game-result.win {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+/* 外れ方の印（研究にない＝木の茶、研究と違う＝赤、研究の先まで＝緑、研究の外＝灰） */
+.kind-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-chip);
+  font-size: var(--font-size-small);
+  line-height: 1.4;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.kind-opp {
+  border-color: var(--color-mark);
+  color: var(--color-mark-text);
+  background: var(--color-mark-soft);
+}
+
+.kind-mine {
+  border-color: var(--color-danger);
+  color: var(--color-danger);
+}
+
+.kind-beyond {
+  border-color: var(--color-ok);
+  color: var(--color-ok);
+}
+
+/* 貼り付けの窓 */
+.dialog-lead {
+  margin-top: 0;
+}
+
+.paste-preview p {
+  margin: var(--space-2) 0;
+}
+
+/* 結果の画面 */
+.game-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.game-result-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.game-result-text {
+  margin: 0;
+}
+
+.game-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-button);
+}
+
+.game-compare div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-2);
+  min-width: 0;
+}
+
+.game-compare div + div {
+  border-left: 1px solid var(--color-border);
+}
+
+.game-compare span {
+  font-size: var(--font-size-small);
+  color: var(--color-text-muted);
+}
+
+.game-compare strong {
+  font-family: var(--font-serif);
+  font-size: 20px;
+  text-align: center;
+}

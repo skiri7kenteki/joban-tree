@@ -224,6 +224,11 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
   return (
     <>
       <div class="screen-header list-header">
+        {tab === 'trees' && (
+          <button type="button" class="btn btn-ghost btn-back" aria-label="‹ 設定" data-testid="trees-back" onClick={() => go('/settings')}>
+            ‹<span class="back-text"> 設定</span>
+          </button>
+        )}
         <h1>{tab === 'studies' ? '定跡帳' : 'ツリー'}</h1>
         {tab === 'studies' && studies && (
           <span class="muted num" data-testid="study-count">

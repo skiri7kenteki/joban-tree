@@ -1,5 +1,6 @@
 // 定跡帳（段階9-2 の「定跡帳として見る」を、段階10-1 で研究を入力する場所の中心にした。持ち主の判断 2026-11-19「おすすめの通りで」）。
-//   #/book/<key>[/<研究手順の id>/<手数>]、#/book/<key>/t/<戦型の id>（新しい研究を始めるとき。研究手順がまだ無くても開ける）
+//   #/book/<key>[/<研究手順の id>/<手数>]、#/book/<key>/t/<戦型の id>（新しい研究を始めるとき。研究手順がまだ無くても開ける）、
+//   #/book/<key>/m/<手順>（段階18：実戦の外れた局面。研究の木の外でもその局面で開き、盤の上に「実戦 11/08 の 21手目。指すと研究に足します」。‹ で実戦の画面へ戻る）
 // - 盤で指すと、その場で研究手順に足す（名前は自動、保存も自動）。決まりは src/tree/bookEdit.ts
 //   （同じ手 → 進むだけ／ここで終わる研究手順 → 延ばす／それ以外 → 新しい研究手順）
 // - 誤操作の対策：足すたびに画面の下に「▲3六歩 を足しました［取り消す］」を 5 秒。「↶ 取り消す」で何回でも続けて戻せる
@@ -42,7 +43,8 @@ import type { Study, TreeData } from '../tree/types';
 import { boardFitProps, measureFitFrame, threeRowsNeed, useBoardFit } from './boardFit';
 import { takeHint } from './recent';
 import { inputHandoff } from './handoff';
-import { bookPath, go, groupReviewPath } from './router';
+import { back, bookPath, go, groupReviewPath } from './router';
+import { bookFromGame } from './games';
 import { OUTCOME_TEXT, copyText, shareFile } from './share';
 import { StudyEditDialog, shareStudies } from './StudyDialogs';
 import { applyStudyChange, ensureStudies, library, studiesNow } from './studies';
@@ -73,7 +75,7 @@ function saveWrite(on: boolean): void {
 const TOAST_MS = 5000;
 
 /** 定跡帳の画面。研究手順と戦型を読み終えてから中身を出す */
-export function BookScreen({ bookKey, id, ply, template }: { bookKey: string; id?: string; ply?: number; template?: string }) {
+export function BookScreen({ bookKey, id, ply, template, line }: { bookKey: string; id?: string; ply?: number; template?: string; line?: string[] }) {
   const [error, setError] = useState('');
   const studies = library.value;
   void myTemplates.value;
@@ -112,7 +114,7 @@ export function BookScreen({ bookKey, id, ply, template }: { bookKey: string; id
     );
   }
   opened.current = true;
-  return <BookViewScreen bookKey={bookKey} side={side} pool={pool} templates={templates} id={id} ply={ply} tpl={tpl} />;
+  return <BookViewScreen bookKey={bookKey} side={side} pool={pool} templates={templates} id={id} ply={ply} tpl={tpl} openLine={line} />;
 }
 
 /** 定跡帳の出発点：平手からの定跡帳は初期局面。戦型のグループは、研究手順（と今の手順）が全部通る、自分の側が同じ、いちばん浅い戦型の出発点（段階10 の直し） */
@@ -124,7 +126,12 @@ function startOf(key: string, pool: readonly Study[], line: readonly string[], t
 const byLatest = (a: Study, b: Study) => b.updatedAt - a.updatedAt;
 
 /** 開いたときの手順と局面 */
-function initialView(key: string, pool: readonly Study[], templates: readonly OpeningTemplate[], id?: string, ply?: number, tpl?: OpeningTemplate): BookView {
+function initialView(key: string, pool: readonly Study[], templates: readonly OpeningTemplate[], id?: string, ply?: number, tpl?: OpeningTemplate, openLine?: string[]): BookView {
+  // 段階18：実戦の外れた局面（平手からの手順）。その手順を通る研究手順があればそれで、無ければ研究の木の外として
+  if (openLine && openLine.length > 0) {
+    const through = pool.filter((x) => startsWith(x.moves, openLine)).sort(byLatest)[0];
+    return through ? { id: through.id, line: [...through.moves], index: openLine.length } : { id: null, line: [...openLine], index: openLine.length };
+  }
   const s = id ? pool.find((x) => x.id === id) : undefined;
   if (s) return { id: s.id, line: [...s.moves], index: Math.min(s.moves.length, ply ?? s.moves.length) };
   if (tpl) {
@@ -159,6 +166,7 @@ function BookViewScreen({
   id,
   ply,
   tpl,
+  openLine,
 }: {
   bookKey: string;
   side: Side;
@@ -167,8 +175,11 @@ function BookViewScreen({
   id?: string;
   ply?: number;
   tpl?: OpeningTemplate;
+  openLine?: string[];
 }) {
-  const [view, setView] = useState<BookView>(() => initialView(bookKey, pool, templates, id, ply, tpl));
+  const [view, setView] = useState<BookView>(() => initialView(bookKey, pool, templates, id, ply, tpl, openLine));
+  // 段階18：実戦から開いたときの一言（開いた局面にいる間だけ）
+  const gameNote = openLine && bookFromGame.value?.line === openLine.join('.') ? bookFromGame.value.text : null;
   const current = view.id ? (pool.find((s) => s.id === view.id) ?? null) : null;
   const line = current ? current.moves : view.line;
   const positions = useMemo(() => studyPositions(line), [line]);
@@ -470,7 +481,7 @@ function BookViewScreen({
   return (
     <div class="board-screen">
       <div class="screen-header">
-        <button type="button" class="btn btn-ghost btn-back" onClick={() => go('/')}>
+        <button type="button" class="btn btn-ghost btn-back" onClick={() => (openLine ? back('/games') : go('/'))}>
           ‹<span class="back-text"> 一覧</span>
         </button>
         <h1 class="tree-title book-title" data-testid="book-title">
@@ -503,7 +514,11 @@ function BookViewScreen({
           </>
         ) : (
           <p class="study-title study-title-line muted" data-testid="book-head-empty">
-            {pool.length === 0 ? '研究手順はまだありません。盤で指すと研究手順ができます' : 'ここは研究の木の外です。指すと研究手順ができます'}
+            {gameNote && view.index === openLine?.length
+              ? gameNote
+              : pool.length === 0
+                ? '研究手順はまだありません。盤で指すと研究手順ができます'
+                : 'ここは研究の木の外です。指すと研究手順ができます'}
           </p>
         )}
       </div>

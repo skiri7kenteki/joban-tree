@@ -1,7 +1,9 @@
 // 画面の切り替え。URL の「#」より後ろで、どの画面かを表す（スマホの戻るボタンがそのまま効く）。
 //   #/           … 定跡帳のタブ（研究手順の一覧。アプリを開くといつもここ。段階11-1）
-//   #/trees      … ツリーのタブ（ツリーの一覧。段階11-1）
+//   #/trees      … ツリーの一覧（段階11-1 はタブ。段階18 からタブから外し、設定の「ツリー（以前の機能）」から開く）
 //   #/reviews    … 復習のタブ（復習の入口。段階11-1）
+//   #/games      … 実戦のタブ（実戦の一覧。段階18）
+//   #/game/<id>  … 実戦 1 局の照らし合わせの結果（段階18）
 //   #/new        … 新しいツリー（局面の入力）
 //   #/new/study  … （段階10-2 で片付けた。トップ画面で「研究手順を登録」の窓を開く。src/app/LegacyRedirect.tsx）
 //   #/tree/<id>  … ツリーの閲覧
@@ -11,6 +13,7 @@
 //   #/book/<グループの key>[/<研究手順の id>/<手数>] … 定跡帳として見る（そのグループの研究手順をつないだツリー。段階9-2）。
 //     段階10-1 から、定跡帳の盤で指すとその場で研究手順に足す。key が study:hirate|<側> なら平手からの定跡帳（その側の研究手順すべて）
 //   #/book/<key>/t/<戦型の id> … 定跡帳を、その戦型の出発点で開く（新しい研究を始めるとき。研究手順がまだ無くても開ける。段階10-1）
+//   #/book/<key>/m/<手.手.手…> … 定跡帳を、平手からその手順の局面で開く（実戦の外れた局面から研究を足すとき。研究の木の外でもよい。段階18）
 //   #/study-import … 変化付き KIF から研究手順をまとめて取り込む（段階8-2）
 //   #/settings   … 設定のタブ
 //   #/review/<id> … 復習モード
@@ -25,11 +28,13 @@ export type Route =
   | { name: 'home' }
   | { name: 'trees' }
   | { name: 'reviews' }
+  | { name: 'games' }
+  | { name: 'game'; id: string }
   | { name: 'new'; study?: boolean }
   | { name: 'settings' }
   | { name: 'tree'; id: string; study?: string; ply?: number }
   | { name: 'study'; id: string; edit?: boolean; ply?: number }
-  | { name: 'book'; key: string; study?: string; ply?: number; template?: string }
+  | { name: 'book'; key: string; study?: string; ply?: number; template?: string; line?: string[] }
   | { name: 'study-import' }
   | { name: 'review'; id: string; studies?: boolean }
   | { name: 'study-review'; study?: string; group?: string };
@@ -41,6 +46,9 @@ function parse(hash: string): Route {
   if (path === '/settings') return { name: 'settings' };
   if (path === '/trees') return { name: 'trees' };
   if (path === '/reviews') return { name: 'reviews' };
+  if (path === '/games') return { name: 'games' };
+  const game = /^\/game\/([\w-]+)$/.exec(path);
+  if (game) return { name: 'game', id: game[1] };
   if (path === '/study-import') return { name: 'study-import' };
   const tree = /^\/tree\/([\w-]+)(?:\/study\/([\w-]+)(?:\/(\d+))?)?$/.exec(path);
   if (tree) {
@@ -52,6 +60,8 @@ function parse(hash: string): Route {
     if (study[2] === 'edit') return { name: 'study', id: study[1], edit: true };
     return study[2] ? { name: 'study', id: study[1], ply: Number(study[2]) } : { name: 'study', id: study[1] };
   }
+  const bookM = /^\/book\/([^/]+)\/m\/([0-9a-zA-Z*+.]+)$/.exec(path);
+  if (bookM) return { name: 'book', key: safeDecode(bookM[1]), line: bookM[2].split('.').filter(Boolean) };
   const bookT = /^\/book\/([^/]+)\/t\/([^/]+)$/.exec(path);
   if (bookT) return { name: 'book', key: safeDecode(bookT[1]), template: safeDecode(bookT[2]) };
   const book = /^\/book\/([^/]+)(?:\/([\w-]+)\/(\d+))?$/.exec(path);
@@ -107,13 +117,19 @@ export function bookTemplatePath(key: string, templateId: string): string {
   return `/book/${encodeURIComponent(key)}/t/${encodeURIComponent(templateId)}`;
 }
 
-/** 画面の下のタブ（段階11-1）。一覧の画面にだけ出す */
-export type TabName = 'home' | 'trees' | 'reviews' | 'settings';
-export const TAB_PATHS: Record<TabName, string> = { home: '/', trees: '/trees', reviews: '/reviews', settings: '/settings' };
+/** 定跡帳を、平手からその手順の局面で開く（段階18） */
+export function bookLinePath(key: string, line: readonly string[]): string {
+  return `/book/${encodeURIComponent(key)}/m/${line.join('.')}`;
+}
 
-/** その画面がタブの画面なら、そのタブ（盤のある画面は null） */
+/** 画面の下のタブ（段階11-1。段階18 から 定跡帳／復習／実戦／設定）。一覧の画面にだけ出す */
+export type TabName = 'home' | 'reviews' | 'games' | 'settings';
+export const TAB_PATHS: Record<TabName, string> = { home: '/', reviews: '/reviews', games: '/games', settings: '/settings' };
+
+/** その画面がタブの画面なら、そのタブ（盤のある画面は null）。段階18：ツリーの一覧は設定から開くので、設定のタブ */
 export function tabOf(r: Route): TabName | null {
-  return r.name === 'home' || r.name === 'trees' || r.name === 'reviews' || r.name === 'settings' ? r.name : null;
+  if (r.name === 'trees') return 'settings';
+  return r.name === 'home' || r.name === 'reviews' || r.name === 'games' || r.name === 'settings' ? r.name : null;
 }
 
 /** 今の画面を、履歴を増やさずに別の画面にする（戻るボタンで前の画面に戻れるように） */

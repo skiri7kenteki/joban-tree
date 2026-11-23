@@ -113,11 +113,11 @@ test.describe('11-1 画面の下のタブ', () => {
     await expect(page.getByTestId('study-register')).toBeVisible();
     await expect(page.getByTestId('new-tree')).toHaveCount(0);
 
-    await page.getByTestId('tab-trees').click();
-    await expect(page).toHaveURL(/#\/trees$/);
-    await expect(page.getByRole('heading', { name: 'ツリー' })).toBeVisible();
-    await expect(page.getByTestId('new-tree')).toBeVisible();
-    await expect(page.getByTestId('import-json')).toBeVisible();
+    // 段階18：ツリーのタブは実戦のタブに置きかわった（ツリーは設定から。e2e/phase18.spec.ts）
+    await page.getByTestId('tab-games').click();
+    await expect(page).toHaveURL(/#\/games$/);
+    await expect(page.getByRole('heading', { name: '実戦' })).toBeVisible();
+    await expect(page.getByTestId('games-paste')).toBeVisible();
     await expect(page.getByTestId('study-register')).toHaveCount(0);
 
     await page.getByTestId('tab-reviews').click();
@@ -140,12 +140,12 @@ test.describe('11-1 画面の下のタブ', () => {
     await page.goBack();
     await expect(page.getByTestId('tab-reviews')).toHaveAttribute('aria-current', 'page');
     await page.goBack();
-    await expect(page.getByTestId('tab-trees')).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByTestId('tab-games')).toHaveAttribute('aria-current', 'page');
     await page.goBack();
     await expect(page.getByTestId('tab-studies')).toHaveAttribute('aria-current', 'page');
 
     // 盤の画面（新しいツリー・定跡帳）にはタブを出さない
-    await page.getByTestId('tab-trees').click();
+    await page.goto('./#/trees');
     await page.getByTestId('new-tree').click();
     await expect(page.getByTestId('board')).toBeVisible();
     await expect(page.getByTestId('tabbar')).toHaveCount(0);
@@ -268,7 +268,7 @@ test.describe('11-5 手順の一覧（棋譜欄）', () => {
   test('スマホ縦：ツリーは固定バーの真ん中で開く。たどった手の先に本線を薄く出し、押すとそこまで進む。開始局面より前の手は押せない', async ({ page }) => {
     await openHome(page);
     const tree = lineTree('k1', ['7g7f'], ['3c3d', '2g2f', '8c8d', '2f2e']);
-    await page.getByTestId('tab-trees').click();
+    await page.goto('./#/trees');
     await page.getByTestId('import-file').setInputFiles({ name: 't.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(tree)) });
     await page.getByTestId('tree-item').click();
     await expect(page.getByTestId('tree-position')).toHaveText('開始局面');
@@ -294,7 +294,7 @@ test.describe('11-5 手順の一覧（棋譜欄）', () => {
 
   test('スマホ縦：新しいツリーの画面も同じ部品。手数を押して局面を選ぶ', async ({ page }) => {
     await openHome(page);
-    await page.getByTestId('tab-trees').click();
+    await page.goto('./#/trees');
     await page.getByTestId('new-tree').click();
     await page.getByTestId('kifu-open').click();
     await page.getByTestId('kifu-input').fill('7g7f 3c3d 2g2f 8c8d');
@@ -390,7 +390,7 @@ test.describe('11-2 盤の下の固定バー', () => {
   test('ツリー：パンくずの行と操作のボタンは無く、操作は見出しの ⋯ に。バーは盤のすぐ下、候補手はその下（段階14）', async ({ page }) => {
     await openHome(page);
     const tree = lineTree('b1', ['7g7f'], ['3c3d', '2g2f', '8c8d']);
-    await page.getByTestId('tab-trees').click();
+    await page.goto('./#/trees');
     await page.getByTestId('import-file').setInputFiles({ name: 't.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(tree)) });
     await page.getByTestId('tree-item').click();
     await expect(page.getByTestId('tree-title')).toHaveText('ツリー棋譜欄 b1');
@@ -421,7 +421,7 @@ test.describe('11-2 盤の下の固定バー', () => {
   test('復習：真ん中に「今日 n／10問」。問題を出している間は ‹ › を押せず、答えた後はさかのぼって見られる', async ({ page }) => {
     await openHome(page);
     const tree = lineTree('b2', [], ['7g7f', '3c3d', '2g2f']);
-    await page.getByTestId('tab-trees').click();
+    await page.goto('./#/trees');
     await page.getByTestId('import-file').setInputFiles({ name: 't.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(tree)) });
     await page.getByTestId('tree-item').click();
     await page.getByTestId('review-open').click();
@@ -452,7 +452,7 @@ test.describe('11-2 盤の下の固定バー', () => {
 
   test('新しいツリー：手順の操作は盤のすぐ下、作るボタンのバーは画面の下（段階14）。貼り付け欄は画面の下から出る窓', async ({ page }) => {
     await openHome(page);
-    await page.getByTestId('tab-trees').click();
+    await page.goto('./#/trees');
     await page.getByTestId('new-tree').click();
     await page.getByTestId('kifu-open').click();
     await expectSheet(page, 'kifu-dialog', 740);
@@ -530,7 +530,7 @@ test.describe('11-3 ⋯ のメニューと説明文', () => {
     const sfen2 = applyUsiMove(root.sfen, '8c8d')!.sfen;
     tree.nodes[sfenKey(sfen2)] = { key: sfenKey(sfen2), sfen: sfen2, round: 0, edges: [] } as TreeNode;
     root.edges.push({ move: '8c8d', to: sfenKey(sfen2), score: { kind: 'cp', value: 0 } } as never);
-    await page.getByTestId('tab-trees').click();
+    await page.goto('./#/trees');
     await page.getByTestId('import-file').setInputFiles({ name: 't.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(tree)) });
     await page.getByTestId('tree-item').click();
     await expect(page.getByTestId('candidate')).toHaveCount(2);
@@ -555,7 +555,7 @@ test.describe('11-3 ⋯ のメニューと説明文', () => {
 
   test('新しいツリー：「盤の駒をタップ…」は初めての 1 回だけ。手番の長い説明は出さない', async ({ page }) => {
     await openHome(page);
-    await page.getByTestId('tab-trees').click();
+    await page.goto('./#/trees');
     await page.getByTestId('new-tree').click();
     await expect(page.getByTestId('hint-board-tap')).toBeVisible();
     await expect(page.getByText('この局面は自分の手番です')).toHaveCount(0);

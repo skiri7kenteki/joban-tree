@@ -10,6 +10,8 @@ import { availablePresets, defaultPcThreads, defaultThreads, pcEngine } from './
 import { isGenerating } from './generation';
 import { AppInfo } from '../components/Footer';
 import { DataSection } from './DataSection';
+import { setWarsName, warsName } from './games';
+import { go } from './router';
 import { HASH_CHOICES, PC_HASH_CHOICES, REVIEW_BATCH_CHOICES, presetLabel, resetSettings, settings, updateSettings, type AppSettings, type PresetValues } from './settings';
 
 export function SettingsScreen() {
@@ -30,6 +32,26 @@ export function SettingsScreen() {
       </div>
       <p class="muted">変えるとすぐ保存されます（この端末の中だけ）。</p>
       {isGenerating() && <p class="notice">生成中です。エンジンの設定は、次の生成から使われます。</p>}
+
+      {/* 段階18：実戦の照らし合わせで、自分の側を決める */}
+      <section class="card settings-section">
+        <h2>実戦</h2>
+        <label class="form-field">
+          <span>将棋ウォーズのユーザー名</span>
+          <input
+            type="text"
+            class="text-input"
+            data-testid="wars-name"
+            value={warsName.value}
+            autocomplete="off"
+            autocapitalize="off"
+            spellcheck={false}
+            maxLength={40}
+            onChange={(e) => setWarsName((e.currentTarget as HTMLInputElement).value)}
+          />
+        </label>
+        <p class="muted">棋譜の先手・後手の名前と照らして、あなたの側を自動で決めます。</p>
+      </section>
 
       {/* 段階17：データの保護とまとめてのバックアップ */}
       <DataSection />
@@ -237,6 +259,15 @@ export function SettingsScreen() {
           </>
         )}
       </div>
+
+      {/* 段階18：ツリーのタブをなくし、入口をここに残した（データは消していない） */}
+      <section class="card settings-section">
+        <h2>ツリー（以前の機能）</h2>
+        <p class="muted">エンジンで応手を調べたツリーの一覧です。</p>
+        <button type="button" class="btn" data-testid="open-trees" onClick={() => go('/trees')}>
+          ツリーの一覧を開く
+        </button>
+      </section>
 
       {/* 段階11-1：画面のいちばん下から移した */}
       <AppInfo />

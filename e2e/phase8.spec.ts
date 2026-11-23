@@ -220,7 +220,7 @@ test.describe('8-1 ツリーとのつながり・復習', () => {
     await importStudies(page, [study('s-a', '研究A', ['7g7f', '3c3d', '2g2f'], { note: 'Aのメモ' }), study('s-b', '研究B', ['2g2f', '3c3d'])]);
     await expect(page.getByTestId('home-message')).toContainText('研究手順 2 本を取り込みました');
 
-    await page.getByTestId('tab-trees').click();
+    await page.goto('./#/trees');
     await page.getByTestId('tree-item').click();
     const cand = page.getByTestId('candidate');
     await expect(cand.filter({ hasText: '▲７六歩' }).getByTestId('study-star')).toHaveCount(1);
@@ -331,7 +331,7 @@ test.describe('8-1 ツリーとのつながり・復習', () => {
     // ツリーの復習画面の「研究手順だけ」：ツリーの開始局面を通る研究手順
     await page.goto('./#/trees');
     await importTrees(page, [lineTree('rv', '復習するツリー')]);
-    await page.getByTestId('tab-trees').click();
+    await page.goto('./#/trees');
     await page.getByTestId('tree-item').click();
     await page.getByTestId('review-open').click();
     await expect(page.getByTestId('review-mode-all')).toHaveAttribute('aria-selected', 'true');
@@ -463,7 +463,7 @@ test.describe('8-1 移し替え（段階7の研究手順 → 独立した研究�
 
     // ツリーには研究手順が無くなっても★は付く（手順が同じなので）
     await page.goto('./#/trees');
-    await page.getByTestId('tab-trees').click();
+    await page.goto('./#/trees');
     await page.getByTestId('tree-item').filter({ hasText: 'ツリーB' }).click();
     await expect(page.getByTestId('candidate').filter({ hasText: '▲７六歩' }).getByTestId('study-star')).toHaveCount(1);
   });
@@ -471,7 +471,7 @@ test.describe('8-1 移し替え（段階7の研究手順 → 独立した研究�
   test('研究手順の入ったツリーの JSON（形式 6）を取り込むと、研究手順も取り込む（同じ手順がすでにあれば二重にしない）', async ({ page }) => {
     await openHome(page);
     await importStudies(page, [study('mine', '自分の研究', ['7g7f', '3c3d', '2g2f'], { updatedAt: 5 })]);
-    await page.getByTestId('tab-trees').click();
+    await page.goto('./#/trees');
     const tree = lineTree('from-friend', '仲間のツリー', [
       { id: 'f-1', name: '仲間の研究（同じ手順）', note: '', moves: ['7g7f', '3c3d', '2g2f'], createdAt: 1, updatedAt: 1 },
       { id: 'f-2', name: '仲間の研究', note: '仲間のメモ', moves: ['7g7f', '3c3d', '6g6f'], createdAt: 1, updatedAt: 1 },
