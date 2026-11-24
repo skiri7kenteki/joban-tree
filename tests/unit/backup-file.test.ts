@@ -63,6 +63,10 @@ function sample(): BackupData {
       { id: 'g-1', kifu: '1 ７六歩(77)', moves: ['7g7f'], black: { name: 'a', rank: '七段' }, white: { name: 'b' }, playedAt: 8, timeLimit: '3分切れ負け', mySide: 'white', winner: 'black', ending: '投了', addedAt: 9 },
     ],
     practice: [{ studyId: 's-1', step: 2, dueAt: 10, lastAt: 5, firstAt: 1, lastMistakes: 0, count: 3 }],
+    positions: [
+      { id: 'white|k1', side: 'white', key: 'k1', note: '局面のメモ', updatedAt: 11 },
+      { id: 'black|k2', side: 'black', key: 'k2', note: '', okMoves: ['2g2f', '7g7f'], updatedAt: 12 },
+    ],
     prefs: { 'joban-tree.settings': '{"version":1}', 'joban-tree:book-write': 'off' },
   };
 }
@@ -77,11 +81,11 @@ describe('バックアップのファイル', () => {
     expect(parsed.file).toEqual(file);
     expect(parsed.unknownKinds).toEqual([]);
     expect(file).toMatchObject({ app: 'joban-tree', kind: 'backup', version: 1, createdAt: 1700000000000, appVersion: '0.41.0' });
-    expect(backupCounts(parsed.file.data)).toEqual({ studies: 2, trees: 1, reviewProblems: 3, templates: 1, games: 1, practice: 1, prefs: 2 });
+    expect(backupCounts(parsed.file.data)).toEqual({ studies: 2, trees: 1, reviewProblems: 3, templates: 1, games: 1, practice: 1, positions: 1, prefs: 2 });
   });
 
   it('空のデータも作って読める', () => {
-    const empty: BackupData = { studies: [], trees: [], reviews: [], templates: [], games: [], practice: [], prefs: {} };
+    const empty: BackupData = { studies: [], trees: [], reviews: [], templates: [], games: [], practice: [], positions: [], prefs: {} };
     const parsed = parseBackupJson(backupToJson(makeBackup(empty, 1, '0.41.0')));
     expect(parsed.ok && parsed.file.data).toEqual(empty);
   });
@@ -114,6 +118,8 @@ describe('バックアップのファイル', () => {
     expect(msg(fileOf((f) => delete f.data.templates[0].createdAt))).toContain('戦型 1 つ目');
     expect(msg(fileOf((f) => (f.data.games[0].mySide = 'x')))).toContain('実戦 1 局目');
     expect(msg(fileOf((f) => (f.data.practice[0].step = -1)))).toContain('稽古の記録 1 つ目');
+    expect(msg(fileOf((f) => (f.data.positions[1].id = 'white|k2')))).toContain('局面メモ 2 つ目');
+    expect(msg(fileOf((f) => (f.data.positions[0].note = 'x'.repeat(3001))))).toContain('局面メモ 1 つ目');
     expect(msg(fileOf((f) => (f.data.prefs['joban-tree.settings'] = 3)))).toContain('設定');
     expect(msg(fileOf((f) => f.data.studies.push({ ...f.data.studies[0] })))).toContain('同じ id');
   });
@@ -146,9 +152,11 @@ describe('段階17 の版のバックアップ（実戦の棋譜・稽古の記�
     const f = JSON.parse(backupToJson(makeBackup(sample(), 1, '0.41.0')));
     delete f.data.games;
     delete f.data.practice;
+    delete f.data.positions;
     const parsed = parseBackupJson(JSON.stringify(f));
     expect(parsed.ok && parsed.file.data.games).toEqual([]);
     expect(parsed.ok && parsed.file.data.practice).toEqual([]);
+    expect(parsed.ok && parsed.file.data.positions).toEqual([]);
     expect(parsed.ok && parsed.unknownKinds).toEqual([]);
   });
 });

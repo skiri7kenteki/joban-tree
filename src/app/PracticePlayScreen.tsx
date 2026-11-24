@@ -3,6 +3,8 @@
 // - 研究手順を 1 本ずつ、戦型の出発点から終わりまで通して指す。相手の手は研究手順の通りにアプリが指す（少し間を置いて）
 // - まちがえたら「△5二玉 ではありません。正解は △6二玉」。盤で正解を指すと続く（止めずに最後まで）。数えるのは 1 回目の答えだけ
 // - 1 本終わったら記録を保存（全部正解なら次の間隔へ、まちがえたら明日）し、「次の研究手順へ（あと n本）」
+// - 段階20-1：ほかの研究手順の自分の手（同じ局面・手順前後も）を指したら、まちがいにしない（「それは『X』の研究の手です」）。
+//   まちがえたとき・ほかの研究の手のときは、その局面の局面メモをカードの下に出す
 // - 盤の画面の決まり（段階14）：1 画面に収める。上の行に、今日の稽古に入った理由と、自分の手の数だけの丸（正解は茶・まちがいは朱）
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
@@ -23,6 +25,9 @@ import { gameDate } from './GamesScreen';
 import { ensurePractice, planNow, practiceRecords, savePractice } from './practice';
 import { back, go } from './router';
 import { ensureStudies, library } from './studies';
+import { buildBookIndex } from '../games/compare';
+import { otherStudyAt } from '../tree/positions';
+import { ensurePositions, noteAt, positionNotes } from './positions';
 import { allTemplates, myTemplates, refreshMyTemplates } from './TemplateDialogs';
 
 export type PracticeTarget = { kind: 'today' } | { kind: 'one'; studyId: string } | { kind: 'group'; key: string };
@@ -100,7 +105,7 @@ function makeQueue(target: PracticeTarget, studies: readonly Study[], records: R
   return [...planned, ...pool.filter((s) => !seen.has(s.id)).map((s) => ({ id: s.id }))];
 }
 
-type Phase = { kind: 'play' } | { kind: 'wrong'; tried: string } | { kind: 'end'; record: PracticeRecord | null; saveError?: string };
+type Phase = { kind: 'play' } | { kind: 'wrong'; tried: string } | { kind: 'other'; tried: string; name: string } | { kind: 'end'; record: PracticeRecord | null; saveError?: string };
 
 function PlayView({ queue }: { queue: QueueItem[] }) {
   const studies = library.value ?? [];
@@ -162,6 +167,13 @@ function StudyPlay({
   /** 終わった後にさかのぼって見ている局面（null は今の局面） */
   const [view, setView] = useState<number | null>(null);
   const mySideText = study.mySide === 'black' ? '☗先手' : '☖後手';
+  // 段階20-1：ほかの研究手順の手か（自分の側が同じ研究手順を局面で引く）と、局面メモ
+  void positionNotes.value;
+  useEffect(() => {
+    void ensurePositions().catch(() => undefined);
+  }, []);
+  const allStudies = library.value;
+  const bookIndex = useMemo(() => buildBookIndex(allStudies ?? [study], study.mySide), [allStudies, study]);
 
   // 相手の手番ならアプリが指す。最後まで来たら記録を保存して終わり
   useEffect(() => {
@@ -199,9 +211,16 @@ function StudyPlay({
         setPly(ply + 1);
         return;
       }
-      if (!answers.has(ply)) setAnswers(new Map(answers).set(ply, false));
+      const tried = textAt(sfen, move.usi, ply > 0 ? study.moves[ply - 1] : undefined);
       setJustOk(false);
-      setPhase({ kind: 'wrong', tried: textAt(sfen, move.usi, ply > 0 ? study.moves[ply - 1] : undefined) });
+      // ほかの研究手順の手なら、まちがいに数えない（正解の手を指すまで続かないのは同じ）
+      const other = otherStudyAt(bookIndex, sfen, move.usi, study.id);
+      if (other) {
+        setPhase({ kind: 'other', tried, name: other.name });
+        return;
+      }
+      if (!answers.has(ply)) setAnswers(new Map(answers).set(ply, false));
+      setPhase({ kind: 'wrong', tried });
     },
     asking,
   );
@@ -287,7 +306,7 @@ function StudyPlay({
         </div>
 
         <div class="tree-side board-frame" ref={frameRef}>
-          <section class="card review-prompt practice-card" ref={cardRef} data-testid="practice-card" data-phase={phase.kind === 'end' ? 'end' : asking ? phase.kind === 'wrong' ? 'wrong' : 'ask' : 'wait'}>
+          <section class="card review-prompt practice-card" ref={cardRef} data-testid="practice-card" data-phase={phase.kind === 'end' ? 'end' : asking ? (phase.kind === 'play' ? 'ask' : phase.kind) : 'wait'}>
             {phase.kind === 'play' && asking && (
               <>
                 {lastOpp && (
@@ -310,10 +329,29 @@ function StudyPlay({
                 </p>
               </>
             )}
+            {phase.kind === 'other' && (
+              <>
+                <p data-testid="practice-other">
+                  {phase.tried} は「{phase.name}」の研究の手です（まちがいにしません）。
+                </p>
+                <p>
+                  この研究は <strong class="practice-answer" data-testid="practice-answer">{texts[ply]}</strong>。盤で指すと続きます。
+                </p>
+              </>
+            )}
             {phase.kind === 'end' && (
               <EndCard record={phase.record} saveError={phase.saveError} mistakes={mistakes} texts={texts} rest={total - index - 1} onNext={onNext} />
             )}
           </section>
+          {/* 段階20-1：まちがえたとき・ほかの研究の手のときは、その局面の局面メモ（カードの下。盤の大きさはカードまでで決める） */}
+          {(phase.kind === 'wrong' || phase.kind === 'other') && noteAt(study.mySide, sfen) && (
+            <div class="practice-after">
+              <p class="study-note practice-note" data-testid="practice-memo">
+                <span class="practice-memo-label">局面メモ</span>
+                {noteAt(study.mySide, sfen)}
+              </p>
+            </div>
+          )}
           {/* 終わった後のメモと「定跡帳で見る」はカードの下（盤の大きさはカードまでで決める。入りきらなければ枠の中でスクロール） */}
           {phase.kind === 'end' && (
             <div class="practice-after">

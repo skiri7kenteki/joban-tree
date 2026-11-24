@@ -2803,3 +2803,175 @@ div.move-bar-center {
   font-size: 20px;
   text-align: center;
 }
+
+/* ---- 段階20-1：局面メモと食い違い ---- */
+
+/* 一覧の見出しの行の局面メモ（1 行目だけ。入りきらなければ …）。行の高さは前と同じに保つ */
+.book-memo {
+  flex: 1 1 auto;
+  min-width: 0;
+  max-width: max-content;
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-mark);
+  border-radius: var(--radius-chip);
+  background: var(--color-mark-soft);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--font-size-small);
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.book-memo-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.book-memo-empty {
+  flex: 0 0 auto;
+  border-style: dashed;
+  border-color: var(--color-border);
+  background: transparent;
+  color: var(--color-text-muted);
+}
+
+/* 食い違いの印（朱の縁） */
+.diff-tag {
+  display: inline-flex;
+  align-items: center;
+  margin-left: var(--space-1);
+  padding: 0 6px;
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-chip);
+  color: var(--color-danger);
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.5;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+/* 手順前後で来るほかの研究手順の手（点線で薄く） */
+.book-list .book-transposed .book-names {
+  color: var(--color-text-muted);
+}
+
+.book-list .book-transposed {
+  border-top: 1px dashed var(--color-border);
+}
+
+.conflict-box {
+  margin-bottom: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-card);
+}
+
+.conflict-box p {
+  margin: 0 0 var(--space-2);
+}
+
+.conflict-word {
+  color: var(--color-danger);
+}
+
+/* 局面メモの窓 */
+.memo-sub {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-small);
+}
+
+.memo-text {
+  width: 100%;
+  min-height: 120px;
+  padding: var(--space-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.6;
+  resize: vertical;
+}
+
+.dialog-action-end {
+  margin-left: auto;
+}
+
+/* 定跡帳のタブの食い違いの知らせ（朱の縁のカード） */
+.conflict-notice {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-danger);
+}
+
+.conflict-notice-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  font-size: var(--font-size-small);
+  line-height: 1.6;
+}
+
+.conflict-notice-btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.conflict-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.conflict-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  border-top: 1px solid var(--color-border);
+}
+
+.conflict-item-open {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: var(--touch-min);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  padding: var(--space-2) 0;
+  border: none;
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.conflict-item-moves {
+  color: var(--color-danger);
+  font-size: var(--font-size-small);
+}
+
+.conflict-item-ok {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* 稽古のカードの下の局面メモ（段階20-1） */
+.practice-memo-label {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--color-mark-text);
+  font-size: var(--font-size-small);
+  font-weight: 600;
+}

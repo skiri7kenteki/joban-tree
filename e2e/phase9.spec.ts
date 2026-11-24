@@ -62,7 +62,7 @@ test.describe('9-2 研究手順どうしをつないで見る', () => {
     await page.getByTestId('study-next').click();
     await expect(page.getByTestId('study-position')).toContainText('17手目');
     await expect(page.getByTestId('study-meta')).toContainText('Aのメモ');
-    await expect(page.getByTestId('study-book-head')).toHaveText('この局面からの研究（3 本）');
+    await expect(page.getByTestId('study-book-head')).toHaveText('研究 3本');
     const rows = page.getByTestId('study-book-branch');
     await expect(rows).toHaveCount(2);
     // 3 行目まで見える高さ（ここでは 2 行と、空けた分）
@@ -71,12 +71,12 @@ test.describe('9-2 研究手順どうしをつないで見る', () => {
 
     // △8四飛 → 2 本
     await rows.nth(0).click();
-    await expect(page.getByTestId('study-book-head')).toHaveText('この局面からの研究（2 本）');
+    await expect(page.getByTestId('study-book-head')).toHaveText('研究 2本');
     // ▲5八玉 → 研究B に切り替わる。研究B はここで終わる
     await rows.filter({ hasText: '▲５八玉' }).click();
     await expect(page.getByTestId('study-title')).toHaveText('研究B');
     await expect(page).toHaveURL(/#\/book\/[^/]+\/s-b\/19$/);
-    await expect(page.getByTestId('study-book-head')).toHaveText('この局面からの研究（1 本）');
+    await expect(page.getByTestId('study-book-head')).toHaveText('研究 1本');
     await expect(page.getByTestId('study-book-ending')).toContainText('研究B');
     await expect(page.getByTestId('study-book-ending')).toHaveAttribute('data-current', 'true');
 

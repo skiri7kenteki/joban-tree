@@ -54,6 +54,7 @@ import { StudyEditDialog, StudyExportDialog, shareStudies } from './StudyDialogs
 import { ensureStudies, homeNotice, importLiftedStudies, library, removeStudy, saveStudies, updateStudyFields } from './studies';
 import { Words } from '../components/Words';
 import { BackupNudge } from './DataSection';
+import { ConflictNotice } from './ConflictNotice';
 
 export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'trees'; isolationMessage: string | null }) {
   const [trees, setTrees] = useState<TreeSummary[] | null>(null);
@@ -256,6 +257,7 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
       {isolationMessage && <p class="notice notice-danger">{isolationMessage}</p>}
       {tab === 'studies' && studies && <BackupNudge studies={studies} />}
       {tab === 'studies' && studies && studyCount > 0 && <StudySummary summary={practiceSummary} />}
+      {tab === 'studies' && studies && studyCount > 1 && <ConflictNotice studies={studies} />}
       <div class="btn-row">
         {tab === 'studies' ? (
           <button type="button" class="btn btn-primary btn-wide" data-testid="study-register" onClick={() => setRegisterMenu(true)}>

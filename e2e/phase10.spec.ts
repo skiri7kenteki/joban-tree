@@ -136,7 +136,7 @@ test.describe('10-1 定跡帳で直接指して研究を足す', () => {
     await expect(page.getByTestId('book-toast')).toContainText('△５二玉 を足しました');
     await expect(page.getByTestId('study-title')).toHaveText('△３三角 ▲３六飛 △５二玉');
     await page.getByTestId('study-prev').click();
-    await expect(page.getByTestId('study-book-head')).toHaveText('この局面からの研究（2 本）');
+    await expect(page.getByTestId('study-book-head')).toHaveText('研究 2本');
     await expect(page.getByTestId('study-book-branch')).toHaveCount(2);
     await backHome(page);
     await expect(page.getByTestId('study-item')).toHaveCount(2);

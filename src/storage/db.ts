@@ -8,17 +8,19 @@
 //   4 … studies（ツリーから独立した研究手順。段階8-1）を追加。ツリーの中の研究手順をここへ移す（src/storage/migrate.ts）
 //   5 … games（実戦の棋譜。段階18）を追加。今のデータはそのまま
 //   6 … practice（稽古の記録。段階19）を追加。今のデータはそのまま
+//   7 … positions（局面メモと食い違いの「このままでよい」。段階20-1）を追加。今のデータはそのまま
 
 import { migrateStudiesInUpgrade } from './migrate';
 
 const DB_NAME = 'joban-tree';
-const DB_VERSION = 6;
+const DB_VERSION = 7;
 export const TREES = 'trees';
 export const REVIEW = 'review';
 export const TEMPLATES = 'templates';
 export const STUDIES = 'studies';
 export const GAMES = 'games';
 export const PRACTICE = 'practice';
+export const POSITIONS = 'positions';
 
 let dbPromise: Promise<IDBDatabase> | null = null;
 
@@ -34,6 +36,7 @@ export function openDb(): Promise<IDBDatabase> {
         if (!db.objectStoreNames.contains(STUDIES)) db.createObjectStore(STUDIES, { keyPath: 'id' });
         if (!db.objectStoreNames.contains(GAMES)) db.createObjectStore(GAMES, { keyPath: 'id' });
         if (!db.objectStoreNames.contains(PRACTICE)) db.createObjectStore(PRACTICE, { keyPath: 'studyId' });
+        if (!db.objectStoreNames.contains(POSITIONS)) db.createObjectStore(POSITIONS, { keyPath: 'id' });
         // 版 3 まで使っていた端末：ツリーの中の研究手順を studies へ移す（この処理は 1 回だけ。全部やり切るか、何もしないか）
         if (event.oldVersion >= 1 && event.oldVersion < 4) {
           migrateStudiesInUpgrade(request.transaction!, { trees: TREES, review: REVIEW, studies: STUDIES });

@@ -11,13 +11,19 @@
 // - 段階11-2：‹ › の行と手順の行（パンくず）をやめ、盤の下の固定バー（MoveBar）に。手数を押すと手順の一覧
 // - 段階11-3：⋯ は画面の下から（小見出し「この研究手順」「この局面」「定跡帳」・短い文字）。★ の行の右端に［復習］（段階19 から［稽古］）
 // - 段階12-3：［復習］は金。「この局面からの研究」の見出しの左に「芽」の紋、行に、その手を通る研究手順の割合の棒（行の高さは変えない）
+// - 段階20-1：一覧の見出しの行に局面メモ（1 行目。押すと窓で読む・直す）。自分の手番で研究手順によって自分の手が違う（食い違い）とき、その手の行に印、
+//   手順前後で来るほかの研究手順の手は「手順前後」の行。行の ⋯ で「このままでよい」。KIF の書き出しに局面メモを入れる
 // 研究手順の画面（StudyScreen）と編集モードは段階10-2 で片付けた（古い URL は src/app/LegacyRedirect.tsx でここへ移す）。
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { Board } from '../components/Board';
 import { Dialog } from '../components/Dialog';
 import { PromotionBox, useMoveInput } from '../components/useMoveInput';
-import { STARTPOS_SFEN, moveText, type Side } from '../shogi/position';
+import { STARTPOS_SFEN, moveText, sfenKey, type Side } from '../shogi/position';
+import { buildBookIndex } from '../games/compare';
+import { NOTE_MAX, conflictAt, type Conflict } from '../tree/positions';
+import { acknowledgeConflict, ensurePositions, noteAt, positionNotes, positionsNow, saveNote, unacknowledgeConflict } from './positions';
+import { studyBookUrl } from './addToBook';
 import { studyPositions } from '../review/studyReview';
 import { loadTreesOnLine } from '../storage/trees';
 import { fileNameOf } from '../tree/backup';
@@ -150,7 +156,8 @@ type BookDialog =
   | { kind: 'trees' }
   | { kind: 'cut'; move: string }
   | { kind: 'end' }
-  | { kind: 'delete' };
+  | { kind: 'delete' }
+  | { kind: 'memo' };
 
 /** 取り消し 1 回分：元に戻す変更と、その操作の前の盤 */
 interface UndoEntry {
@@ -255,6 +262,16 @@ function BookViewScreen({
 
   const treesHere = current ? trees.filter((t) => pathInTree(t, here) !== null) : [];
 
+  // 段階20-1：局面メモと食い違い（自分の側が同じ研究手順すべてを局面で引く。手順前後も同じ局面）
+  void positionNotes.value;
+  useEffect(() => {
+    void ensurePositions().catch(() => undefined);
+  }, []);
+  const allStudies = library.value ?? pool;
+  const bookIndex = useMemo(() => buildBookIndex(allStudies, side), [allStudies, side]);
+  const conflict = conflictAt(bookIndex, side, sfen, positionsNow());
+  const memo = noteAt(side, sfen);
+
   // 段階14：1 画面に収める。「この局面からの研究」の枠の中で 3 行目まで見える盤の幅（一覧の行が少ない局面でも同じだけ空けて、盤の大きさを変えない）
   const boardRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
@@ -271,6 +288,8 @@ function BookViewScreen({
   // 段階14：操作の結果の一言（コピーしました・読むだけ など）は、一覧の下ではなく画面の下の知らせで 5 秒（画面を広げない）
   useEffect(() => {
     if (!note) return;
+    // 新しい一言が出たら、前の取り消しの知らせは消す（両方が同時に消えて、一言が一度も見えないことがあったため。取り消しは ⋯ からもできる）
+    setToast(null);
     const timer = setTimeout(() => setNote(''), TOAST_MS);
     return () => clearTimeout(timer);
   }, [note]);
@@ -467,7 +486,7 @@ function BookViewScreen({
 
   /** 定跡帳の研究手順を、変化付きの 1 つの KIF にして渡す（並びは画面と同じ。共有の前に待たない） */
   async function shareBook() {
-    const kif = studiesToKif(bookOrder(pool), `定跡帳：${label}`);
+    const kif = studiesToKif(bookOrder(pool), `定跡帳：${label}`, (s) => noteAt(side, s));
     const outcome = await shareFile(fileNameOf(`定跡帳-${label}`, 'kifu'), kif, 'text/plain');
     if (outcome !== 'cancelled') {
       setDialog(null);
@@ -476,6 +495,48 @@ function BookViewScreen({
   }
 
   const connections = bookAt(pool, here);
+  /** 手順前後で同じ局面に来る、ほかの研究手順の自分の手（この定跡帳の一覧に無い手） */
+  const transposed = conflict
+    ? conflict.moves
+        .filter((m) => !connections.branches.some((b) => b.move === m.move))
+        .map((m) => {
+          const study = [...m.studies].sort(byLatest)[0];
+          const at = bookIndex.get(sfenKey(sfen))?.through.find((t) => t.study.id === study.id)?.ply ?? study.moves.length;
+          return { move: m.move, study, ply: at };
+        })
+    : [];
+
+  /** 手順前後の研究手順へ（この定跡帳にあれば切り替え、無ければその研究手順の定跡帳で） */
+  function openTransposed(t: { study: Study; ply: number }) {
+    if (pool.some((s) => s.id === t.study.id)) switchTo(t.study, t.ply);
+    else go(studyBookUrl(t.study, t.ply));
+  }
+
+  async function doSaveMemo(text: string) {
+    setBusy(true);
+    try {
+      await saveNote(side, sfen, text);
+      setDialog(null);
+      setNote(text.trim() ? '局面メモを保存しました' : '局面メモを消しました');
+    } catch (e) {
+      setNote(`保存できませんでした：${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function setConflictOk(c: Conflict, ok: boolean) {
+    setBusy(true);
+    try {
+      await (ok ? acknowledgeConflict(c) : unacknowledgeConflict(c));
+      setDialog(null);
+      setNote(ok ? '食い違いの印を消しました（この局面の手が増えたら、また知らせます）' : '食い違いの印を戻しました');
+    } catch (e) {
+      setNote(`保存できませんでした：${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setBusy(false);
+    }
+  }
   const outside = index > covered || pool.length === 0;
 
   return (
@@ -561,6 +622,11 @@ function BookViewScreen({
             onBranch={pickBranch}
             onEnding={(s) => switchTo(s, index)}
             onMenu={(move) => setDialog({ kind: 'cut', move })}
+            conflict={conflict}
+            transposed={transposed}
+            onTransposed={openTransposed}
+            memo={memo}
+            onMemo={() => setDialog({ kind: 'memo' })}
           />
         </div>
       </div>
@@ -710,6 +776,7 @@ function BookViewScreen({
 
       {dialog?.kind === 'cut' && cutPlan && (
         <Dialog title={`${moveText(sfen, dialog.move, prevMove)} から先`} onClose={() => setDialog(null)} testId="book-cut-dialog">
+          {conflict && conflict.moves.some((m) => m.move === dialog.move) && <ConflictBox conflict={conflict} busy={busy} onOk={(ok) => void setConflictOk(conflict, ok)} />}
           <CutText plan={cutPlan} />
           <div class="dialog-actions">
             <button type="button" class="btn btn-danger" data-testid="book-cut-ok" disabled={busy} onClick={() => void doCut(dialog.move)}>
@@ -751,6 +818,17 @@ function BookViewScreen({
         </Dialog>
       )}
 
+      {dialog?.kind === 'memo' && (
+        <MemoDialog
+          title={index === 0 ? '初期局面' : `${index}手目 ${texts[index - 1] ?? ''} の局面`}
+          side={side}
+          initial={memo}
+          busy={busy}
+          onSave={(t) => void doSaveMemo(t)}
+          onClose={() => setDialog(null)}
+        />
+      )}
+
       {dialog?.kind === 'trees' && (
         <Dialog title="どのツリーで見ますか？" onClose={() => setDialog(null)} testId="study-trees-dialog">
           <div class="dialog-actions dialog-actions-column">
@@ -763,6 +841,65 @@ function BookViewScreen({
         </Dialog>
       )}
     </div>
+  );
+}
+
+/** 食い違いの説明と「このままでよい」（行の ⋯ の窓の上） */
+function ConflictBox({ conflict, busy, onOk }: { conflict: Conflict; busy: boolean; onOk: (ok: boolean) => void }) {
+  const prev = undefined;
+  return (
+    <div class="conflict-box" data-testid="book-conflict-box">
+      <p>
+        <strong class="conflict-word">食い違い</strong>：この局面で、研究手順によって自分の手が違います（
+        {conflict.moves.map((m) => `${moveText(conflict.sfen, m.move, prev)}（${m.studies.length}本）`).join('／')}）。
+      </p>
+      <p class="muted">稽古では、どちらを指してもまちがいにしません。わざと両方を研究しているなら「このままでよい」で印を消せます。</p>
+      <div class="dialog-actions">
+        {conflict.ok ? (
+          <button type="button" class="btn" data-testid="book-conflict-unok" disabled={busy} onClick={() => onOk(false)}>
+            また知らせる
+          </button>
+        ) : (
+          <button type="button" class="btn" data-testid="book-conflict-ok" disabled={busy} onClick={() => onOk(true)}>
+            このままでよい
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** 局面メモの窓（画面の下から。全文を読む・直す・消す） */
+function MemoDialog({ title, side, initial, busy, onSave, onClose }: { title: string; side: Side; initial: string; busy: boolean; onSave: (text: string) => void; onClose: () => void }) {
+  const [text, setText] = useState(initial);
+  return (
+    <Dialog title="局面メモ" onClose={onClose} testId="book-memo-dialog" sheet>
+      <p class="muted memo-sub">
+        {title}（{side === 'black' ? '☗先手' : '☖後手'}の定跡帳）。手順前後で来ても同じメモが出ます。
+      </p>
+      <textarea
+        class="memo-text"
+        data-testid="book-memo-text"
+        aria-label="局面メモ"
+        maxLength={NOTE_MAX}
+        rows={5}
+        value={text}
+        onInput={(e) => setText((e.target as HTMLTextAreaElement).value)}
+      />
+      <div class="dialog-actions">
+        <button type="button" class="btn btn-primary" data-testid="book-memo-save" disabled={busy || text.trimEnd() === initial} onClick={() => onSave(text)}>
+          保存
+        </button>
+        <button type="button" class="btn" onClick={onClose}>
+          やめる
+        </button>
+        {initial && (
+          <button type="button" class="btn btn-danger dialog-action-end" data-testid="book-memo-delete" disabled={busy} onClick={() => onSave('')}>
+            消す
+          </button>
+        )}
+      </div>
+    </Dialog>
   );
 }
 
@@ -798,6 +935,11 @@ function BookBranches({
   onEnding,
   onMenu,
   listRef,
+  conflict,
+  transposed,
+  onTransposed,
+  memo,
+  onMemo,
 }: {
   connections: BookPosition<Study>;
   current: Study | null;
@@ -809,15 +951,33 @@ function BookBranches({
   onEnding: (s: Study) => void;
   onMenu: (move: string) => void;
   listRef: { current: HTMLDivElement | null };
+  conflict: Conflict | null;
+  transposed: { move: string; study: Study; ply: number }[];
+  onTransposed: (t: { move: string; study: Study; ply: number }) => void;
+  memo: string;
+  onMemo: () => void;
 }) {
   const { branches, ending, count } = connections;
+  /** 食い違いの印を付ける手（「このままでよい」にしてあれば付けない） */
+  const diffMoves = new Set(conflict && !conflict.ok ? conflict.moves.map((m) => m.move) : []);
   /** 名前の並び：今たどっている研究手順を先に */
   const names = (list: readonly Study[]) =>
     [...list.filter((s) => s.id === current?.id), ...list.filter((s) => s.id !== current?.id)].map((s) => s.name).join('・');
   return (
     <div class="card candidates book-list" ref={listRef} data-testid="study-book-list">
       <div class="candidates-head book-list-head">
-        <strong data-testid="study-book-head">この局面からの研究（{count} 本）</strong>
+        <strong data-testid="study-book-head">研究 {count}本</strong>
+        {/* 段階20-1：局面メモ（1 行目。押すと窓で全文） */}
+        <button type="button" class={memo ? 'book-memo' : 'book-memo book-memo-empty'} data-testid="book-memo" aria-label={memo ? `局面メモ：${firstLine(memo)}` : '局面メモを書く'} onClick={onMemo}>
+          {memo ? (
+            <>
+              <span aria-hidden="true">✎ </span>
+              <span class="book-memo-text">{firstLine(memo)}</span>
+            </>
+          ) : (
+            '＋ 局面メモ'
+          )}
+        </button>
       </div>
       <ul class="candidate-list">
         {branches.map((b) => {
@@ -835,6 +995,11 @@ function BookBranches({
                   <span class="candidate-move">
                     {isCurrent ? '▶ ' : ''}
                     {moveText(sfen, b.move, prev)}
+                    {diffMoves.has(b.move) && (
+                      <span class="diff-tag" data-testid="book-conflict-tag">
+                        食い違い
+                      </span>
+                    )}
                   </span>
                   <span class="book-names">{names(b.studies)}</span>
                   {/* その手を通る研究手順の割合の棒（段階12-3。本数はこの局面を通る研究手順の数に対して） */}
@@ -850,6 +1015,23 @@ function BookBranches({
             </li>
           );
         })}
+        {transposed.map((t) => (
+          <li key={`tr-${t.move}`}>
+            <button type="button" class="candidate book-row book-transposed" data-testid="book-transposed" onClick={() => onTransposed(t)}>
+              <span class="candidate-line">
+                <span class="candidate-move">
+                  {moveText(sfen, t.move, prev)}
+                  {diffMoves.has(t.move) && (
+                    <span class="diff-tag" data-testid="book-conflict-tag">
+                      食い違い
+                    </span>
+                  )}
+                </span>
+                <span class="book-names">手順前後：{t.study.name}</span>
+              </span>
+            </button>
+          </li>
+        ))}
         {ending.map((s) => {
           const isCurrent = s.id === current?.id;
           return (
@@ -869,7 +1051,7 @@ function BookBranches({
             </li>
           );
         })}
-        {count === 0 && (
+        {count === 0 && transposed.length === 0 && (
           <li>
             <p class="muted book-row book-empty" data-testid="study-book-empty">
               {outside ? '盤で指すと、ここから研究手順ができます。' : 'この局面からの研究はありません。'}

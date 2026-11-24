@@ -1,8 +1,8 @@
 // まとめてのバックアップのファイル（段階17、v0.41.0〜。持ち主の依頼書 stage17-prompt・判断 2026-11-23「おすすめの通りで」）。
 // 研究手順・ツリー・復習の記録・自分で登録した戦型・設定を 1 つの JSON にする。ここは形を作る・確かめるだけ（保存場所の読み書きは src/storage/backup.ts）。
 //
-// ファイルの形：{ app: 'joban-tree', kind: 'backup', version: 1, createdAt, appVersion, data: { studies, trees, reviews, templates, games, practice, prefs } }
-// - あとから種類を足せる：data に新しい種類を足すだけなら version は 1 のまま（段階18 で games＝実戦の棋譜、段階19 で practice＝稽古の記録を足した。無いファイルは空として読む）。
+// ファイルの形：{ app: 'joban-tree', kind: 'backup', version: 1, createdAt, appVersion, data: { studies, trees, reviews, templates, games, practice, positions, prefs } }
+// - あとから種類を足せる：data に新しい種類を足すだけなら version は 1 のまま（段階18 で games＝実戦の棋譜、段階19 で practice＝稽古の記録、段階20-1 で positions＝局面メモを足した。無いファイルは空として読む）。
 //   この版のアプリが知らない種類は読まずに、画面で「戻すとそれは入りません」と知らせる（unknownKinds）
 // - version が新しい（形の違う）ファイルは、分かりやすく断る
 // - 中身は信用せず、ツリー・研究手順・戦型は今の取り込みと同じ確かめ方、復習の記録と設定はここで確かめる。1 つでもおかしければ全体を読まない
@@ -13,6 +13,7 @@ import { checkStudy } from './studyFile';
 import { checkTemplate } from './templates';
 import { gameProblem, type Game } from '../games/game';
 import { practiceProblem, type PracticeRecord } from '../practice/practice';
+import { positionProblem, type PositionNote } from './positions';
 import { TREE_APP, type Study, type TreeData } from './types';
 import type { OpeningTemplate } from './templates';
 
@@ -45,12 +46,14 @@ export interface BackupData {
   games: Game[];
   /** 稽古の記録（段階19） */
   practice: PracticeRecord[];
+  /** 局面メモと食い違いの「このままでよい」（段階20-1） */
+  positions: PositionNote[];
   /** 端末の設定（localStorage の名前 → 値の文字列） */
   prefs: Record<string, string>;
 }
 
 /** この版のアプリが知っている種類（段階18 で games を足した） */
-export const KNOWN_KINDS = ['studies', 'trees', 'reviews', 'templates', 'games', 'practice', 'prefs'] as const;
+export const KNOWN_KINDS = ['studies', 'trees', 'reviews', 'templates', 'games', 'practice', 'positions', 'prefs'] as const;
 
 /** 種類の名前（画面に出す） */
 export const KIND_LABELS: Record<string, string> = {
@@ -61,6 +64,7 @@ export const KIND_LABELS: Record<string, string> = {
   prefs: '設定',
   games: '実戦の棋譜',
   practice: '稽古の記録',
+  positions: '局面メモ',
 };
 
 export interface BackupFile {
@@ -181,6 +185,12 @@ export function parseBackupJson(text: string): BackupParseResult {
     const p = practiceProblem(practice[i]);
     if (p) return fail(`稽古の記録 ${i + 1} つ目の${p}`);
   }
+  const positions = d.positions ?? [];
+  if (!Array.isArray(positions)) return fail('局面メモ');
+  for (let i = 0; i < positions.length; i++) {
+    const p = positionProblem(positions[i]);
+    if (p) return fail(`局面メモ ${i + 1} つ目の${p}`);
+  }
   const prefs = d.prefs ?? {};
   if (!isObject(prefs)) return fail('設定');
   for (const [k, v] of Object.entries(prefs)) {
@@ -194,7 +204,8 @@ export function parseBackupJson(text: string): BackupParseResult {
     duplicated(reviews as ReviewRecord[], (r) => r.treeId) ??
     duplicated(templates as BackupTemplate[], (t) => t.id) ??
     duplicated(games as Game[], (g) => g.id) ??
-    duplicated(practice as PracticeRecord[], (r) => r.studyId);
+    duplicated(practice as PracticeRecord[], (r) => r.studyId) ??
+    duplicated(positions as PositionNote[], (r) => r.id);
   if (dup) return fail(`同じ id が 2 つあります：${dup}`);
 
   const knownPrefs: Record<string, string> = {};
@@ -207,6 +218,7 @@ export function parseBackupJson(text: string): BackupParseResult {
     templates: templates as BackupTemplate[],
     games: games as Game[],
     practice: practice as PracticeRecord[],
+    positions: positions as PositionNote[],
     prefs: knownPrefs,
   };
   const unknownKinds = Object.keys(d).filter((k) => !(KNOWN_KINDS as readonly string[]).includes(k));
@@ -228,6 +240,8 @@ export interface BackupCounts {
   games: number;
   /** 稽古の記録の数（研究手順の本数） */
   practice: number;
+  /** 局面メモの数（メモの入っているものだけ） */
+  positions: number;
   /** 入っている設定の数 */
   prefs: number;
 }
@@ -240,6 +254,7 @@ export function backupCounts(data: BackupData): BackupCounts {
     templates: data.templates.length,
     games: (data.games ?? []).length,
     practice: (data.practice ?? []).length,
+    positions: (data.positions ?? []).filter((p) => p.note.trim() !== '').length,
     prefs: Object.keys(data.prefs).length,
   };
 }
