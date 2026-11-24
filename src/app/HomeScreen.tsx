@@ -8,6 +8,8 @@
 //   - 行をタップで研究手順の画面（#/study/<id>）。段階10-1 から、その研究手順の終わりの局面で定跡帳を開く。行の ⋯：この研究手順を復習・名前・メモを直す・書き出す・消す（確認あり）
 //   - ツリーの JSON（形式 6 まで）を取り込むと、中の研究手順も研究手順として取り込む（同じ手順がすでにあれば足さない）
 //   - 端末の保存場所を新しい版にしたときの移し替えの結果を、一度だけ知らせる
+// 段階20-3：「＋ 研究手順を登録」に「基本の研究を入れる」（BasicStudiesDialog）。「書き出し」（タブの右上・グループの ⋯）と 1 本ずつの JSON・KIF で渡すは外した
+//   （書き出しは設定の「データ」へ。DataSection）
 // 段階11-1：画面の下のタブに分けた。list='studies' が定跡帳のタブ（#/。いちばん目立つのは「＋ 研究手順を登録」）、
 //   list='trees' がツリーのタブ（#/trees。「＋ 新しいツリーを作る」・最近開いた・ツリーの取り込み）。画面の上の「ツリー｜研究手順」の切り替えはやめた
 // v0.29.0：名前・メモで絞り込む欄はやめた（持ち主の依頼 2026-11-21。使わなかったため）
@@ -50,7 +52,8 @@ import { fixStoredStudies } from './studyFix';
 
 /** 次にトップ画面を開いたとき「研究手順を登録」の窓を開く（古い登録の画面の URL #/new/study から来たとき。段階10-2） */
 export const registerRequest = signal(false);
-import { StudyEditDialog, StudyExportDialog, shareStudies } from './StudyDialogs';
+import { StudyEditDialog } from './StudyDialogs';
+import { BasicStudiesDialog } from './BasicStudiesDialog';
 import { ensureStudies, homeNotice, importLiftedStudies, library, removeStudy, saveStudies, updateStudyFields } from './studies';
 import { Words } from '../components/Words';
 import { BackupNudge } from './DataSection';
@@ -90,8 +93,8 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
   const [pasting, setPasting] = useState(false);
   /** 新しい研究：戦型を選ぶ窓（picking）・自分の側を選ぶ窓（start。template が null なら平手から） */
   const [newStudy, setNewStudy] = useState<{ kind: 'picking' } | { kind: 'start'; template: OpeningTemplate | null } | null>(null);
-  /** 研究手順の書き出し（initial：初めに選んでおく研究手順） */
-  const [exporting, setExporting] = useState<{ initial?: string[] } | null>(null);
+  /** 基本の研究を入れる窓（段階20-3） */
+  const [basic, setBasic] = useState(false);
   /** 取り込もうとしたツリーが既にあるとき */
   const [conflict, setConflict] = useState<TreeData | null>(null);
   /** 取り込もうとした研究手順に、同じ手順で中身の違うものがあるとき */
@@ -248,11 +251,6 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
           </span>
         )}
         <span class="spacer" />
-        {tab === 'studies' && studyCount > 0 && (
-          <button type="button" class="btn btn-ghost" data-testid="study-export-open" onClick={() => setExporting({})}>
-            書き出し
-          </button>
-        )}
       </div>
       {isolationMessage && <p class="notice notice-danger">{isolationMessage}</p>}
       {tab === 'studies' && studies && <BackupNudge studies={studies} />}
@@ -363,6 +361,17 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
             >
               戦型から選ぶ
             </button>
+            <button
+              type="button"
+              class="btn"
+              data-testid="study-register-basic"
+              onClick={() => {
+                setRegisterMenu(false);
+                setBasic(true);
+              }}
+            >
+              基本の研究を入れる
+            </button>
           </div>
           <p class="menu-section-title">棋譜・ファイルから</p>
           <div class="dialog-actions dialog-actions-column">
@@ -393,6 +402,8 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
 
       {pasting && <KifPasteDialog onClose={() => setPasting(false)} />}
 
+      {basic && <BasicStudiesDialog onClose={() => setBasic(false)} />}
+
       {newStudy?.kind === 'start' && <NewStudyDialog template={newStudy.template} onClose={() => setNewStudy(null)} />}
 
       {menuGroup && (
@@ -404,23 +415,10 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
             <button type="button" class="btn" data-testid="study-group-review" onClick={() => go(groupPracticePath(menuGroup.key))}>
               稽古（{menuGroup.items.length}本）
             </button>
-            <button
-              type="button"
-              class="btn"
-              data-testid="study-group-export"
-              onClick={() => {
-                const ids = menuGroup.items.map((s) => s.id);
-                setMenuGroup(null);
-                setExporting({ initial: ids });
-              }}
-            >
-              書き出す…
-            </button>
           </div>
         </Dialog>
       )}
 
-      {exporting && <StudyExportDialog groups={studyGroups} initial={exporting.initial} onClose={() => setExporting(null)} />}
 
       {menuStudy && (
         <StudyMenu
@@ -636,11 +634,10 @@ function StudyRow({ study, bookKey, due, onMenu }: { study: Study; bookKey: stri
   );
 }
 
-/** 研究手順の行の ⋯ のメニュー：この研究手順を復習・名前・メモを直す・書き出す（JSON・KIF）・消す（確認あり） */
+/** 研究手順の行の ⋯ のメニュー：稽古・名前・メモを直す・消す（確認あり）。1 本ずつの JSON・KIF で渡すは段階20-3 で外した */
 function StudyMenu({ study, onClose, onDone }: { study: Study; onClose: () => void; onDone: (message: string) => void }) {
   const [editing, setEditing] = useState(false);
   const [confirm, setConfirm] = useState(false);
-  const [note, setNote] = useState('');
 
   async function save(f: { name: string; note: string; mySide: Study['mySide'] }) {
     await updateStudyFields(study, f);
@@ -650,11 +647,6 @@ function StudyMenu({ study, onClose, onDone }: { study: Study; onClose: () => vo
   async function remove() {
     await removeStudy(study.id);
     onDone(`研究手順「${study.name}」を消しました`);
-  }
-
-  async function share(kind: 'json' | 'kif') {
-    const outcome = await shareStudies([study], kind);
-    if (outcome !== 'cancelled') setNote(OUTCOME_TEXT[outcome]);
   }
 
   if (editing) {
@@ -678,12 +670,6 @@ function StudyMenu({ study, onClose, onDone }: { study: Study; onClose: () => vo
         <button type="button" class="btn" data-testid="study-menu-edit" onClick={() => setEditing(true)}>
           名前・メモ
         </button>
-        <button type="button" class="btn" data-testid="study-menu-json" onClick={() => void share('json')}>
-          JSONで渡す
-        </button>
-        <button type="button" class="btn" data-testid="study-menu-kif" onClick={() => void share('kif')}>
-          KIFで渡す
-        </button>
       </div>
       <div class="dialog-actions">
         {!confirm ? (
@@ -702,11 +688,6 @@ function StudyMenu({ study, onClose, onDone }: { study: Study; onClose: () => vo
           </>
         )}
       </div>
-      {note && (
-        <p class="muted" role="status">
-          {note}
-        </p>
-      )}
     </Dialog>
   );
 }

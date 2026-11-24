@@ -5,14 +5,15 @@
 //   （同じ手 → 進むだけ／ここで終わる研究手順 → 延ばす／それ以外 → 新しい研究手順）
 // - 誤操作の対策：足すたびに画面の下に「▲3六歩 を足しました［取り消す］」を 5 秒。「↶ 取り消す」で何回でも続けて戻せる
 //   （足す・消す・ここで終わりにする・研究手順を消す・名前とメモを直す。この画面を開いている間だけ）。⋯ の「書き込む」を切にすると読むだけ
-// - 「この局面からの研究」の行の ⋯ で「この手から先を消す」。⋯ に、今の研究手順の操作（復習・書き出し・ここで終わりにする・消す）、
-//   この局面の操作（ツリーを作る・ツリーで見る）、定跡帳の操作（KIF で書き出す・書き込む 入／切）
+// - 「この局面からの研究」の行の ⋯ で「この手から先を消す」。⋯ に、今の研究手順の操作（名前・メモ・稽古・KIF をコピー・ここで終わりにする・消す）、
+//   定跡帳の操作（まとめて稽古・取り消す・KIF で渡す・書き込む 入／切）。段階20-3 で「この局面」（ツリーを作る・ツリーで見る）と 1 本ずつの JSON・KIF で渡すを外した
 // - ★ の行を押すと、今の研究手順の名前・メモを直す
 // - 段階11-2：‹ › の行と手順の行（パンくず）をやめ、盤の下の固定バー（MoveBar）に。手数を押すと手順の一覧
 // - 段階11-3：⋯ は画面の下から（小見出し「この研究手順」「この局面」「定跡帳」・短い文字）。★ の行の右端に［復習］（段階19 から［稽古］）
 // - 段階12-3：［復習］は金。「この局面からの研究」の見出しの左に「芽」の紋、行に、その手を通る研究手順の割合の棒（行の高さは変えない）
 // - 段階20-1：一覧の見出しの行に局面メモ（1 行目。押すと窓で読む・直す）。自分の手番で研究手順によって自分の手が違う（食い違い）とき、その手の行に印、
 //   手順前後で来るほかの研究手順の手は「手順前後」の行。行の ⋯ で「このままでよい」。KIF の書き出しに局面メモを入れる
+// - 段階20-2：一覧の見出しの行の右端に［エンジンに聞く］（src/app/AskEngine.tsx）
 // 研究手順の画面（StudyScreen）と編集モードは段階10-2 で片付けた（古い URL は src/app/LegacyRedirect.tsx でここへ移す）。
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
@@ -25,7 +26,6 @@ import { NOTE_MAX, conflictAt, type Conflict } from '../tree/positions';
 import { acknowledgeConflict, ensurePositions, noteAt, positionNotes, positionsNow, saveNote, unacknowledgeConflict } from './positions';
 import { studyBookUrl } from './addToBook';
 import { studyPositions } from '../review/studyReview';
-import { loadTreesOnLine } from '../storage/trees';
 import { fileNameOf } from '../tree/backup';
 import {
 
@@ -42,18 +42,17 @@ import {
   type CutPlan,
 } from '../tree/bookEdit';
 import { bookLabel, bookPool, bookSide, fitsBook, isHirateBook } from '../tree/organize';
-import { firstLine, moveTexts, newStudyId, pathInTree, startsWith, studyMovesText, studyTemplate } from '../tree/studies';
+import { firstLine, moveTexts, newStudyId, startsWith, studyMovesText } from '../tree/studies';
 import { bookAt, bookOrder, bookStart, type BookBranch, type BookPosition } from '../tree/studyBook';
 import { studiesToKif } from '../tree/studyFile';
 import { listName, type OpeningTemplate } from '../tree/templates';
-import type { Study, TreeData } from '../tree/types';
+import type { Study } from '../tree/types';
 import { boardFitProps, measureFitFrame, threeRowsNeed, useBoardFit } from './boardFit';
 import { takeHint } from './recent';
-import { inputHandoff } from './handoff';
 import { back, bookPath, go, groupPracticePath } from './router';
 import { bookFromGame } from './games';
 import { OUTCOME_TEXT, copyText, shareFile } from './share';
-import { StudyEditDialog, shareStudies } from './StudyDialogs';
+import { StudyEditDialog } from './StudyDialogs';
 import { applyStudyChange, ensureStudies, library, studiesNow } from './studies';
 import { KifuPanel, KifuSheet, useWideLayout, type KifuRow } from '../components/KifuList';
 import { MoveBar } from '../components/MoveBar';
@@ -87,16 +86,16 @@ export function BookScreen({ bookKey, id, ply, template, line }: { bookKey: stri
   const [error, setError] = useState('');
   const studies = library.value;
   void myTemplates.value;
-  // 定跡帳はグループ分けに自分で登録した戦型も使うので、読み終わるまで待つ
-  const [templatesReady, setTemplatesReady] = useState(myTemplates.value !== null);
+  // 定跡帳はグループ分けに自分で登録した戦型も使うので、読み終わるまで待つ。
+  // 読み終えたかは myTemplates をそのまま見る（段階20-3 の直し：アプリを開いたときの研究手順の直し〔studyFix〕が先に読み終えると、
+  // 前の作り〔読み終えたら自分で印を立てる〕では印が立たず、ずっと「読み込み中…」のままになることがあった）。読めなかったときも先へ進む
+  const [templatesFailed, setTemplatesFailed] = useState(false);
+  const templatesReady = myTemplates.value !== null || templatesFailed;
   /** 一度開いたら、研究手順を全部消しても（取り消せるように）定跡帳のまま */
   const opened = useRef(false);
   useEffect(() => {
     ensureStudies().catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
-    if (!myTemplates.value)
-      void refreshMyTemplates()
-        .catch(() => undefined)
-        .finally(() => setTemplatesReady(true));
+    if (!myTemplates.value) void refreshMyTemplates().catch(() => setTemplatesFailed(true));
   }, []);
 
   if (error) return <p class="status-ng">{error}</p>;
@@ -155,7 +154,6 @@ function initialView(key: string, pool: readonly Study[], templates: readonly Op
 type BookDialog =
   | { kind: 'menu' }
   | { kind: 'fields' }
-  | { kind: 'trees' }
   | { kind: 'cut'; move: string }
   | { kind: 'end' }
   | { kind: 'delete' }
@@ -217,8 +215,6 @@ function BookViewScreen({
   const [toast, setToast] = useState<{ text: string; undo: boolean; seq: number } | null>(null);
   const undoStack = useRef<UndoEntry[]>([]);
   const [undoCount, setUndoCount] = useState(0);
-  /** 今の局面までの手順を含むツリー（「ツリーで見る」の候補） */
-  const [trees, setTrees] = useState<TreeData[]>([]);
   /** 棋譜欄（段階11-5）：広い画面は盤の横に常に、スマホ縦は固定バーの手数を押すと画面下から */
   const wide = useWideLayout();
   const [kifuOpen, setKifuOpen] = useState(false);
@@ -240,15 +236,6 @@ function BookViewScreen({
     if (view.id && !current) setView(settleView(pool, view.line, view.index, null));
   }, [view.id, current, pool]);
 
-  useEffect(() => {
-    let alive = true;
-    loadTreesOnLine(line)
-      .then((list) => alive && setTrees(list))
-      .catch(() => undefined);
-    return () => {
-      alive = false;
-    };
-  }, [line]);
 
   // 取り消しの知らせは 5 秒で消す
   useEffect(() => {
@@ -263,7 +250,6 @@ function BookViewScreen({
     if (current && location.hash !== url) history.replaceState(history.state, '', url);
   }, [bookKey, current?.id, index]);
 
-  const treesHere = current ? trees.filter((t) => pathInTree(t, here) !== null) : [];
 
   // 段階20-1：局面メモと食い違い（自分の側が同じ研究手順すべてを局面で引く。手順前後も同じ局面）
   void positionNotes.value;
@@ -498,30 +484,11 @@ function BookViewScreen({
     saveWrite(on);
   }
 
-  function makeTree() {
-    const t = studyTemplate({ moves: here, mySide: side }, templates);
-    inputHandoff.value = { moves: [...line], index, mySide: side, ...(t ? { templateId: t.id } : {}) };
-    go('/new');
-  }
-
-  function openTree(t: TreeData) {
-    if (current) go(`/tree/${t.id}/study/${current.id}/${index}`);
-  }
-
   async function copyKif() {
     if (!current) return;
     setDialog(null);
     const ok = await copyText(studiesToKif([current]));
     setNote(ok ? 'KIF をコピーしました。ほかのアプリの「クリップボードから読み込み」で貼り付けられます。' : 'コピーできませんでした');
-  }
-
-  async function share(kind: 'json' | 'kif') {
-    if (!current) return;
-    const outcome = await shareStudies([current], kind);
-    if (outcome !== 'cancelled') {
-      setDialog(null);
-      setNote(OUTCOME_TEXT[outcome]);
-    }
   }
 
   /** 定跡帳の研究手順を、変化付きの 1 つの KIF にして渡す（並びは画面と同じ。共有の前に待たない） */
@@ -723,12 +690,6 @@ function BookViewScreen({
                 <button type="button" class="btn" data-testid="study-copy-kif" onClick={() => void copyKif()}>
                   KIFをコピー
                 </button>
-                <button type="button" class="btn" data-testid="study-share-json" onClick={() => void share('json')}>
-                  JSONで渡す
-                </button>
-                <button type="button" class="btn" data-testid="study-share-kif" onClick={() => void share('kif')}>
-                  KIFで渡す
-                </button>
                 <button type="button" class="btn" data-testid="book-end-here" disabled={!endPlan} onClick={() => setDialog({ kind: 'end' })}>
                   ここで終わり…
                 </button>
@@ -738,22 +699,6 @@ function BookViewScreen({
               </div>
             </>
           )}
-          <p class="menu-section-title">この局面</p>
-          <div class="dialog-actions dialog-actions-column">
-            <button type="button" class="btn" data-testid="study-make-tree" onClick={makeTree}>
-              ツリーを作る
-            </button>
-            {treesHere.length > 0 && (
-              <button
-                type="button"
-                class="btn"
-                data-testid="study-open-tree"
-                onClick={() => (treesHere.length === 1 ? openTree(treesHere[0]) : setDialog({ kind: 'trees' }))}
-              >
-                ツリーで見る{treesHere.length > 1 ? `（${treesHere.length}）` : ''}
-              </button>
-            )}
-          </div>
           <p class="menu-section-title">定跡帳</p>
           <div class="dialog-actions dialog-actions-column">
             {/* 段階14：盤の下から ⋯ へ移した */}
@@ -884,17 +829,6 @@ function BookViewScreen({
         />
       )}
 
-      {dialog?.kind === 'trees' && (
-        <Dialog title="どのツリーで見ますか？" onClose={() => setDialog(null)} testId="study-trees-dialog">
-          <div class="dialog-actions dialog-actions-column">
-            {treesHere.map((t) => (
-              <button type="button" key={t.id} class="btn" data-testid="study-tree-choice" onClick={() => openTree(t)}>
-                {t.name}
-              </button>
-            ))}
-          </div>
-        </Dialog>
-      )}
     </div>
   );
 }

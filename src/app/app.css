@@ -3084,3 +3084,60 @@ div.move-bar-center {
   min-height: 44px;
   padding: 0 var(--space-3);
 }
+
+/* ---- 段階20-3：基本の研究を入れる ---- */
+
+.basic-set-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+}
+
+.basic-set-head strong {
+  font-family: var(--font-serif);
+  font-weight: 600;
+}
+
+.basic-list {
+  list-style: none;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+}
+
+/* 1 行＝チェック・名前・手数（行全体を押せる。48px 以上） */
+.basic-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 56px;
+  padding: var(--space-1) 0;
+  border-top: 1px solid var(--color-border);
+  cursor: pointer;
+}
+
+.basic-row input {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  accent-color: var(--color-primary);
+}
+
+.basic-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.basic-name {
+  font-weight: 600;
+}
+
+.basic-have {
+  cursor: default;
+}
+
+.basic-have .basic-name {
+  color: var(--color-text-muted);
+}

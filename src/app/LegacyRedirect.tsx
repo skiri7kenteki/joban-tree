@@ -16,14 +16,14 @@ import { registerRequest } from './HomeScreen';
 export function StudyRedirect({ id, ply }: { id: string; ply?: number }) {
   const [error, setError] = useState('');
   const studies = library.value;
-  // 定跡帳はグループ分けに自分で登録した戦型も使うので、読み終わるまで待つ
-  const [templatesReady, setTemplatesReady] = useState(myTemplates.value !== null);
+  // 定跡帳はグループ分けに自分で登録した戦型も使うので、読み終わるまで待つ。
+  // 読み終えたかは myTemplates をそのまま見る（段階20-3 の直し：アプリを開いたときの研究手順の直し〔studyFix〕が先に読み終えると、
+  // 前の作り〔読み終えたら自分で印を立てる〕では印が立たず、ずっと「読み込み中…」のままになることがあった）。読めなかったときも先へ進む
+  const [templatesFailed, setTemplatesFailed] = useState(false);
+  const templatesReady = myTemplates.value !== null || templatesFailed;
   useEffect(() => {
     ensureStudies().catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
-    if (!myTemplates.value)
-      void refreshMyTemplates()
-        .catch(() => undefined)
-        .finally(() => setTemplatesReady(true));
+    if (!myTemplates.value) void refreshMyTemplates().catch(() => setTemplatesFailed(true));
   }, []);
   const study = studies?.find((s) => s.id === id);
   useEffect(() => {

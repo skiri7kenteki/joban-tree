@@ -5,6 +5,7 @@
 //   iPhone/iPad は「押した直後」でないと共有を断るので、ファイルの中身は画面を開いたときに作っておく（押したときに await を挟まない）
 // - ［バックアップから戻す］：ファイルを選ぶ → 中身の数を見せる → 「今のデータを全部置きかえる」を確かめてから戻す。戻す前のデータは端末の中に取っておく
 // - ［戻す前のデータに戻す］：戻したことがあるときだけ。戻したあとはアプリを読み込み直す
+// - ［研究手順を書き出す］（段階20-3 で定跡帳のタブの右上から移した）：選んで JSON・KIF（StudyExportDialog）。研究手順があるときだけ
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { Dialog } from '../components/Dialog';
@@ -26,6 +27,10 @@ import { isGenerating } from './generation';
 import { settings } from './settings';
 import { go } from './router';
 import { shareFile } from './share';
+import { groupStudies } from '../tree/organize';
+import { StudyExportDialog } from './StudyDialogs';
+import { allTemplates, myTemplates, refreshMyTemplates } from './TemplateDialogs';
+import { ensureStudies, library } from './studies';
 
 /** 日付（11/23 13:05 の形） */
 function shortDateTime(t: number): string {
@@ -64,8 +69,15 @@ export function DataSection() {
   const [pending, setPending] = useState<Pending | null>(null);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  /** 研究手順の書き出しの窓 */
+  const [exporting, setExporting] = useState(false);
+  const studies = library.value ?? [];
+  // 自分で登録した戦型のグループ分けにも使う（読み込み前なら読む）
+  void myTemplates.value;
 
   useEffect(() => {
+    void ensureStudies().catch(() => undefined);
+    if (!myTemplates.value) void refreshMyTemplates().catch(() => undefined);
     void persistState().then(setPersist);
     loadSnapshot()
       .then((s) => setSnapshotAt(s ? s.createdAt : null))
@@ -194,6 +206,14 @@ export function DataSection() {
         )}
       </div>
       <input ref={fileRef} type="file" accept="application/json,.json" hidden data-testid="backup-restore-file" onChange={(e) => void pick(e)} />
+      {studies.length > 0 && (
+        <div class="data-buttons">
+          <button type="button" class="btn btn-wide" data-testid="study-export-open" onClick={() => setExporting(true)}>
+            研究手順を書き出す（JSON・KIF）
+          </button>
+        </div>
+      )}
+      {exporting && <StudyExportDialog groups={groupStudies(studies, allTemplates())} onClose={() => setExporting(false)} />}
       {message && (
         <p class="muted" role="status" data-testid="backup-message">
           {message}

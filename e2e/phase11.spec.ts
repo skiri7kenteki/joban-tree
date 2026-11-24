@@ -452,7 +452,8 @@ test.describe('11-3 ⋯ のメニューと説明文', () => {
     // 一覧の行の ⋯ も画面の下から。文字は短く
     await page.getByTestId('study-menu').click();
     await expectSheet(page, 'study-menu-dialog', 740);
-    await expect(page.getByTestId('study-menu-json')).toHaveText('JSONで渡す');
+    await expect(page.getByTestId('study-menu-edit')).toHaveText('名前・メモ');
+    await expect(page.getByTestId('study-menu-json')).toHaveCount(0);
     await closeDialog(page);
 
     await page.getByTestId('study-item').click();
@@ -469,8 +470,9 @@ test.describe('11-3 ⋯ のメニューと説明文', () => {
     await page.getByTestId('book-menu').click();
     await expectSheet(page, 'book-menu-dialog', 740);
     const menu = page.getByTestId('book-menu-dialog');
-    await expect(menu.locator('.menu-section-title')).toHaveText(['この研究手順（★ 横歩の手前）', 'この局面', '定跡帳']);
-    await expect(menu.getByTestId('study-share-json')).toHaveText('JSONで渡す');
+    // 段階20-3：「この局面」（ツリーを作る・ツリーで見る）と 1 本ずつの JSON・KIF で渡すを外した
+    await expect(menu.locator('.menu-section-title')).toHaveText(['この研究手順（★ 横歩の手前）', '定跡帳']);
+    await expect(menu.getByTestId('study-copy-kif')).toHaveText('KIFをコピー');
     await expect(menu.getByTestId('book-share-kif')).toHaveText('KIFで渡す（1本）');
     for (const b of await menu.locator('.dialog-actions-column .btn').all()) {
       expect((await b.boundingBox())!.height).toBeLessThan(50);

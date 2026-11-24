@@ -106,7 +106,7 @@ const KIF = (handicap: string, moves: string[]) =>
 
 test.describe('8-1 登録（エンジンを使わない）', () => {
   // 段階10-2：登録の画面（#/new/study）を片付けたので、棋譜を貼って 1 本登録する窓と定跡帳で確かめる
-  test('棋譜を貼って 1 本登録 → 定跡帳（終わりの局面）が開く → 一覧に出る → 前後に動かす → この局面からツリーを作る', async ({ page }) => {
+  test('棋譜を貼って 1 本登録 → 定跡帳（終わりの局面）が開く → 一覧に出る → 前後に動かす（⋯ にツリーの操作は無い。段階20-3）', async ({ page }) => {
     await openHome(page);
     await page.getByTestId('tab-studies').click();
     await expect(page.getByTestId('studies-empty')).toBeVisible();
@@ -147,10 +147,13 @@ test.describe('8-1 登録（エンジンを使わない）', () => {
     await item.click();
     await expect(page.getByTestId('study-position')).toHaveText('3手目 ▲２六歩');
     await expect(page.getByTestId('study-meta')).toContainText('狙い：早めの');
-    // ツリーが無いので「ツリーで見る」は出ない（⋯ の中）
+    // 段階20-3：定跡帳の ⋯ から「ツリーを作る」「ツリーで見る」と 1 本ずつの JSON・KIF で渡すを外した
     await page.getByTestId('book-menu').click();
-    await expect(page.getByTestId('study-make-tree')).toBeVisible();
+    await expect(page.getByTestId('book-menu-dialog')).toBeVisible();
+    await expect(page.getByTestId('study-make-tree')).toHaveCount(0);
     await expect(page.getByTestId('study-open-tree')).toHaveCount(0);
+    await expect(page.getByTestId('study-share-json')).toHaveCount(0);
+    await expect(page.getByTestId('study-copy-kif')).toBeVisible();
     await closeDialog(page);
     // 前後に動かす
     await page.getByTestId('study-prev').click();
@@ -158,17 +161,7 @@ test.describe('8-1 登録（エンジンを使わない）', () => {
     await page.getByTestId('study-prev').click();
     await expect(page.getByTestId('study-position')).toHaveText('1手目 ▲７六歩');
     await page.getByTestId('study-next').click();
-
-    // この局面からツリーを作る（⋯ の中）：新しいツリーの画面に、手順を読み込んだ状態で移る（その局面・自分の側）
-    await page.getByTestId('book-menu').click();
-    await page.getByTestId('study-make-tree').click();
-    await expect(page).toHaveURL(/#\/new$/);
-    await expect(page.locator('h1')).toHaveText('新しいツリー');
-    await expect(page.getByTestId('input-position')).toHaveText('2手目 △３四歩');
-    await expect(page.getByTestId('side-black')).toHaveAttribute('aria-checked', 'true');
-    await page.getByTestId('input-next').click();
-    await expect(page.getByTestId('input-position')).toHaveText('3手目 ▲２六歩');
-    await expect(page.getByTestId('start-normal')).toBeVisible();
+    await expect(page.getByTestId('study-position')).toHaveText('2手目 △３四歩');
   });
 
   test('棋譜を貼って登録：戦型の後の手順で名前を付ける。同じ手順・平手以外・戦型の出発点そのものは足さない', async ({ page }) => {
@@ -214,7 +207,7 @@ test.describe('8-1 登録（エンジンを使わない）', () => {
 });
 
 test.describe('8-1 ツリーとのつながり・復習', () => {
-  test('ツリーを開くと★が付く（独立して登録した研究手順でも）。終わりの局面で名前。ツリーで見る。ツリーから定跡帳に足す', async ({ page }) => {
+  test('ツリーを開くと★が付く（独立して登録した研究手順でも）。終わりの局面で名前。ツリーから定跡帳に足す', async ({ page }) => {
     await openHome(page);
     await importTrees(page, [lineTree('line', '研究用ツリー')]);
     await importStudies(page, [study('s-a', '研究A', ['7g7f', '3c3d', '2g2f'], { note: 'Aのメモ' }), study('s-b', '研究B', ['2g2f', '3c3d'])]);
@@ -257,31 +250,18 @@ test.describe('8-1 ツリーとのつながり・復習', () => {
       await expect(menu.getByTestId('study-open')).toHaveText('定跡帳で開く');
     });
 
-    // ★ の窓の「定跡帳で開く」→ 定跡帳の ⋯ の「ツリーで見る」（今の局面）
+    // ★ の窓の「定跡帳で開く」（定跡帳の ⋯ の「ツリーで見る」は段階20-3 で外した）
     await page.getByTestId('nav-back').click();
     await cand.filter({ hasText: '▲２六歩' }).click();
     await page.getByTestId('study-here').click();
     await expect(page.getByTestId('study-view-note')).toHaveText('Aのメモ');
     await page.getByTestId('study-view-open').click();
     await expect(page).toHaveURL(/#\/book\/[^/]+\/s-a\/3$/);
-    await page.getByTestId('study-prev').click();
-    await page.getByTestId('book-menu').click();
-    await page.getByTestId('study-open-tree').click();
-    await expect(page).toHaveURL(/#\/tree\/line\/study\/s-a\/2$/);
-    await expect(page.getByTestId('tree-position')).toHaveText('2手目 △３四歩');
 
-    // 研究B はツリーで最後までたどれない（▲2六歩 △3四歩 はツリーに無い）。1 手目まで戻せばツリーで見られる。
     // 古い研究手順の画面の URL は、その研究手順の定跡帳へ移る
     await page.goto('./#/study/s-b');
     await expect(page).toHaveURL(/#\/book\/[^/]+\/s-b\/2$/);
     await expect(page.getByTestId('study-title')).toHaveText('研究B');
-    await page.getByTestId('book-menu').click();
-    await expect(page.getByTestId('study-make-tree')).toBeVisible();
-    await expect(page.getByTestId('study-open-tree')).toHaveCount(0);
-    await closeDialog(page);
-    await page.getByTestId('study-prev').click();
-    await page.getByTestId('book-menu').click();
-    await expect(page.getByTestId('study-open-tree')).toBeVisible();
   });
 
   test('研究手順の稽古（段階19 で復習から置きかえ）が、ツリーなしの研究手順で動く（1 本・グループ・定跡帳から）', async ({ page }) => {
@@ -347,6 +327,9 @@ test.describe('8-1 書き出し・取り込み', () => {
     await importStudies(page, [study('s-1', '研究1', ['7g7f', '3c3d'], { note: 'メモ1' }), study('s-2', '研究2', ['2g2f', '8c8d'])]);
     await expect(page.getByTestId('study-item')).toHaveCount(2);
 
+    // 段階20-3：書き出しは定跡帳のタブの右上から、設定の「データ」へ移した
+    await expect(page.getByTestId('study-export-open')).toHaveCount(0);
+    await page.getByTestId('tab-settings').click();
     await page.getByTestId('study-export-open').click();
     await expect(page.getByTestId('study-export-count')).toContainText('2 本');
     await page.getByTestId('study-export-none').click();
