@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(./dist/**)",
+      "Read(./node_modules/**)",
+      "Read(./package-lock.json)",
+      "Read(./public/eval/**)",
+      "Read(./public/trees/**)",
+      "Read(./src/assets/fonts/**)",
+      "Read(./playwright-report/**)",
+      "Read(./test-results/**)"
+    ]
+  }
+}

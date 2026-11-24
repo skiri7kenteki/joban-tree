@@ -251,6 +251,8 @@
 
 ## 完了したこと
 
+- 2026-11-24 CLAUDE.md を分けた（機能ごとの仕様は `.claude/rules/*.md`、フォルダ構成と片付けた機能の記録は `docs/claude/`、段階の締めは `/finish-stage`。アプリは変えていない）
+
 ### 段階20-1 局面メモと食い違いの知らせ（v0.44.0）
 - `src/tree/positions.ts`：局面の記録の形（`PositionNote`。局面メモと「このままでよい」の手）・食い違いを探す（`findConflicts`・`conflictAt`。`buildBookIndex` で自分の側ごとに局面で引く）・稽古のほかの研究の手（`otherStudyAt`）・形の確かめ
 - `src/storage/positions.ts`・DB の版 7（`positions` を足しただけ）。バックアップに `positions`（局面メモ。段階19 までのファイルは 0 として読む）。`src/app/positions.ts`（画面どうしの共有）
