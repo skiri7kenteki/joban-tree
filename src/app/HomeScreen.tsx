@@ -13,6 +13,8 @@
 // v0.29.0：名前・メモで絞り込む欄はやめた（持ち主の依頼 2026-11-21。使わなかったため）
 // 段階12-3：定跡帳のタブのいちばん上に集計（研究手順の数・覚えた問題の輪・前回まちがい）、研究手順の行の右に覚えた割合の輪、
 //   グループの見出しの左に「芽」の紋。数えるのは今の復習の記録から（読むだけ。データの形は変えない）
+// 段階19：集計は稽古の数（今日の稽古・身についた・前回まちがい）、行の右は次の稽古の日（今日・明日・あと n 日・はじめて）。
+//   行・グループの ⋯ の「復習」は「稽古」に（#/practice/play/<id>・#/practice/group/<key>）
 
 import { signal } from '@preact/signals';
 import { useEffect, useRef, useState } from 'preact/hooks';
@@ -32,16 +34,15 @@ import {
 } from '../tree/organize';
 import type { Side } from '../shogi/position';
 import { listName, type OpeningTemplate } from '../tree/templates';
-import { firstLine, liftTreeStudies, studyMovesText, studyStartIndex } from '../tree/studies';
-import { LearnRing } from '../components/Marks';
-import { loadReview } from '../storage/review';
-import { STUDY_RECORD_ID, reviewStart, summarizeStudies } from '../review/studyReview';
-import type { ReviewRecord, ReviewSummary } from '../review/review';
+import { firstLine, liftTreeStudies, studyMovesText } from '../tree/studies';
+import { dueText, summarizePractice, type PracticeSummary } from '../practice/practice';
+import { ensurePractice, planNow, practiceRecords } from './practice';
+import { ensureGames, gameList } from './games';
 import { parseStudiesJson, planStudyImport, resolveStudyImport, type StudyConflictChoice, type StudyImportPlan } from '../tree/studyFile';
 import type { Study, TreeData } from '../tree/types';
 import { generation, isGenerating, openTree, treeVersion } from './generation';
 import { collapsedGroups, forgetOpened, recentOpened, toggleGroup } from './recent';
-import { bookPath, bookTemplatePath, go, groupReviewPath } from './router';
+import { bookPath, bookTemplatePath, go, groupPracticePath } from './router';
 import { OUTCOME_TEXT, shareFile } from './share';
 import { TemplatePicker, allTemplates, myTemplates, refreshMyTemplates } from './TemplateDialogs';
 import { KifPasteDialog } from './addToBook';
@@ -101,15 +102,17 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
   // 自分で登録した戦型も、グループ分けに使う（読み込んだら描き直す）
   void myTemplates.value;
   const studies = library.value;
-  /** 研究手順の復習の記録（段階12-3：一覧の上の集計と、行ごとの覚えた割合の輪に使う。読むだけ） */
-  const [studyRecord, setStudyRecord] = useState<ReviewRecord | null>(null);
+  /** 段階19：稽古の記録と実戦の棋譜（一覧の上の集計と、行ごとの次の稽古の日に使う。読むだけ） */
+  const records = practiceRecords.value;
+  const games = gameList.value;
   useEffect(() => {
     if (!myTemplates.value) void refreshMyTemplates().catch(() => undefined);
     ensureStudies().catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
   }, []);
   useEffect(() => {
     if (list !== 'studies') return;
-    loadReview(STUDY_RECORD_ID).then(setStudyRecord, () => setStudyRecord(null));
+    ensurePractice().catch(() => undefined);
+    ensureGames().catch(() => undefined);
   }, [list]);
 
   useEffect(() => {
@@ -129,9 +132,12 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
   const groups = trees ? groupTrees(trees, templates) : [];
   const studyGroups = studies ? groupStudies(studies, templates) : [];
   const studyCount = studies?.length ?? 0;
-  /** 研究手順の復習の出題を始める手（復習の画面・復習のタブと同じ数え方） */
-  const startOf = (s: Study) => reviewStart(s, studyStartIndex(s, templates));
-  const summaryOf = (items: readonly Study[]) => (studyRecord ? summarizeStudies(items, startOf, studyRecord) : null);
+  /** 段階19：稽古の集計（稽古のタブと同じ数え方） */
+  const plan = studies && records && games ? planNow(studies, records, games, templates) : null;
+  const practiceSummary = plan && studies && records ? summarizePractice(studies, records, plan.today.length, templates) : null;
+  const todayIds = new Set(plan?.today.map((i) => i.study.id) ?? []);
+  /** 行の右の、次の稽古の日（今日の稽古に入っていれば「今日」） */
+  const dueOf = (s: Study): string | null => (!records ? null : todayIds.has(s.id) ? '今日' : records.has(s.id) ? dueText(records.get(s.id), Date.now()) : null);
   // 最近開いた：ツリーが 4 つ以上あるときだけ
   const recent = trees && trees.length >= RECENT_MIN_TREES ? recentItems(trees, recentOpened.value) : [];
   const collapsed = collapsedGroups.value;
@@ -249,7 +255,7 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
       </div>
       {isolationMessage && <p class="notice notice-danger">{isolationMessage}</p>}
       {tab === 'studies' && studies && <BackupNudge studies={studies} />}
-      {tab === 'studies' && studies && studyCount > 0 && <StudySummary count={studyCount} summary={summaryOf(studies)} />}
+      {tab === 'studies' && studies && studyCount > 0 && <StudySummary summary={practiceSummary} />}
       <div class="btn-row">
         {tab === 'studies' ? (
           <button type="button" class="btn btn-primary btn-wide" data-testid="study-register" onClick={() => setRegisterMenu(true)}>
@@ -310,7 +316,7 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
               onMenu={() => setMenuGroup(g)}
             >
               {g.items.map((s) => (
-                <StudyRow key={s.id} study={s} bookKey={bookKeyOfGroup(g.key)} summary={summaryOf([s])} onMenu={() => setMenuStudy(s)} />
+                <StudyRow key={s.id} study={s} bookKey={bookKeyOfGroup(g.key)} due={dueOf(s)} onMenu={() => setMenuStudy(s)} />
               ))}
             </GroupSection>
           ))}
@@ -393,8 +399,8 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
             <button type="button" class="btn btn-primary" data-testid="study-group-book" onClick={() => go(bookPath(bookKeyOfGroup(menuGroup.key)))}>
               定跡帳として見る
             </button>
-            <button type="button" class="btn" data-testid="study-group-review" onClick={() => go(groupReviewPath(menuGroup.key))}>
-              復習（{menuGroup.items.length}本）
+            <button type="button" class="btn" data-testid="study-group-review" onClick={() => go(groupPracticePath(menuGroup.key))}>
+              稽古（{menuGroup.items.length}本）
             </button>
             <button
               type="button"
@@ -559,42 +565,39 @@ function GroupSection<T>({
 }
 
 /**
- * 定跡帳のタブのいちばん上の集計（段階12-3）：研究手順の数・覚えた問題（輪と「覚えた数／問題の数」）・前回まちがい。
- * 数え方は復習と同じ（覚えた＝最後に答えたとき正解（v0.36.0〜。前は 2 回続けて正解）、前回まちがい＝最後に出したとき 1 回目で正解しなかった。同じ局面・同じ正解は 1 問）
+ * 定跡帳のタブのいちばん上の集計（段階12-3。段階19 から稽古の数）：今日の稽古・身についた（1 週以上空くところまで進んだ / 稽古できる研究手順）・前回まちがい。
+ * 押すと稽古のタブへ
  */
-function StudySummary({ count, summary }: { count: number; summary: ReviewSummary | null }) {
+function StudySummary({ summary }: { summary: PracticeSummary | null }) {
   return (
-    <div class="card book-summary" data-testid="book-summary">
-      <div class="book-summary-cell">
-        <span class="book-summary-label">研究手順</span>
-        <span class="book-summary-value num" data-testid="book-summary-studies">
-          {count}
+    <button type="button" class="card book-summary book-summary-practice" data-testid="book-summary" onClick={() => go('/practice')}>
+      <span class="book-summary-cell">
+        <span class="book-summary-label">今日の稽古</span>
+        <span class="book-summary-value num" data-testid="book-summary-today">
+          {summary ? summary.today : '–'}
           <small> 本</small>
         </span>
-      </div>
-      <div class="book-summary-cell book-summary-learned">
-        <LearnRing learned={summary?.learned ?? 0} total={summary?.total ?? 0} size={40} testId="book-summary-ring" />
-        <span class="book-summary-text">
-          <span class="book-summary-label">覚えた問題</span>
-          <span class="book-summary-value num" data-testid="book-summary-learned">
-            {summary ? summary.learned : '–'}
-            <small> / {summary ? summary.total : '–'}</small>
-          </span>
+      </span>
+      <span class="book-summary-cell">
+        <span class="book-summary-label">身についた</span>
+        <span class="book-summary-value num" data-testid="book-summary-learned">
+          {summary ? summary.learned : '–'}
+          <small> / {summary ? summary.total : '–'}本</small>
         </span>
-      </div>
-      <div class="book-summary-cell">
+      </span>
+      <span class="book-summary-cell">
         <span class="book-summary-label">前回まちがい</span>
         <span class="book-summary-value num" data-testid="book-summary-wrong">
           {summary ? summary.wrong : '–'}
-          <small> 問</small>
+          <small> 本</small>
         </span>
-      </div>
-    </div>
+      </span>
+    </button>
   );
 }
 
-/** 研究手順の 1 行（★名前・メモの最初の 1 行・手数・日付、右に覚えた割合の輪）。タップで定跡帳 */
-function StudyRow({ study, bookKey, summary, onMenu }: { study: Study; bookKey: string; summary: ReviewSummary | null; onMenu: () => void }) {
+/** 研究手順の 1 行（★名前・メモの最初の 1 行・手数・日付、右に次の稽古の日）。タップで定跡帳 */
+function StudyRow({ study, bookKey, due, onMenu }: { study: Study; bookKey: string; due: string | null; onMenu: () => void }) {
   const note = firstLine(study.note);
   return (
     <li class="tree-row">
@@ -618,12 +621,9 @@ function StudyRow({ study, bookKey, summary, onMenu }: { study: Study; bookKey: 
           {study.moves.length} 手・{formatShortDate(study.updatedAt)}
         </span>
         </span>
-        {summary && summary.total > 0 && (
-          <span class="study-ring">
-            <LearnRing learned={summary.learned} total={summary.total} testId="study-ring" />
-            <span class="study-ring-label" aria-hidden="true">
-              覚えた
-            </span>
+        {due && (
+          <span class={due === '今日' ? 'study-due today' : 'study-due'} data-testid="study-due">
+            {due === 'はじめて' ? '稽古はまだ' : `稽古 ${due}`}
           </span>
         )}
       </button>
@@ -670,8 +670,8 @@ function StudyMenu({ study, onClose, onDone }: { study: Study; onClose: () => vo
   return (
     <Dialog title={`★ ${study.name}`} onClose={onClose} testId="study-menu-dialog" sheet>
       <div class="dialog-actions dialog-actions-column">
-        <button type="button" class="btn btn-primary" data-testid="study-menu-review" onClick={() => go(`/study-review/${study.id}`)}>
-          復習
+        <button type="button" class="btn btn-primary" data-testid="study-menu-review" onClick={() => go(`/practice/play/${study.id}`)}>
+          稽古
         </button>
         <button type="button" class="btn" data-testid="study-menu-edit" onClick={() => setEditing(true)}>
           名前・メモ

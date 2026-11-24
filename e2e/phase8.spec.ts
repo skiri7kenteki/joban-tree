@@ -284,7 +284,7 @@ test.describe('8-1 ツリーとのつながり・復習', () => {
     await expect(page.getByTestId('study-open-tree')).toBeVisible();
   });
 
-  test('研究手順だけの復習が、ツリーなしの研究手順で動く（1 本・グループ・定跡帳から）', async ({ page }) => {
+  test('研究手順の稽古（段階19 で復習から置きかえ）が、ツリーなしの研究手順で動く（1 本・グループ・定跡帳から）', async ({ page }) => {
     await openHome(page);
     await importStudies(page, [
       study('s-1', '研究1', ['7g7f', '3c3d', '2g2f', '8c8d'], { note: 'メモの 1 行目\n2 行目', updatedAt: 3 }),
@@ -293,40 +293,37 @@ test.describe('8-1 ツリーとのつながり・復習', () => {
     await expect(page.getByTestId('study-item')).toHaveText([/研究1/, /研究2/]);
     await page.getByTestId('study-menu').first().click();
     await page.getByTestId('study-menu-review').click();
-    await expect(page).toHaveURL(/#\/study-review\/s-1$/);
-    await expect(page.getByTestId('review-summary')).toContainText('研究「研究1」だけ・問題 2（まだ 2');
-    await expect(page.getByTestId('review-opponent')).toHaveText('相手は ▲７六歩');
+    await expect(page).toHaveURL(/#\/practice\/play\/s-1$/);
+    // 相手の ▲7六歩 はアプリが指す → △3四歩（正解）→ ▲2六歩 → △1四歩（まちがい）→ 正解の △8四歩 を指して続く
+    await expect(page.getByTestId('practice-card')).toHaveAttribute('data-phase', 'ask');
+    await expect(page.getByTestId('practice-card')).toContainText('相手は ▲７六歩');
     await play(page, '33', '34');
-    await expect(page.getByTestId('review-answer')).toContainText('正解！');
-    await expect(page.getByTestId('review-opponent')).toHaveText('相手は ▲２六歩');
+    await expect(page.getByTestId('practice-card')).toContainText('相手は ▲２六歩');
     await play(page, '13', '14');
-    await expect(page.getByTestId('review-wrong')).toContainText('△１四歩 ではありません');
-    await page.getByTestId('review-retry').click();
+    await expect(page.getByTestId('practice-wrong')).toContainText('△１四歩 ではありません');
     await play(page, '83', '84');
-    await expect(page.getByTestId('review-end')).toHaveText('研究「研究1」を最後まで答えました（2 問中 1 問、1 回目で正解）。');
-    await expect(page.getByTestId('review-study-note')).toHaveText('メモの 1 行目\n2 行目');
-    await expect(page.getByTestId('review-next')).toHaveText('もう一度');
-    await expect(page.getByTestId('review-summary')).toContainText('問題 2（まだ 0・前回まちがい 1');
+    await expect(page.getByTestId('practice-end')).toContainText('4手目 △８四歩');
+    await expect(page.locator('.practice-note')).toHaveText('メモの 1 行目\n2 行目');
+    await expect(page.getByTestId('practice-next')).toHaveText('終わる');
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 
-    // グループ（その他）の研究手順を復習：記録は研究手順どうしで共通
+    // グループ（その他）の研究手順を稽古
     await page.goto('./#/trees');
     await page.getByTestId('tab-studies').click();
     await page.getByTestId('study-group-menu-open').click();
     await page.getByTestId('study-group-review').click();
-    await expect(page).toHaveURL(/#\/study-review\/group\//);
-    await expect(page.getByTestId('review-summary')).toContainText('「その他（後手番）」の研究手順 2 本・問題 3（まだ 1・前回まちがい 1');
-    await expect(page.getByTestId('review-prompt')).toHaveAttribute('data-phase', 'ask');
+    await expect(page).toHaveURL(/#\/practice\/group\//);
+    await expect(page.getByTestId('practice-title')).toContainText('稽古 1／2本');
 
     // 定跡帳の ⋯ から（古い研究手順の画面の URL は定跡帳へ移る）
     await page.goto('./#/study/s-2');
     await expect(page.getByTestId('book-title')).toBeVisible();
     await page.getByTestId('book-menu').click();
     await page.getByTestId('book-study-review').click();
-    await expect(page).toHaveURL(/#\/study-review\/s-2$/);
-    await expect(page.getByTestId('review-opponent')).toHaveText('相手は ▲２六歩');
+    await expect(page).toHaveURL(/#\/practice\/play\/s-2$/);
+    await expect(page.getByTestId('practice-card')).toContainText('相手は ▲２六歩');
     await play(page, '83', '84');
-    await expect(page.getByTestId('review-end')).toContainText('研究「研究2」を最後まで答えました（1 問中 1 問');
+    await expect(page.getByTestId('practice-end')).toContainText('全部正解');
 
     // ツリーの復習画面の「研究手順だけ」：ツリーの開始局面を通る研究手順
     await page.goto('./#/trees');
@@ -457,9 +454,12 @@ test.describe('8-1 移し替え（段階7の研究手順 → 独立した研究�
     await page.getByTestId('book-head').click();
     await expect(page.getByTestId('study-note')).toHaveValue('新しいメモ\n――\n古いメモ');
     await page.locator('dialog[open]').last().getByRole('button', { name: '閉じる' }).click();
-    await page.getByTestId('book-menu').click();
-    await page.getByTestId('book-study-review').click();
-    await expect(page.getByTestId('review-summary')).toContainText('問題 1（まだ 0・前回まちがい 0・覚えた 1）');
+    // 段階19：研究手順の 1 局面ずつの復習は稽古に置きかえたので、写した記録はツリーの復習の「研究手順だけ」で確かめる
+    await page.goto('./#/trees');
+    await page.getByTestId('tree-item').filter({ hasText: 'ツリーB' }).click();
+    await page.getByTestId('review-open').click();
+    await page.getByTestId('review-mode-studies').click();
+    await expect(page.getByTestId('review-summary')).toContainText('覚えた 1');
 
     // ツリーには研究手順が無くなっても★は付く（手順が同じなので）
     await page.goto('./#/trees');

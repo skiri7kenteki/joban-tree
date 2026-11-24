@@ -1,8 +1,8 @@
 // まとめてのバックアップのファイル（段階17、v0.41.0〜。持ち主の依頼書 stage17-prompt・判断 2026-11-23「おすすめの通りで」）。
 // 研究手順・ツリー・復習の記録・自分で登録した戦型・設定を 1 つの JSON にする。ここは形を作る・確かめるだけ（保存場所の読み書きは src/storage/backup.ts）。
 //
-// ファイルの形：{ app: 'joban-tree', kind: 'backup', version: 1, createdAt, appVersion, data: { studies, trees, reviews, templates, games, prefs } }
-// - あとから種類を足せる：data に新しい種類を足すだけなら version は 1 のまま（段階18 で games＝実戦の棋譜を足した。無いファイルは 0 局として読む）。
+// ファイルの形：{ app: 'joban-tree', kind: 'backup', version: 1, createdAt, appVersion, data: { studies, trees, reviews, templates, games, practice, prefs } }
+// - あとから種類を足せる：data に新しい種類を足すだけなら version は 1 のまま（段階18 で games＝実戦の棋譜、段階19 で practice＝稽古の記録を足した。無いファイルは空として読む）。
 //   この版のアプリが知らない種類は読まずに、画面で「戻すとそれは入りません」と知らせる（unknownKinds）
 // - version が新しい（形の違う）ファイルは、分かりやすく断る
 // - 中身は信用せず、ツリー・研究手順・戦型は今の取り込みと同じ確かめ方、復習の記録と設定はここで確かめる。1 つでもおかしければ全体を読まない
@@ -12,6 +12,7 @@ import { treeProblem } from './backup';
 import { checkStudy } from './studyFile';
 import { checkTemplate } from './templates';
 import { gameProblem, type Game } from '../games/game';
+import { practiceProblem, type PracticeRecord } from '../practice/practice';
 import { TREE_APP, type Study, type TreeData } from './types';
 import type { OpeningTemplate } from './templates';
 
@@ -42,12 +43,14 @@ export interface BackupData {
   templates: BackupTemplate[];
   /** 実戦の棋譜（段階18） */
   games: Game[];
+  /** 稽古の記録（段階19） */
+  practice: PracticeRecord[];
   /** 端末の設定（localStorage の名前 → 値の文字列） */
   prefs: Record<string, string>;
 }
 
 /** この版のアプリが知っている種類（段階18 で games を足した） */
-export const KNOWN_KINDS = ['studies', 'trees', 'reviews', 'templates', 'games', 'prefs'] as const;
+export const KNOWN_KINDS = ['studies', 'trees', 'reviews', 'templates', 'games', 'practice', 'prefs'] as const;
 
 /** 種類の名前（画面に出す） */
 export const KIND_LABELS: Record<string, string> = {
@@ -57,6 +60,7 @@ export const KIND_LABELS: Record<string, string> = {
   templates: '自分で登録した戦型',
   prefs: '設定',
   games: '実戦の棋譜',
+  practice: '稽古の記録',
 };
 
 export interface BackupFile {
@@ -171,6 +175,12 @@ export function parseBackupJson(text: string): BackupParseResult {
     const p = gameProblem(games[i]);
     if (p) return fail(`実戦 ${i + 1} 局目の${p}`);
   }
+  const practice = d.practice ?? [];
+  if (!Array.isArray(practice)) return fail('稽古の記録');
+  for (let i = 0; i < practice.length; i++) {
+    const p = practiceProblem(practice[i]);
+    if (p) return fail(`稽古の記録 ${i + 1} つ目の${p}`);
+  }
   const prefs = d.prefs ?? {};
   if (!isObject(prefs)) return fail('設定');
   for (const [k, v] of Object.entries(prefs)) {
@@ -183,7 +193,8 @@ export function parseBackupJson(text: string): BackupParseResult {
     duplicated(trees as TreeData[], (t) => t.id) ??
     duplicated(reviews as ReviewRecord[], (r) => r.treeId) ??
     duplicated(templates as BackupTemplate[], (t) => t.id) ??
-    duplicated(games as Game[], (g) => g.id);
+    duplicated(games as Game[], (g) => g.id) ??
+    duplicated(practice as PracticeRecord[], (r) => r.studyId);
   if (dup) return fail(`同じ id が 2 つあります：${dup}`);
 
   const knownPrefs: Record<string, string> = {};
@@ -195,6 +206,7 @@ export function parseBackupJson(text: string): BackupParseResult {
     reviews: reviews as ReviewRecord[],
     templates: templates as BackupTemplate[],
     games: games as Game[],
+    practice: practice as PracticeRecord[],
     prefs: knownPrefs,
   };
   const unknownKinds = Object.keys(d).filter((k) => !(KNOWN_KINDS as readonly string[]).includes(k));
@@ -214,6 +226,8 @@ export interface BackupCounts {
   templates: number;
   /** 実戦の数 */
   games: number;
+  /** 稽古の記録の数（研究手順の本数） */
+  practice: number;
   /** 入っている設定の数 */
   prefs: number;
 }
@@ -225,6 +239,7 @@ export function backupCounts(data: BackupData): BackupCounts {
     reviewProblems: data.reviews.reduce((n, r) => n + Object.keys(r.nodes).length, 0),
     templates: data.templates.length,
     games: (data.games ?? []).length,
+    practice: (data.practice ?? []).length,
     prefs: Object.keys(data.prefs).length,
   };
 }

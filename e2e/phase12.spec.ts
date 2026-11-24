@@ -3,6 +3,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { STARTPOS_SFEN, applyUsiMove, sfenKey } from '../src/shogi/position';
 import { TREE_APP, TREE_FORMAT_VERSION, type Study, type TreeData, type TreeNode } from '../src/tree/types';
+import { openStudyReview } from './studyTree';
 
 test.use({ viewport: { width: 360, height: 740 }, hasTouch: true });
 
@@ -248,8 +249,8 @@ test.describe('12-1 色・文字・部品の土台（段階16 で明るい対局
     await check('定跡帳の ⋯');
     await closeDialog(page);
 
-    // 研究手順の復習（まちがえた後のカードも）
-    await page.goto('./#/study-review/s-line');
+    // 研究手順の復習（まちがえた後のカードも。段階19 からツリーの「研究手順だけ」で）
+    await openStudyReview(page);
     await expect(page.getByTestId('review-progress')).toBeVisible();
     await check('復習');
     await page.locator('[data-square="17"]').click();
@@ -260,9 +261,10 @@ test.describe('12-1 色・文字・部品の土台（段階16 で明るい対局
     // ツリー
     await page.goto('./#/trees');
     await page.getByTestId('import-file').setInputFiles({ name: 't.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(sampleTree())) });
-    await expect(page.getByTestId('tree-item')).toHaveCount(1);
+    // 復習を開くのに使った初期局面からのツリーもある
+    await expect(page.getByTestId('tree-item')).toHaveCount(2);
     await check('ツリーのタブ');
-    await page.getByTestId('tree-item').click();
+    await page.getByTestId('tree-item').filter({ hasNotText: '初期局面からのツリー' }).click();
     await expect(page.getByTestId('candidate')).toHaveCount(4);
     await check('ツリー');
     await page.getByTestId('tree-menu').click();
@@ -274,8 +276,20 @@ test.describe('12-1 色・文字・部品の土台（段階16 で明るい対局
     await page.getByTestId('new-tree').click();
     await expect(page.getByRole('heading', { name: '新しいツリー' })).toBeVisible();
     await check('新しいツリー');
-    await page.goto('./#/reviews');
-    await check('復習のタブ');
+    // 段階19：稽古のタブと稽古の画面、段階18：実戦のタブ
+    await page.goto('./#/practice');
+    await expect(page.getByTestId('practice-start')).toBeVisible();
+    await check('稽古のタブ');
+    await page.goto('./#/practice/play/s-line');
+    await expect(page.getByTestId('practice-card')).toHaveAttribute('data-phase', 'ask');
+    await check('稽古');
+    await page.locator('[data-square="17"]').click();
+    await page.locator('[data-square="16"]').click();
+    await expect(page.getByTestId('practice-wrong')).toBeVisible();
+    await check('稽古（まちがえた後）');
+    await page.goto('./#/games');
+    await expect(page.getByTestId('games-empty')).toBeVisible();
+    await check('実戦のタブ');
     await page.goto('./#/settings');
     await check('設定');
     // 段階16：藍と金がどの画面にも残っていない（設定のタブ）
@@ -324,36 +338,32 @@ test.describe('12-2 盤と駒', () => {
   });
 });
 
-/** 研究手順の復習の記録を端末の保存場所に書く（s-line の問題のうち、はじめの 3 問を覚えた・4 問目を前回まちがい） */
-async function seedStudyRecord(page: Page, streak = 2) {
-  const keys: string[] = [];
-  let sfen = STARTPOS_SFEN;
-  for (const m of STUDIES[0].moves) {
-    // 問題＝自分（先手）の手番の局面。キーは「局面のキー>正解の手」（src/review/studyReview.ts と同じ）
-    if (sfen.split(' ')[1] === 'b') keys.push(`${sfenKey(sfen)}>${m}`);
-    sfen = applyUsiMove(sfen, m)!.sfen;
-  }
-  const nodes: Record<string, unknown> = {};
-  for (const k of keys.slice(0, 3)) nodes[k] = { seen: streak, correct: streak, streak, lastOk: true, lastAt: 1 };
-  nodes[keys[3]] = { seen: 1, correct: 0, streak: 0, lastOk: false, lastAt: 1 };
+/** 稽古の記録（段階19）を端末の保存場所に書く：s-line は 1 週空く段（身についた）、s-line2 は前回まちがい（今日やる） */
+async function seedPractice(page: Page) {
+  const DAY = 24 * 60 * 60 * 1000;
+  const today = new Date(new Date().toDateString()).getTime();
+  const recs = [
+    { studyId: 's-line', step: 2, dueAt: today + 7 * DAY, lastAt: Date.now() - DAY, firstAt: Date.now() - 20 * DAY, lastMistakes: 0, count: 3 },
+    { studyId: 's-line2', step: 0, dueAt: today, lastAt: Date.now() - DAY, firstAt: Date.now() - 2 * DAY, lastMistakes: 1, count: 1 },
+  ];
   await page.evaluate(
-    (rec) =>
+    (list) =>
       new Promise<void>((resolve, reject) => {
         const open = indexedDB.open('joban-tree');
         open.onsuccess = () => {
-          const tx = open.result.transaction('review', 'readwrite');
-          tx.objectStore('review').put(rec);
+          const tx = open.result.transaction('practice', 'readwrite');
+          for (const r of list) tx.objectStore('practice').put(r);
           tx.oncomplete = () => resolve();
           tx.onerror = () => reject(tx.error);
         };
         open.onerror = () => reject(open.error);
       }),
-    { treeId: 'studies', nodes },
+    recs,
   );
 }
 
 test.describe('12-3 定跡帳', () => {
-  test('一覧の上の集計（研究手順の数・覚えた問題・前回まちがい）、行ごとの覚えた割合の輪（段階13 で芽の紋はやめた）', async ({ page }) => {
+  test('一覧の上の集計（段階19 から稽古：今日の稽古・身についた・前回まちがい）、行ごとの次の稽古の日', async ({ page }) => {
     await openHome(page);
     await page.getByTestId('study-import-file').setInputFiles({
       name: 's.json',
@@ -361,23 +371,24 @@ test.describe('12-3 定跡帳', () => {
       buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies: STUDIES })),
     });
     await expect(page.getByTestId('study-item')).toHaveCount(2);
-    await seedStudyRecord(page);
+    await seedPractice(page);
     await page.reload();
-    // 問題は s-line が 6、銀を上がるが 5（はじめの 4 つは同じ局面・同じ正解なので 1 問）＝全部で 7
-    await expect(page.getByTestId('book-summary-studies')).toHaveText('2 本');
-    await expect(page.getByTestId('book-summary-learned')).toHaveText('3 / 7');
-    await expect(page.getByTestId('book-summary-wrong')).toHaveText('1 問');
-    await expect(page.getByTestId('book-summary-ring')).toHaveAttribute('aria-label', '覚えた問題 3／7（43%）');
-    const rings = page.getByTestId('study-ring');
-    await expect(rings).toHaveCount(2);
-    await expect(rings.nth(0)).toHaveAttribute('aria-label', '覚えた問題 3／6（50%）');
-    await expect(rings.nth(1)).toHaveAttribute('aria-label', '覚えた問題 3／5（60%）');
+    await expect(page.getByTestId('book-summary-today')).toHaveText('1 本');
+    await expect(page.getByTestId('book-summary-learned')).toHaveText('1 / 2本');
+    await expect(page.getByTestId('book-summary-wrong')).toHaveText('1 本');
+    const due = page.getByTestId('study-due');
+    await expect(due).toHaveCount(2);
+    await expect(page.getByTestId('study-item').filter({ hasText: '銀' }).getByTestId('study-due')).toHaveText('稽古 今日');
+    await expect(page.getByTestId('study-item').filter({ hasNotText: '銀' }).getByTestId('study-due')).toHaveText('稽古 あと 7日');
     await expect(page.locator('.sprout-mark')).toHaveCount(0);
     // 研究手順の行は 1 枚のカード（行と ⋯ が同じ箱）
     const row = await page.locator('.tree-row').first().boundingBox();
     const menu = await page.getByTestId('study-menu').first().boundingBox();
     expect(menu!.x + menu!.width).toBeLessThanOrEqual(row!.x + row!.width + 0.5);
     expect(Math.round(menu!.height)).toBeGreaterThanOrEqual(44);
+    // 集計を押すと稽古のタブ
+    await page.getByTestId('book-summary').click();
+    await expect(page).toHaveURL(/#\/practice$/);
   });
 
   test('定跡帳の盤の画面：［復習］は墨、「この局面からの研究」に、その手を通る研究手順の割合の棒（名前の下）', async ({ page }) => {
@@ -402,28 +413,6 @@ test.describe('12-3 定跡帳', () => {
       const names = (await page.getByTestId('study-book-branch').nth(i).locator('.book-names').boundingBox())!;
       expect(bar!.y).toBeGreaterThanOrEqual(names.y + names.height - 1);
     }
-  });
-});
-
-test.describe('覚えた＝最後に答えたとき正解（v0.36.0）', () => {
-  test('1 回の正解で「覚えた」に数える。集計・研究手順の輪・復習の画面・復習のタブの数がそろう', async ({ page }) => {
-    await openHome(page);
-    await page.getByTestId('study-import-file').setInputFiles({
-      name: 's.json',
-      mimeType: 'application/json',
-      buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies: STUDIES })),
-    });
-    await expect(page.getByTestId('study-item')).toHaveCount(2);
-    // はじめの 3 問は 1 回だけ正解（続けての正解は 1）、4 問目は前回まちがい
-    await seedStudyRecord(page, 1);
-    await page.reload();
-    await expect(page.getByTestId('book-summary-learned')).toHaveText('3 / 7');
-    await expect(page.getByTestId('book-summary-wrong')).toHaveText('1 問');
-    await expect(page.getByTestId('study-ring').nth(0)).toHaveAttribute('aria-label', '覚えた問題 3／6（50%）');
-    await page.goto('./#/reviews');
-    await expect(page.getByTestId('reviews-overview').first()).toContainText('前回まちがえた 1 問');
-    await page.goto('./#/study-review/s-line');
-    await expect(page.getByTestId('review-summary')).toContainText('問題 6（まだ 2・前回まちがい 1・覚えた 3）');
   });
 });
 
@@ -457,7 +446,7 @@ test.describe('12-4 残りの画面', () => {
     });
     // 取り込みの保存が終わってから復習を開く（終わる前に開くと問題が 0 になることがあった）
     await expect(page.getByTestId('study-item')).toHaveCount(1);
-    await page.goto('./#/study-review/s-line');
+    await openStudyReview(page);
     const progress = page.getByTestId('review-progress');
     await expect(progress).toHaveText('今日 1／5問');
     const play = async (from: string, to: string) => {
@@ -500,7 +489,7 @@ test.describe('12-4 残りの画面', () => {
       buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies: [STUDIES[0]] })),
     });
     await expect(page.getByTestId('study-item')).toHaveCount(1);
-    await page.goto('./#/study-review/s-line');
+    await openStudyReview(page);
     await expect(page.getByTestId('review-progress')).toBeVisible();
     await page.locator('[data-square="77"]').click();
     await page.locator('[data-square="76"]').click();
@@ -613,7 +602,7 @@ test.describe('段階12 の追加：駒と駒台（v0.34.0）', () => {
     await expect(page.getByTestId('study-item')).toHaveCount(1);
     await page.goto('./#/settings');
     await page.getByTestId('review-batch-5').click();
-    await page.goto('./#/study-review/s-mid');
+    await openStudyReview(page);
     const progress = page.getByTestId('review-progress');
     for (let i = 1; i <= 5; i++) {
       await expect(progress).toContainText(`今日 ${i}／5問`);

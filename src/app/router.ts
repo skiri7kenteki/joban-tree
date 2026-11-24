@@ -1,7 +1,8 @@
 // 画面の切り替え。URL の「#」より後ろで、どの画面かを表す（スマホの戻るボタンがそのまま効く）。
 //   #/           … 定跡帳のタブ（研究手順の一覧。アプリを開くといつもここ。段階11-1）
 //   #/trees      … ツリーの一覧（段階11-1 はタブ。段階18 からタブから外し、設定の「ツリー（以前の機能）」から開く）
-//   #/reviews    … 復習のタブ（復習の入口。段階11-1）
+//   #/practice   … 稽古のタブ（段階19。前の「復習」のタブ #/reviews を置きかえた。#/reviews もここへ）
+//   #/practice/play[/<研究手順の id>] … 稽古（今日の稽古を続けて／その 1 本）。#/practice/group/<定跡帳の key> … そのグループの稽古
 //   #/games      … 実戦のタブ（実戦の一覧。段階18）
 //   #/game/<id>  … 実戦 1 局の照らし合わせの結果（段階18）
 //   #/new        … 新しいツリー（局面の入力）
@@ -18,8 +19,7 @@
 //   #/settings   … 設定のタブ
 //   #/review/<id> … 復習モード
 //   #/review/<id>/study … 研究手順だけの復習（そのツリーの開始局面を通る研究手順）
-//   #/study-review/<研究手順の id> … 研究手順だけの復習（その 1 本だけ。段階8-1）
-//   #/study-review/group/<グループの key> … 研究手順だけの復習（そのグループの研究手順。段階8-1）
+//   #/study-review/<研究手順の id>・#/study-review/group/<key> … （段階19 で稽古に置きかえた。その 1 本・そのグループの稽古へ）
 //   （v0.17.0 の #/review/<id>/study/<研究手順の id> は、その 1 本だけの復習として開く）
 
 import { signal } from '@preact/signals';
@@ -27,7 +27,8 @@ import { signal } from '@preact/signals';
 export type Route =
   | { name: 'home' }
   | { name: 'trees' }
-  | { name: 'reviews' }
+  | { name: 'practice' }
+  | { name: 'practice-play'; study?: string; group?: string }
   | { name: 'games' }
   | { name: 'game'; id: string }
   | { name: 'new'; study?: boolean }
@@ -36,8 +37,7 @@ export type Route =
   | { name: 'study'; id: string; edit?: boolean; ply?: number }
   | { name: 'book'; key: string; study?: string; ply?: number; template?: string; line?: string[] }
   | { name: 'study-import' }
-  | { name: 'review'; id: string; studies?: boolean }
-  | { name: 'study-review'; study?: string; group?: string };
+  | { name: 'review'; id: string; studies?: boolean };
 
 function parse(hash: string): Route {
   const path = hash.replace(/^#/, '');
@@ -45,7 +45,12 @@ function parse(hash: string): Route {
   if (path === '/new/study') return { name: 'new', study: true };
   if (path === '/settings') return { name: 'settings' };
   if (path === '/trees') return { name: 'trees' };
-  if (path === '/reviews') return { name: 'reviews' };
+  if (path === '/reviews' || path === '/practice') return { name: 'practice' };
+  if (path === '/practice/play') return { name: 'practice-play' };
+  const play = /^\/practice\/play\/([\w-]+)$/.exec(path);
+  if (play) return { name: 'practice-play', study: play[1] };
+  const playGroup = /^\/practice\/group\/([^/]+)$/.exec(path);
+  if (playGroup) return { name: 'practice-play', group: safeDecode(playGroup[1]) };
   if (path === '/games') return { name: 'games' };
   const game = /^\/game\/([\w-]+)$/.exec(path);
   if (game) return { name: 'game', id: game[1] };
@@ -70,12 +75,12 @@ function parse(hash: string): Route {
     return book[2] ? { name: 'book', key, study: book[2], ply: Number(book[3]) } : { name: 'book', key };
   }
   const one = /^\/study-review\/([\w-]+)$/.exec(path);
-  if (one && one[1] !== 'group') return { name: 'study-review', study: one[1] };
+  if (one && one[1] !== 'group') return { name: 'practice-play', study: one[1] };
   const group = /^\/study-review\/group\/([^/]+)$/.exec(path);
-  if (group) return { name: 'study-review', group: safeDecode(group[1]) };
+  if (group) return { name: 'practice-play', group: safeDecode(group[1]) };
   const review = /^\/review\/([\w-]+)(\/study(?:\/([\w-]+))?)?$/.exec(path);
   if (review) {
-    if (review[3]) return { name: 'study-review', study: review[3] };
+    if (review[3]) return { name: 'practice-play', study: review[3] };
     if (review[2]) return { name: 'review', id: review[1], studies: true };
     return { name: 'review', id: review[1] };
   }
@@ -102,8 +107,8 @@ export function go(path: string): void {
 }
 
 /** 研究手順のグループの復習へ */
-export function groupReviewPath(key: string): string {
-  return `/study-review/group/${encodeURIComponent(key)}`;
+export function groupPracticePath(key: string): string {
+  return `/practice/group/${encodeURIComponent(key)}`;
 }
 
 /** 定跡帳（研究手順のグループをつないだツリー）へ。study・ply を渡すと、その研究手順のその局面 */
@@ -123,13 +128,13 @@ export function bookLinePath(key: string, line: readonly string[]): string {
 }
 
 /** 画面の下のタブ（段階11-1。段階18 から 定跡帳／復習／実戦／設定）。一覧の画面にだけ出す */
-export type TabName = 'home' | 'reviews' | 'games' | 'settings';
-export const TAB_PATHS: Record<TabName, string> = { home: '/', reviews: '/reviews', games: '/games', settings: '/settings' };
+export type TabName = 'home' | 'practice' | 'games' | 'settings';
+export const TAB_PATHS: Record<TabName, string> = { home: '/', practice: '/practice', games: '/games', settings: '/settings' };
 
 /** その画面がタブの画面なら、そのタブ（盤のある画面は null）。段階18：ツリーの一覧は設定から開くので、設定のタブ */
 export function tabOf(r: Route): TabName | null {
   if (r.name === 'trees') return 'settings';
-  return r.name === 'home' || r.name === 'reviews' || r.name === 'games' || r.name === 'settings' ? r.name : null;
+  return r.name === 'home' || r.name === 'practice' || r.name === 'games' || r.name === 'settings' ? r.name : null;
 }
 
 /** 今の画面を、履歴を増やさずに別の画面にする（戻るボタンで前の画面に戻れるように） */

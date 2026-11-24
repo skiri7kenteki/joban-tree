@@ -12,7 +12,8 @@ import { HomeScreen } from './app/HomeScreen';
 import { InputScreen } from './app/InputScreen';
 import { TreeScreen } from './app/TreeScreen';
 import { SettingsScreen } from './app/SettingsScreen';
-import { ReviewsScreen } from './app/ReviewsScreen';
+import { PracticeScreen } from './app/PracticeScreen';
+import { PracticePlayScreen } from './app/PracticePlayScreen';
 import { ReviewScreen } from './app/ReviewScreen';
 import { BookScreen } from './app/BookScreen';
 import { RegisterRedirect, StudyRedirect } from './app/LegacyRedirect';
@@ -41,7 +42,13 @@ function App() {
       <main class="main">
         {r.name === 'home' && <HomeScreen key="studies" list="studies" isolationMessage={isolationMessage(isolation)} />}
         {r.name === 'trees' && <HomeScreen key="trees" list="trees" isolationMessage={isolationMessage(isolation)} />}
-        {r.name === 'reviews' && <ReviewsScreen />}
+        {r.name === 'practice' && <PracticeScreen />}
+        {r.name === 'practice-play' && (
+          <PracticePlayScreen
+            key={`${r.study ?? ''}/${r.group ?? ''}`}
+            target={r.group !== undefined ? { kind: 'group', key: r.group } : r.study ? { kind: 'one', studyId: r.study } : { kind: 'today' }}
+          />
+        )}
         {r.name === 'games' && <GamesScreen />}
         {r.name === 'game' && <GameScreen key={r.id} id={r.id} />}
         {r.name === 'new' && (r.study ? <RegisterRedirect /> : <InputScreen />)}
@@ -54,12 +61,6 @@ function App() {
         {r.name === 'settings' && <SettingsScreen />}
         {r.name === 'review' && !r.studies && <ReviewScreen key={r.id} id={r.id} />}
         {r.name === 'review' && r.studies && <StudyReviewScreen key={`tree/${r.id}`} target={{ kind: 'tree', treeId: r.id }} />}
-        {r.name === 'study-review' && (
-          <StudyReviewScreen
-            key={`${r.study ?? ''}/${r.group ?? ''}`}
-            target={r.group !== undefined ? { kind: 'group', key: r.group } : { kind: 'one', studyId: r.study ?? '' }}
-          />
-        )}
       </main>
       {tab && <TabBar current={tab} />}
     </div>

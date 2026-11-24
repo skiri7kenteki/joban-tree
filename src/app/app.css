@@ -2493,6 +2493,127 @@ div.move-bar-center {
   font-size: 20px;
 }
 
+/* ---- 段階19：稽古（src/app/PracticeScreen.tsx・PracticePlayScreen.tsx） ---- */
+.practice-summary {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+
+/* 定跡帳のタブの集計（押すと稽古のタブへ） */
+.book-summary-practice {
+  grid-template-columns: 1fr 1fr 1fr;
+  width: 100%;
+  font: inherit;
+  color: inherit;
+  text-align: center;
+  cursor: pointer;
+}
+
+.practice-item {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+}
+
+.practice-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+/* 自分の手の数だけの丸（正解＝木の茶、まちがい＝朱、今答える手＝太い縁） */
+.practice-pips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.practice-pip {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid var(--color-mark);
+  background: var(--color-surface);
+}
+
+.practice-pip.ok {
+  background: var(--color-mark);
+}
+
+.practice-pip.ng {
+  background: var(--color-danger);
+  border-color: var(--color-danger);
+}
+
+.practice-pip.now {
+  border-width: 2px;
+  box-shadow: 0 0 0 2px var(--color-mark-soft);
+}
+
+.practice-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.practice-card p {
+  margin: 0;
+}
+
+.practice-answer {
+  font-family: var(--font-serif);
+  font-size: 20px;
+}
+
+/* 次の稽古までの間隔の並び（今の段を墨で塗る） */
+.practice-ladder {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  align-items: center;
+  font-size: var(--font-size-small);
+  color: var(--color-text-muted);
+}
+
+.practice-step {
+  padding: 1px 5px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-chip);
+}
+
+.practice-step.on {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: var(--color-primary-text);
+}
+
+.practice-after {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.practice-note {
+  margin: 0;
+  white-space: pre-wrap;
+  font-size: var(--font-size-small);
+  color: var(--color-text-muted);
+}
+
+.study-due {
+  font-size: var(--font-size-small);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.study-due.today {
+  color: var(--color-mark-text);
+  font-weight: 600;
+}
+
 /* ---- 段階18：実戦（src/app/GamesScreen.tsx・GameScreen.tsx） ---- */
 .list-section-title {
   margin: var(--space-3) 0 var(--space-2);

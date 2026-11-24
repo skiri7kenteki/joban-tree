@@ -140,8 +140,8 @@ for (const [w, h] of [
     await expectOneScreen(page, '新しいツリー', 'input-nav', h);
     await expect(page.getByTestId('start-normal')).toBeInViewport({ ratio: 0.99 });
 
-    // 復習：問題のカード（まちがえた後の［もう一度］［正解を見る］も）が画面の中
-    await page.goto('./#/study-review/s-a');
+    // 復習：問題のカード（まちがえた後の［もう一度］［正解を見る］も）が画面の中（段階19 からツリーの復習で。稽古の画面は e2e/phase19.spec.ts）
+    await page.goto('./#/review/one-tree');
     await expect(page.getByTestId('review-prompt')).toHaveAttribute('data-phase', 'ask');
     await expectOneScreen(page, '復習', 'review-nav', h);
     await page.locator('[data-square="17"]').click();

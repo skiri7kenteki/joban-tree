@@ -207,6 +207,7 @@ function ResultCard({
               <strong>{actual}</strong>
             </div>
           </div>
+          <p class="game-result-text muted">この研究手順は、稽古で先に出します。</p>
           <button
             type="button"
             class="btn btn-wide"

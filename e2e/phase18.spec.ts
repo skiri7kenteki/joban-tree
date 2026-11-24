@@ -67,10 +67,10 @@ async function paste(page: Page, text: string) {
   await page.getByTestId('games-paste-text').fill(text);
 }
 
-test('タブは 定跡帳／復習／実戦／設定。ツリーは設定の「ツリー（以前の機能）」から', async ({ page }) => {
+test('タブは 定跡帳／稽古／実戦／設定（段階19 で復習→稽古）。ツリーは設定の「ツリー（以前の機能）」から', async ({ page }) => {
   await page.goto('./');
   await expect(page.getByTestId('isolation')).toHaveAttribute('data-state', 'isolated', { timeout: 30_000 });
-  await expect(page.locator('.tabbar-label')).toHaveText(['定跡帳', '復習', '実戦', '設定']);
+  await expect(page.locator('.tabbar-label')).toHaveText(['定跡帳', '稽古', '実戦', '設定']);
   await page.getByTestId('tab-games').click();
   await expect(page.getByTestId('games-empty')).toBeVisible();
   await page.getByTestId('tab-settings').click();

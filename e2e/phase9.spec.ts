@@ -96,11 +96,11 @@ test.describe('9-2 研究手順どうしをつないで見る', () => {
     await expect(page.getByTestId('study-title')).toHaveText('研究C');
     await expect(page.getByTestId('study-meta')).toContainText('Cのメモ');
 
-    // まとめて復習（段階14：⋯ の中）
+    // まとめて稽古（段階14：⋯ の中。段階19 で復習→稽古）
     await page.getByTestId('book-menu').click();
     await page.getByTestId('book-review').click();
-    await expect(page).toHaveURL(/#\/study-review\/group\//);
-    await expect(page.getByTestId('review-summary')).toContainText('研究手順 3 本');
+    await expect(page).toHaveURL(/#\/practice\/group\//);
+    await expect(page.getByTestId('practice-title')).toContainText('稽古 1／3本');
   });
 
   test('定跡帳の KIF：研究手順の多い手が本譜、分かれ目は変化', async ({ page }) => {

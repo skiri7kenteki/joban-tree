@@ -9,7 +9,7 @@
 //   この局面の操作（ツリーを作る・ツリーで見る）、定跡帳の操作（KIF で書き出す・書き込む 入／切）
 // - ★ の行を押すと、今の研究手順の名前・メモを直す
 // - 段階11-2：‹ › の行と手順の行（パンくず）をやめ、盤の下の固定バー（MoveBar）に。手数を押すと手順の一覧
-// - 段階11-3：⋯ は画面の下から（小見出し「この研究手順」「この局面」「定跡帳」・短い文字）。★ の行の右端に［復習］
+// - 段階11-3：⋯ は画面の下から（小見出し「この研究手順」「この局面」「定跡帳」・短い文字）。★ の行の右端に［復習］（段階19 から［稽古］）
 // - 段階12-3：［復習］は金。「この局面からの研究」の見出しの左に「芽」の紋、行に、その手を通る研究手順の割合の棒（行の高さは変えない）
 // 研究手順の画面（StudyScreen）と編集モードは段階10-2 で片付けた（古い URL は src/app/LegacyRedirect.tsx でここへ移す）。
 
@@ -43,7 +43,7 @@ import type { Study, TreeData } from '../tree/types';
 import { boardFitProps, measureFitFrame, threeRowsNeed, useBoardFit } from './boardFit';
 import { takeHint } from './recent';
 import { inputHandoff } from './handoff';
-import { back, bookPath, go, groupReviewPath } from './router';
+import { back, bookPath, go, groupPracticePath } from './router';
 import { bookFromGame } from './games';
 import { OUTCOME_TEXT, copyText, shareFile } from './share';
 import { StudyEditDialog, shareStudies } from './StudyDialogs';
@@ -508,8 +508,8 @@ function BookViewScreen({
                 {firstLine(current.note) || 'メモなし'}
               </span>
             </button>
-            <button type="button" class="btn btn-primary study-head-review" data-testid="book-head-review" onClick={() => go(`/study-review/${current.id}`)}>
-              復習
+            <button type="button" class="btn btn-primary study-head-review" data-testid="book-head-review" onClick={() => go(`/practice/play/${current.id}`)}>
+              稽古
             </button>
           </>
         ) : (
@@ -610,8 +610,8 @@ function BookViewScreen({
                 <button type="button" class="btn" data-testid="book-edit-fields" onClick={() => setDialog({ kind: 'fields' })}>
                   名前・メモ
                 </button>
-                <button type="button" class="btn" data-testid="book-study-review" onClick={() => go(`/study-review/${current.id}`)}>
-                  復習
+                <button type="button" class="btn" data-testid="book-study-review" onClick={() => go(`/practice/play/${current.id}`)}>
+                  稽古
                 </button>
                 <button type="button" class="btn" data-testid="study-copy-kif" onClick={() => void copyKif()}>
                   KIFをコピー
@@ -655,9 +655,9 @@ function BookViewScreen({
               class="btn"
               data-testid="book-review"
               disabled={pool.length === 0}
-              onClick={() => go(groupReviewPath(bookKey))}
+              onClick={() => go(groupPracticePath(bookKey))}
             >
-              まとめて復習（{pool.length} 本）
+              まとめて稽古（{pool.length} 本）
             </button>
             <button
               type="button"

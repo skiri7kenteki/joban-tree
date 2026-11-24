@@ -187,3 +187,18 @@ export function nextSpots(list: readonly MatchedGame[]): NextSpot[] {
   }
   return [...spots.values()].sort((a, b) => b.count - a.count || gameTime(b.latest.game) - gameTime(a.latest.game));
 }
+
+/**
+ * 段階19：「自分が研究と違う手」を指した研究手順と、いちばん新しい実戦の日時（studyId → 日時）。
+ * 稽古で、最後の稽古より後の実戦で違う手を指した研究手順を先に出すのに使う（印は保存せず、ここで計算する）
+ */
+export function missedStudies(list: readonly MatchedGame[]): Map<string, number> {
+  const out = new Map<string, number>();
+  for (const g of list) {
+    if (g.match.kind !== 'mine' || !g.match.study) continue;
+    const t = gameTime(g.game);
+    const id = g.match.study.id;
+    if ((out.get(id) ?? -Infinity) < t) out.set(id, t);
+  }
+  return out;
+}

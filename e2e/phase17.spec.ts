@@ -215,9 +215,9 @@ test.describe('段階17 データを守る', () => {
     await expect(page.getByTestId('backup-error')).toContainText('研究手順 1 本目');
     await expect(page.getByTestId('backup-restore-dialog')).toHaveCount(0);
     expect(await dump(page)).toEqual(before);
-    // あとの段階の稽古の記録など、この版が知らない種類があるファイル：戻せるが、それは入らないと知らせる（段階18 から実戦の棋譜 games は知っている種類）
-    await pick({ app: 'joban-tree', kind: 'backup', version: 1, createdAt: 1, appVersion: '0.43.0', data: { studies: STUDIES, games: [], practice: [] } });
-    await expect(page.getByTestId('backup-unknown')).toContainText('practice');
+    // あとの段階の局面メモなど、この版が知らない種類があるファイル：戻せるが、それは入らないと知らせる（段階18 から games、段階19 から practice は知っている種類）
+    await pick({ app: 'joban-tree', kind: 'backup', version: 1, createdAt: 1, appVersion: '0.44.0', data: { studies: STUDIES, games: [], practice: [], notes: [] } });
+    await expect(page.getByTestId('backup-unknown')).toContainText('notes');
     await expect(page.getByTestId('backup-unknown')).not.toContainText('実戦の棋譜');
   });
 

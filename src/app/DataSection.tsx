@@ -236,6 +236,7 @@ function RestoreSummary({ pending }: { pending: Pending }) {
         <li>復習の記録 {c.reviewProblems} 問</li>
         <li>自分で登録した戦型 {c.templates} 個</li>
         <li>実戦 {c.games} 局</li>
+        <li>稽古の記録 {c.practice} 本</li>
         <li>設定 {c.prefs > 0 ? 'あり' : 'なし（初期値のまま）'}</li>
       </ul>
       {pending.unknownKinds.length > 0 && (
@@ -244,7 +245,7 @@ function RestoreSummary({ pending }: { pending: Pending }) {
         </p>
       )}
       <p>
-        今の研究手順・ツリー・復習の記録・戦型・実戦・設定は、全部このデータに置きかわります。
+        今の研究手順・ツリー・復習と稽古の記録・戦型・実戦・設定は、全部このデータに置きかわります。
         {pending.fromSnapshot ? '今のデータは、また［戻す前のデータに戻す］で元に戻せます。' : '戻す前のデータは端末の中に取っておき、［戻す前のデータに戻す］で元に戻せます。'}
       </p>
     </div>
