@@ -1,48 +1,35 @@
 // 段階20-3：基本の研究（src/data/basic-studies.json・src/tree/basicStudies.ts）
-// データが同梱ツリーの本線と合っているか（作り直し忘れ・手の打ち間違いを見つける）と、入れる研究手順の作り方
-import { readFileSync } from 'node:fs';
+// データの手順が合法手でつながるか（手の打ち間違いを見つける）と、入れる研究手順の作り方
 import { describe, expect, it } from 'vitest';
 import { BASIC_SETS, basicRows, basicToAdd } from '../../src/tree/basicStudies';
 import { BUNDLED_TEMPLATES } from '../../src/tree/templates';
-import type { TreeData } from '../../src/tree/types';
 import { applyUsiMove, STARTPOS_SFEN } from '../../src/shogi/position';
 
-const tree = (id: string, version: number): TreeData =>
-  JSON.parse(readFileSync(new URL(`../../public/trees/${id}.v${version}.json`, import.meta.url), 'utf8')).tree as TreeData;
-
 describe('基本の研究のデータ', () => {
-  it('横歩取り △3三角（後手番）の 4 本（端歩の手順は外した）。どれも未確認', () => {
+  it('横歩取り △3三角（後手番）の 4 本（青野流 3 本と ▲3六飛 1 本）。どれも出典があり、未確認', () => {
     const set = BASIC_SETS.find((s) => s.id === 'yokofu-33kaku-gote')!;
     expect(set.mySide).toBe('white');
     expect(set.reviewed).toBe(false);
-    expect(set.lines).toHaveLength(4);
-    // 分かれ目の相手の手（17・19 手目）に端歩が無い
+    expect(set.lines.map((l) => l.moves.split(' ')[0])).toEqual(['5i5h', '5i5h', '5i5h', '3d3f']);
     for (const line of set.lines) {
-      const m = line.split(' ');
-      expect(['9g9f', '1g1f']).not.toContain(m[0]);
-      expect(['9g9f', '1g1f']).not.toContain(m[2]);
+      expect(line.note).not.toBe('');
+      expect(line.source).not.toBe('');
     }
   });
 
   for (const set of BASIC_SETS) {
-    it(`${set.name}：どの手順も同梱ツリーの中を通り、合法手で、ツリーの終わりまで`, () => {
-      const t = tree(set.source.tree, set.source.version);
+    it(`${set.name}：どの手順も戦型の出発点から合法手でつながる`, () => {
       const template = BUNDLED_TEMPLATES.find((x) => x.id === set.templateId)!;
       expect(template).toBeTruthy();
       expect(template.mySide).toBe(set.mySide);
       for (const line of set.lines) {
-        let key = t.rootKey;
         let sfen = STARTPOS_SFEN;
         for (const m of template.moves) sfen = applyUsiMove(sfen, m)!.sfen;
-        for (const m of line.split(' ')) {
-          const edge = t.nodes[key]?.edges.find((e) => e.move === m);
-          expect(edge, `${line} の ${m}`).toBeTruthy();
-          key = edge!.to;
+        for (const m of line.moves.split(' ')) {
           const next = applyUsiMove(sfen, m);
-          expect(next, `${m} が指せない`).not.toBeNull();
+          expect(next, `${line.note} の ${m} が指せない`).not.toBeNull();
           sfen = next!.sfen;
         }
-        expect(t.nodes[key]?.edges.length ?? 0).toBe(0);
       }
     });
   }
@@ -62,9 +49,9 @@ describe('入れる研究手順を作る', () => {
       expect(r.study.mySide).toBe('white');
       expect(r.study.templateId).toBe(set.templateId);
       expect(r.study.moves.slice(0, template.moves.length)).toEqual(template.moves);
-      expect(r.study.moves).toHaveLength(28);
       expect(r.study.name).not.toBe('');
     }
+    expect(rows.map((r) => r.study.moves.length)).toEqual([26, 31, 24, 28]);
     // 名前はみな違う
     expect(new Set(rows.map((r) => r.study.name)).size).toBe(4);
     expect(rows.map((r) => r.study.createdAt)).toEqual([1000, 1001, 1002, 1003]);

@@ -1,5 +1,5 @@
 // 基本の研究（段階20-3、v0.46.0〜。持ち主の判断 2026-11-24「全ておすすめの通りで」）。
-// 戦型ごとに、同梱ツリーの本線から作った研究手順の組（src/data/basic-studies.json。作り方は scripts/make-basic-studies.mjs）。
+// 戦型ごとに、手で選んだ研究手順の組（src/data/basic-studies.json。v0.46.1 から解説記事の手順を手で書く。持ち主の判断 2026-11-24）。
 // 「＋ 研究手順を登録」→「基本の研究を入れる」で選んで定跡帳に入れる。入れた後は自分の研究手順と同じ（直す・消す・稽古）。
 // reviewed が false の組は「未確認」の印で出す（有段者の持ち主が中身を確かめたら true にする）
 
@@ -18,10 +18,17 @@ export interface BasicSet {
   mySide: Side;
   /** 持ち主が中身を確かめたか（false なら「未確認」） */
   reviewed: boolean;
-  /** 元にした同梱ツリーと版 */
-  source: { tree: string; version: number };
+  lines: BasicLine[];
+}
+
+/** 基本の研究の 1 本 */
+export interface BasicLine {
   /** 戦型の出発点からの手（USI）を空白でつないだもの */
-  lines: string[];
+  moves: string;
+  /** どんな変化か（確かめる人のため。画面には出さない） */
+  note: string;
+  /** 手順の出典（解説記事の URL など） */
+  source: string;
 }
 
 export const BASIC_SETS: readonly BasicSet[] = data.sets as BasicSet[];
@@ -43,7 +50,7 @@ export function basicRows(set: BasicSet, templates: readonly OpeningTemplate[], 
   if (!template) return null;
   const pool: Study[] = existing.filter((s) => s.mySide === set.mySide);
   return set.lines.map((line, i) => {
-    const moves = [...template.moves, ...line.split(' ')];
+    const moves = [...template.moves, ...line.moves.split(' ')];
     const have = existing.find((s) => s.mySide === set.mySide && same(s.moves, moves)) ?? null;
     const made = studyFromMoves(moves, set.mySide, templates, now + i, newId());
     const study = { ...made, name: autoName(made, pool, templates) };
@@ -57,7 +64,7 @@ export function basicToAdd(rows: readonly BasicRow[], picked: ReadonlySet<string
   return rows.filter((r) => !r.have && picked.has(r.study.id)).map((r) => r.study);
 }
 
-/** 手数（「28手目まで」） */
+/** 手数（「26手目まで」） */
 export function lineEnd(row: BasicRow): string {
   return `${row.study.moves.length}手目まで`;
 }

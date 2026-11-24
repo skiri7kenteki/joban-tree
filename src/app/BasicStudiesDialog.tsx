@@ -62,7 +62,7 @@ export function BasicStudiesDialog({ onClose }: { onClose: () => void }) {
               </span>
             )}
           </p>
-          <p class="muted memo-sub">同梱のツリーの本線から作った手順です。入れた後は、自分の研究手順と同じように直せます。</p>
+          <p class="muted memo-sub">定跡の解説などに載っている手順です。入れた後は、自分の研究手順と同じように直せます。</p>
           <ul class="basic-list">
             {rows.map((r) => (
               <li key={r.study.id}>
