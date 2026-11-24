@@ -433,10 +433,16 @@ test.describe('11-2 盤の下の固定バー', () => {
   });
 });
 
-/** 窓が画面の下から出ていること（下端が画面の下端） */
+/** 窓が画面の下から出ていること（下端が画面の下端）。窓が開き終わるまで待って測る（開く途中で測ると、GitHub の実行環境で落ちた） */
 async function expectSheet(page: Page, testId: string, height: number) {
-  const box = (await page.getByTestId(testId).boundingBox())!;
-  expect(Math.round(box.y + box.height)).toBe(height);
+  const sheet = page.getByTestId(testId);
+  await expect(sheet).toBeVisible();
+  await expect
+    .poll(async () => {
+      const box = await sheet.boundingBox();
+      return box ? Math.round(box.y + box.height) : null;
+    })
+    .toBe(height);
 }
 
 test.describe('11-3 ⋯ のメニューと説明文', () => {
