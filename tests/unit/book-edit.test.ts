@@ -10,6 +10,8 @@ import {
   inverseChange,
   isDefaultName,
   playInBook,
+  playLineInBook,
+  diffChange,
   settleView,
   checkNewMoves,
   fixStudies,
@@ -363,5 +365,58 @@ describe('定跡帳の出発点がずれる不具合の直し（段階10 の直�
     expect(candidateName(cand, 'white', T)).toBe('▲３六飛 △８四飛');
     expect(candidateName(cand, 'black', T)).toBe('△３三角 ▲３六飛 △８四飛');
     expect(candidateName({ ...cand, named: true, name: '本線' }, 'black', T)).toBe('本線');
+  });
+});
+
+describe('手順をまとめて足す（段階20-2「エンジンに聞く」の［足す］）', () => {
+  it('相手の手と自分の対応の 2 手を、1 本の新しい研究手順として 1 つの変更で足す', () => {
+    const r = playLineInBook([A, B], [A, B], K, ['5i5h', '5a5b'], 'A', ctx());
+    expect(r.kind).toBe('ok');
+    if (r.kind !== 'ok') return;
+    expect(r.played).toBe(2);
+    expect(r.change?.remove).toEqual([]);
+    expect(r.change?.put).toHaveLength(1);
+    expect(r.study.moves).toEqual([...K, '5i5h', '5a5b']);
+    expect(r.change?.put[0].id).toBe(r.study.id);
+  });
+
+  it('取り消しは 1 回で元に戻る', () => {
+    const before = [A, B];
+    const r = playLineInBook(before, before, K, ['5i5h', '5a5b'], 'A', ctx());
+    if (r.kind !== 'ok' || !r.change) throw new Error('足せていない');
+    const after = applyChange(before, r.change);
+    expect(after).toHaveLength(3);
+    const back = applyChange(after, inverseChange(r.change, before));
+    expect(back.map((s) => s.id).sort()).toEqual(['A', 'B']);
+    expect(back.find((s) => s.id === 'A')).toBe(A);
+  });
+
+  it('1 手目が研究にある手なら進み、2 手目で終わりの研究手順を延ばす', () => {
+    const here = [...K, '3d3f', '8f8d', '3f2f', '3a2b'];
+    const r = playLineInBook([A, B], [A, B], here.slice(0, -1), ['3a2b', '5i5h'], 'A', ctx());
+    expect(r.kind).toBe('ok');
+    if (r.kind !== 'ok') return;
+    expect(r.study.id).toBe('A');
+    expect(r.study.moves).toEqual([...here, '5i5h']);
+    expect(r.change?.put.map((s) => s.id)).toEqual(['A']);
+  });
+
+  it('全部すでにある手なら、変更は無し（進むだけ）', () => {
+    const r = playLineInBook([A, B], [A, B], K, ['3d3f', '8f8d'], 'A', ctx());
+    expect(r.kind).toBe('ok');
+    if (r.kind !== 'ok') return;
+    expect(r.change).toBeNull();
+    expect(r.played).toBe(2);
+  });
+
+  it('1 手目から定跡帳のグループを外れるなら足さない', () => {
+    const r = playLineInBook([A, B], [A, B], K, ['5i5h', '5a5b'], 'A', ctx({ fits: () => false }));
+    expect(r.kind).toBe('outside');
+  });
+
+  it('diffChange：同じ一覧なら null、増えた・消えたものを拾う', () => {
+    expect(diffChange([A, B], [A, B])).toBeNull();
+    const A2 = { ...A, updatedAt: 9 };
+    expect(diffChange([A, B], [A2])).toEqual({ put: [A2], remove: [B] });
   });
 });

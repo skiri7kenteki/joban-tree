@@ -201,6 +201,52 @@ export function playInBook(pool: readonly Study[], all: readonly Study[], here: 
   return { kind: ending ? 'extend' : 'create', change: { put: [study], remove: [] }, study };
 }
 
+/** 手順を続けて足した結果（段階20-2「エンジンに聞く」の［足す］：相手の手と自分の対応の 2 手など） */
+export type LineResult =
+  /** 足した（または全部すでにあって進むだけ）。change は全部まとめた 1 つの変更（取り消しは 1 回で戻る）。study は最後にたどる研究手順 */
+  | { kind: 'ok'; change: BookChange | null; study: Study; played: number }
+  /** 1 手目から足せない（playInBook と同じ理由） */
+  | Extract<PlayResult, { kind: 'same' | 'outside' | 'too-short' }>;
+
+/**
+ * 手順 moves を here から続けて指したことにする（1 手ずつ playInBook と同じ決まり）。
+ * 途中の手が足せなければ、そこまでで止める（played が指せた手の数）
+ */
+export function playLineInBook(pool: readonly Study[], all: readonly Study[], here: readonly string[], moves: readonly string[], currentId: string | null, ctx: BookCtx): LineResult {
+  let curPool = [...pool];
+  let curAll = [...all];
+  let curHere = [...here];
+  let curId = currentId;
+  let study: Study | null = null;
+  let played = 0;
+  for (const move of moves) {
+    const r = playInBook(curPool, curAll, curHere, move, curId, ctx);
+    if (r.kind === 'advance') {
+      study = r.target;
+    } else if ('change' in r) {
+      curPool = applyChange(curPool, r.change);
+      curAll = applyChange(curAll, r.change);
+      study = r.study;
+    } else {
+      if (played === 0) return r;
+      break;
+    }
+    curId = study.id;
+    curHere = [...curHere, move];
+    played++;
+  }
+  return { kind: 'ok', change: diffChange(all, curAll), study: study!, played };
+}
+
+/** 前と後の一覧の違いを 1 つの変更にする（変わらなければ null） */
+export function diffChange(before: readonly Study[], after: readonly Study[]): BookChange | null {
+  const old = new Map(before.map((s) => [s.id, s]));
+  const now = new Set(after.map((s) => s.id));
+  const put = after.filter((s) => old.get(s.id) !== s);
+  const remove = before.filter((s) => !now.has(s.id));
+  return put.length + remove.length > 0 ? { put, remove } : null;
+}
+
 /** 消す変更と、残した研究手順（here で終わる形にしたもの。残さなければ null） */
 export interface CutPlan extends BookChange {
   kept: Study | null;

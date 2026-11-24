@@ -34,6 +34,7 @@ import {
   endHere,
   inverseChange,
   playInBook,
+  playLineInBook,
   settleView,
   type BookChange,
   type BookCtx,
@@ -56,6 +57,7 @@ import { StudyEditDialog, shareStudies } from './StudyDialogs';
 import { applyStudyChange, ensureStudies, library, studiesNow } from './studies';
 import { KifuPanel, KifuSheet, useWideLayout, type KifuRow } from '../components/KifuList';
 import { MoveBar } from '../components/MoveBar';
+import { AskEngine } from './AskEngine';
 import { allTemplates, myTemplates, refreshMyTemplates } from './TemplateDialogs';
 
 /** 「書き込む」の入／切（端末ごとに覚える。初期値は入） */
@@ -157,7 +159,8 @@ type BookDialog =
   | { kind: 'cut'; move: string }
   | { kind: 'end' }
   | { kind: 'delete' }
-  | { kind: 'memo' };
+  | { kind: 'memo' }
+  | { kind: 'ask' };
 
 /** 取り消し 1 回分：元に戻す変更と、その操作の前の盤 */
 interface UndoEntry {
@@ -413,6 +416,43 @@ function BookViewScreen({
     await commit(r.change, () => ({ id: made.id, line: [...made.moves], index: index + 1 }), `${played} を足しました`);
   }
 
+  // ---- 段階20-2：エンジンに聞く ----
+
+  /** 研究にある手へ進む（この定跡帳の手、または手順前後のほかの研究手順の手） */
+  function askAdvance(move: string) {
+    setDialog(null);
+    const branch = connections.branches.find((b) => b.move === move);
+    if (branch) return pickBranch(branch);
+    const t = transposed.find((x) => x.move === move);
+    if (t) openTransposed(t);
+  }
+
+  /** エンジンの候補を足す（相手の手と自分の対応の 2 手は、まとめて 1 回で取り消せる） */
+  async function askAdd(moves: string[]) {
+    if (busy || !write) return;
+    setDialog(null);
+    input.clear();
+    const r = playLineInBook(pool, studiesNow(), here, moves, current?.id ?? null, ctx());
+    const played = moveText(sfen, moves[0], prevMove);
+    if (r.kind === 'same') {
+      setNote(`この手順は、研究手順「${r.other.name}」としてすでにあります（${r.other.mySide === 'black' ? '先手番' : '後手番'}）。`);
+      return;
+    }
+    if (r.kind === 'outside') {
+      setNote(`${played} を足すと、この定跡帳（${label}）のグループから外れるので足しません。`);
+      return;
+    }
+    if (r.kind !== 'ok') return;
+    const made = r.study;
+    const view = { id: made.id, line: [...made.moves], index: index + 1 };
+    if (!r.change) {
+      setView(view);
+      return;
+    }
+    const added = moveTexts([...here, ...moves.slice(0, r.played)]).slice(index).join(' ');
+    await commit(r.change, () => view, `${added} を足しました`);
+  }
+
   // ---- 消す ----
 
   /** 消した後の盤：残した研究手順か今の研究手順が今の局面を通っていればそのまま、無ければ近くの研究手順へ */
@@ -627,6 +667,7 @@ function BookViewScreen({
             onTransposed={openTransposed}
             memo={memo}
             onMemo={() => setDialog({ kind: 'memo' })}
+            onAsk={() => setDialog({ kind: 'ask' })}
           />
         </div>
       </div>
@@ -829,6 +870,20 @@ function BookViewScreen({
         />
       )}
 
+      {dialog?.kind === 'ask' && (
+        <AskEngine
+          sfen={sfen}
+          mySide={side}
+          prev={prevMove}
+          place={index === 0 ? '初期局面' : `${index}手目 ${texts[index - 1] ?? ''} の局面`}
+          bookMoves={[...connections.branches.map((b) => b.move), ...transposed.map((t) => t.move)]}
+          write={write}
+          onAdvance={askAdvance}
+          onAdd={(moves) => void askAdd(moves)}
+          onClose={() => setDialog(null)}
+        />
+      )}
+
       {dialog?.kind === 'trees' && (
         <Dialog title="どのツリーで見ますか？" onClose={() => setDialog(null)} testId="study-trees-dialog">
           <div class="dialog-actions dialog-actions-column">
@@ -940,6 +995,7 @@ function BookBranches({
   onTransposed,
   memo,
   onMemo,
+  onAsk,
 }: {
   connections: BookPosition<Study>;
   current: Study | null;
@@ -956,6 +1012,7 @@ function BookBranches({
   onTransposed: (t: { move: string; study: Study; ply: number }) => void;
   memo: string;
   onMemo: () => void;
+  onAsk: () => void;
 }) {
   const { branches, ending, count } = connections;
   /** 食い違いの印を付ける手（「このままでよい」にしてあれば付けない） */
@@ -977,6 +1034,10 @@ function BookBranches({
           ) : (
             '＋ 局面メモ'
           )}
+        </button>
+        {/* 段階20-2：今の局面だけをエンジンで数秒調べる */}
+        <button type="button" class="btn book-ask" data-testid="book-ask" onClick={onAsk}>
+          エンジンに聞く
         </button>
       </div>
       <ul class="candidate-list">
