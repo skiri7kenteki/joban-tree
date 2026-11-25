@@ -105,6 +105,28 @@ for (const size of SIZES) {
       await page.getByTestId('book-branch-menu').nth(1).click();
       await shot(page, size.name, 'row-menu');
       await page.getByTestId('book-cut-dialog').getByRole('button', { name: '閉じる' }).click();
+      // 段階21-2：咎め方を盤でたどる
+      await page.getByTestId('book-cand-row').click();
+      await page.getByTestId('study-next').click();
+      await shot(page, size.name, 'refute');
+      await page.getByTestId('refute-close').click();
+      // 稽古で次善・悪手
+      for (const [name, to] of [
+        ['practice-alt', ['51', '52']],
+        ['practice-bad', ['13', '14']],
+      ] as const) {
+        await page.goto('./#/practice/play/s-a');
+        await page.reload();
+        await expect(page.getByTestId('practice-card')).toHaveAttribute('data-phase', 'ask');
+        for (const square of to) await page.locator(`[data-testid="practice-board"] [data-square="${square}"]`).click();
+        await shot(page, size.name, name);
+        if (name === 'practice-bad') {
+          await expect(page.getByTestId('practice-refute-again')).toBeVisible({ timeout: 15_000 });
+          await shot(page, size.name, 'practice-bad-back');
+        }
+      }
+      await page.goto(`./#/book/${KEY}/s-a/17`);
+      await expect(page.getByTestId('book-table')).toBeVisible();
       if (process.env.ENGINE_AVAILABLE) {
         await page.getByTestId('book-ask').click();
         await expect(page.getByTestId('ask-list')).toBeVisible({ timeout: 60_000 });

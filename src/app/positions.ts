@@ -40,8 +40,17 @@ export function noteAt(side: Side, sfen: string): string {
 /** 記録のうち、候補の表の部分（取り消しのために覚える） */
 export type TableSnapshot = Pick<PositionNote, 'okMoves' | 'candidates'>;
 
+/** 前の書き込みが終わってから次を始める（重なると、後の書き込みが前の変更を知らないまま上書きするため） */
+let writing: Promise<unknown> = Promise.resolve();
+
+function write(side: Side, sfen: string, change: Partial<Pick<PositionNote, 'note'>> & TableSnapshot): Promise<void> {
+  const run = writing.then(() => writeNow(side, sfen, change));
+  writing = run.catch(() => undefined);
+  return run;
+}
+
 /** 記録を書く（メモも候補の表も無くなったら消す） */
-async function write(side: Side, sfen: string, change: Partial<Pick<PositionNote, 'note'>> & TableSnapshot): Promise<void> {
+async function writeNow(side: Side, sfen: string, change: Partial<Pick<PositionNote, 'note'>> & TableSnapshot): Promise<void> {
   const id = positionId(side, sfen);
   // 読み終える前に書くと前の記録を知らないまま上書きするので、必ず読んでから
   const prev = (await ensurePositions()).get(id);
@@ -77,6 +86,7 @@ export function saveTable(side: Side, sfen: string, candidates: Candidate[]): Pr
 
 /** 今の記録の、候補の表の部分 */
 export async function tableSnapshot(side: Side, sfen: string): Promise<TableSnapshot> {
+  await writing;
   const rec = (await ensurePositions()).get(positionId(side, sfen));
   return { okMoves: rec?.okMoves, candidates: rec?.candidates };
 }

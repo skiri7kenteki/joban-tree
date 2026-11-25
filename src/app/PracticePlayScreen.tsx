@@ -3,8 +3,9 @@
 // - 研究手順を 1 本ずつ、戦型の出発点から終わりまで通して指す。相手の手は研究手順の通りにアプリが指す（少し間を置いて）
 // - まちがえたら「△5二玉 ではありません。正解は △6二玉」。盤で正解を指すと続く（止めずに最後まで）。数えるのは 1 回目の答えだけ
 // - 1 本終わったら記録を保存（全部正解なら次の間隔へ、まちがえたら明日）し、「次の研究手順へ（あと n本）」
-// - 段階20-1：ほかの研究手順の自分の手（同じ局面・手順前後も）を指したら、まちがいにしない（「それは『X』の研究の手です」）。
-//   まちがえたとき・ほかの研究の手のときは、その局面の局面メモをカードの下に出す
+// - 段階21-2：候補の表の次善・本命と、ほかの研究手順の自分の手（同じ局面・手順前後も）は、まちがいにしない（「△5二玉 は 次善 −80」）。
+//   悪手はまちがい。咎め方を盤で 1 手ずつ自動で見せて（相手の手と同じ 0.45 秒ずつ）戻り、正解を指すと続く
+// - まちがえたとき・まちがいにしないときは、その局面の局面メモをカードの下に出す（段階20-1）
 // - 盤の画面の決まり（段階14）：1 画面に収める。上の行に、今日の稽古に入った理由と、自分の手の数だけの丸（正解は茶・まちがいは朱）
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
@@ -12,7 +13,7 @@ import { Board } from '../components/Board';
 import { MoveBar } from '../components/MoveBar';
 import { OnceHint } from '../components/OnceHint';
 import { PromotionBox, useMoveInput } from '../components/useMoveInput';
-import { STEP_LABELS, REASON_TEXT, nextRecord, practicePlies, practiceStart, startOfDay, type PracticeReason, type PracticeRecord } from '../practice/practice';
+import { STEP_LABELS, REASON_TEXT, judgeAnswer, nextRecord, practicePlies, practiceStart, startOfDay, type PracticeReason, type PracticeRecord } from '../practice/practice';
 import { studyPositions } from '../review/studyReview';
 import { STARTPOS_SFEN, moveText } from '../shogi/position';
 import { bookPool } from '../tree/organize';
@@ -26,8 +27,10 @@ import { ensurePractice, planNow, practiceRecords, savePractice } from './practi
 import { back, go } from './router';
 import { ensureStudies, library } from './studies';
 import { buildBookIndex } from '../games/compare';
-import { otherStudyAt } from '../tree/positions';
-import { ensurePositions, noteAt, positionNotes } from './positions';
+import { markText, refutation, tableOf, type Candidate, type Refutation } from '../tree/candidates';
+import { otherStudyAt, positionId, studyMovesAt } from '../tree/positions';
+import { ensurePositions, noteAt, positionNotes, positionsNow } from './positions';
+import { MarkTag } from './CandidateDialogs';
 import { allTemplates, myTemplates, refreshMyTemplates } from './TemplateDialogs';
 
 export type PracticeTarget = { kind: 'today' } | { kind: 'one'; studyId: string } | { kind: 'group'; key: string };
@@ -55,6 +58,8 @@ export function PracticePlayScreen({ target }: { target: PracticeTarget }) {
     ensureStudies().catch(fail);
     ensurePractice().catch(fail);
     ensureGames().catch(fail);
+    // 候補の表を読み終える前に指すと、次善がまちがいになるので、読み終えてから出す
+    ensurePositions().catch(fail);
     if (!myTemplates.value) void refreshMyTemplates().catch(() => undefined);
   }, []);
 
@@ -65,7 +70,7 @@ export function PracticePlayScreen({ target }: { target: PracticeTarget }) {
   }, [studies, records, games]);
 
   if (error) return <p class="status-ng">{error}</p>;
-  if (!queue) return <p class="muted">読み込み中…</p>;
+  if (!queue || !positionNotes.value) return <p class="muted">読み込み中…</p>;
   if (queue.length === 0) {
     return (
       <>
@@ -105,7 +110,14 @@ function makeQueue(target: PracticeTarget, studies: readonly Study[], records: R
   return [...planned, ...pool.filter((s) => !seen.has(s.id)).map((s) => ({ id: s.id }))];
 }
 
-type Phase = { kind: 'play' } | { kind: 'wrong'; tried: string } | { kind: 'other'; tried: string; name: string } | { kind: 'end'; record: PracticeRecord | null; saveError?: string };
+type Phase =
+  | { kind: 'play' }
+  | { kind: 'wrong'; tried: string }
+  /** まちがいにしない手（表の次善・本命、ほかの研究手順の手） */
+  | { kind: 'other'; tried: string; mark: 'main' | 'alt'; tag: string; name: string | null; answerIsMain: boolean }
+  /** 悪手。step：咎め方を見せている手（null は見せ終わって、問題の局面に戻った） */
+  | { kind: 'bad'; tried: string; tag: string; entry: Candidate; line: Refutation; step: number | null }
+  | { kind: 'end'; record: PracticeRecord | null; saveError?: string };
 
 function PlayView({ queue }: { queue: QueueItem[] }) {
   const studies = library.value ?? [];
@@ -167,11 +179,8 @@ function StudyPlay({
   /** 終わった後にさかのぼって見ている局面（null は今の局面） */
   const [view, setView] = useState<number | null>(null);
   const mySideText = study.mySide === 'black' ? '☗先手' : '☖後手';
-  // 段階20-1：ほかの研究手順の手か（自分の側が同じ研究手順を局面で引く）と、局面メモ
+  // 候補の表・ほかの研究手順の手（自分の側が同じ研究手順を局面で引く）と、局面メモ
   void positionNotes.value;
-  useEffect(() => {
-    void ensurePositions().catch(() => undefined);
-  }, []);
   const allStudies = library.value;
   const bookIndex = useMemo(() => buildBookIndex(allStudies ?? [study], study.mySide), [allStudies, study]);
 
@@ -200,30 +209,54 @@ function StudyPlay({
 
   const asking = phase.kind !== 'end' && own.has(ply) && ply < end;
   const sfen = positions[ply] ?? STARTPOS_SFEN;
+  /** 悪手の咎め方を盤で見せている間 */
+  const replaying = phase.kind === 'bad' && phase.step !== null;
   const input = useMoveInput(
     sfen,
     (move) => {
-      const correct = move.usi === study.moves[ply];
-      if (correct) {
+      const prev = ply > 0 ? study.moves[ply - 1] : undefined;
+      const table = tableOf(positionsNow().get(positionId(study.mySide, sfen)), studyMovesAt(bookIndex, sfen));
+      const other = otherStudyAt(bookIndex, sfen, move.usi, study.id);
+      const judge = judgeAnswer(move.usi, study.moves[ply], table, other);
+      if (judge.kind === 'correct') {
         if (!answers.has(ply)) setAnswers(new Map(answers).set(ply, true));
         setJustOk(phase.kind === 'play');
         setPhase({ kind: 'play' });
         setPly(ply + 1);
         return;
       }
-      const tried = textAt(sfen, move.usi, ply > 0 ? study.moves[ply - 1] : undefined);
+      const tried = textAt(sfen, move.usi, prev);
       setJustOk(false);
-      // ほかの研究手順の手なら、まちがいに数えない（正解の手を指すまで続かないのは同じ）
-      const other = otherStudyAt(bookIndex, sfen, move.usi, study.id);
-      if (other) {
-        setPhase({ kind: 'other', tried, name: other.name });
+      // まちがいに数えない（この研究手順の手を指すまで続かないのは同じ）
+      if (judge.kind === 'near') {
+        setPhase({
+          kind: 'other',
+          tried,
+          mark: judge.mark,
+          tag: judge.entry ? markText(table, judge.entry) : '次善',
+          name: judge.other?.name ?? null,
+          answerIsMain: table.some((c) => c.mark === 'main' && c.move === study.moves[ply]),
+        });
         return;
       }
       if (!answers.has(ply)) setAnswers(new Map(answers).set(ply, false));
+      const line = judge.kind === 'bad' ? refutation(sfen, judge.entry) : null;
+      if (judge.kind === 'bad' && line) {
+        // 読み筋が無ければ、見せずに問題の局面のまま
+        setPhase({ kind: 'bad', tried, tag: markText(table, judge.entry), entry: judge.entry, line, step: line.texts.length > 0 ? 0 : null });
+        return;
+      }
       setPhase({ kind: 'wrong', tried });
     },
-    asking,
+    asking && !replaying,
   );
+  // 咎め方を 1 手ずつ見せて、最後まで来たら問題の局面に戻る
+  useEffect(() => {
+    if (phase.kind !== 'bad' || phase.step === null) return;
+    const next = phase.step < phase.line.texts.length ? phase.step + 1 : null;
+    const timer = setTimeout(() => setPhase({ ...phase, step: next }), OPPONENT_DELAY);
+    return () => clearTimeout(timer);
+  }, [phase]);
   useEffect(() => {
     if (!justOk) return;
     const timer = setTimeout(() => setJustOk(false), 700);
@@ -231,8 +264,23 @@ function StudyPlay({
   }, [justOk, ply]);
 
   const shown = phase.kind === 'end' && view !== null ? view : ply;
-  const shownSfen = positions[shown] ?? STARTPOS_SFEN;
-  const shownLast = shown > 0 ? study.moves[shown - 1] : undefined;
+  const replay = phase.kind === 'bad' && phase.step !== null ? { line: phase.line, step: phase.step } : null;
+  /** 悪手の間の、操作バーの真ん中の操作（咎め方をとばす・もう一度見る） */
+  const refuteAction =
+    phase.kind === 'bad' && phase.line.texts.length > 0
+      ? phase.step !== null
+        ? { label: 'とばして戻る', testId: 'practice-refute-skip', run: () => setPhase({ ...phase, step: null }) }
+        : {
+            label: '咎め方をもう一度見る',
+            testId: 'practice-refute-again',
+            run: () => {
+              input.clear();
+              setPhase({ ...phase, step: 0 });
+            },
+          }
+      : null;
+  const shownSfen = replay ? replay.line.sfens[replay.step] : (positions[shown] ?? STARTPOS_SFEN);
+  const shownLast = replay ? replay.line.moves[replay.step] : shown > 0 ? study.moves[shown - 1] : undefined;
 
   const boardRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
@@ -240,6 +288,8 @@ function StudyPlay({
   // 同じ研究手順の間は、一度縮めた盤を戻さない（終わりのカードが出ても盤が行ったり来たりしない）
   const fitMemo = useRef<number | null>(null);
   const boardFit = useBoardFit(boardRef, (board) => {
+    // 悪手の間は盤の大きさを変えない
+    if (phase.kind === 'bad' && fitMemo.current !== null) return fitMemo.current;
     const frame = frameRef.current;
     const width = frame && cardRef.current ? measureFitFrame(board, frame, bottomInFrame(frame, cardRef.current)) : null;
     const kept = fitMemo.current !== null && width !== null ? Math.min(fitMemo.current, width) : width;
@@ -286,7 +336,7 @@ function StudyPlay({
             <Board
               sfen={shownSfen}
               lastMove={shownLast}
-              selection={input.selection}
+              selection={replay ? null : input.selection}
               onSquare={input.onSquare}
               onHand={input.onHand}
               flash={justOk && view === null}
@@ -300,8 +350,16 @@ function StudyPlay({
             onNext={() => setView(shown + 1 >= ply ? null : shown + 1)}
             canPrev={phase.kind === 'end' && shown > start}
             canNext={phase.kind === 'end' && shown < ply}
+            onCenter={refuteAction?.run}
+            centerLabel={refuteAction?.label}
           >
-            {shown === 0 ? '初期局面' : `${shown}手目 ${texts[shown - 1] ?? ''}`}
+            {refuteAction ? (
+              <span data-testid={refuteAction.testId}>{refuteAction.label}</span>
+            ) : shown === 0 ? (
+              '初期局面'
+            ) : (
+              `${shown}手目 ${texts[shown - 1] ?? ''}`
+            )}
           </MoveBar>
         </div>
 
@@ -332,19 +390,50 @@ function StudyPlay({
             {phase.kind === 'other' && (
               <>
                 <p data-testid="practice-other">
-                  {phase.tried} は「{phase.name}」の研究の手です（まちがいにしません）。
+                  {phase.tried} は <MarkTag mark={phase.mark} text={phase.tag} />
+                  {phase.name && `「${phase.name}」の研究の手`}（まちがいにしません）。
                 </p>
                 <p>
-                  この研究は <strong class="practice-answer" data-testid="practice-answer">{texts[ply]}</strong>。盤で指すと続きます。
+                  {phase.answerIsMain ? '本命は' : 'この研究は'} <strong class="practice-answer" data-testid="practice-answer">{texts[ply]}</strong>。盤で指すと続きます。
                 </p>
+              </>
+            )}
+            {phase.kind === 'bad' && (
+              <>
+                <p class="status-ng" data-testid="practice-bad">
+                  {phase.tried} は悪手です。 <MarkTag mark="bad" text={phase.tag} />
+                </p>
+                {phase.step !== null ? (
+                  <p data-testid="practice-refute">
+                    咎め方 <span class="num">{phase.step}／{phase.line.texts.length}</span>：
+                    {/* 長い読み筋は今のあたりの 3 手だけ（カードを高くしない） */}
+                    {phase.line.texts.map((t, i) => {
+                      const from = Math.max(0, Math.min(phase.step! - 2, phase.line.texts.length - 3));
+                      return i >= from && i < from + 3 ? (
+                        <span key={i} class={i + 1 === phase.step ? 'practice-refute-on' : ''}>
+                          {t}{' '}
+                        </span>
+                      ) : null;
+                    })}
+                  </p>
+                ) : (
+                  <p>
+                    正解は <strong class="practice-answer" data-testid="practice-answer">{texts[ply]}</strong>。盤で指すと続きます。
+                  </p>
+                )}
               </>
             )}
             {phase.kind === 'end' && (
               <EndCard record={phase.record} saveError={phase.saveError} mistakes={mistakes} texts={texts} rest={total - index - 1} onNext={onNext} />
             )}
           </section>
-          {/* 段階20-1：まちがえたとき・ほかの研究の手のときは、その局面の局面メモ（カードの下。盤の大きさはカードまでで決める） */}
-          {(phase.kind === 'wrong' || phase.kind === 'other') && noteAt(study.mySide, sfen) && (
+          {/* 悪手の理由と局面メモはカードの下（盤の大きさはカードまでで決める） */}
+          {phase.kind === 'bad' && phase.entry.reason && (
+            <div class="practice-after">
+              <p class="study-note practice-note">{phase.entry.reason}</p>
+            </div>
+          )}
+          {(phase.kind === 'wrong' || phase.kind === 'other' || phase.kind === 'bad') && noteAt(study.mySide, sfen) && (
             <div class="practice-after">
               <p class="study-note practice-note" data-testid="practice-memo">
                 <span class="practice-memo-label">局面メモ</span>

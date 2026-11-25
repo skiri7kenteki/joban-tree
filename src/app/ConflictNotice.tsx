@@ -1,6 +1,7 @@
 // 食い違いの知らせ（段階20-1）：定跡帳のタブの集計の下に「食い違い n か所［見る］」。
 // 食い違い＝自分の手番の同じ局面（手順前後を含む）で、研究手順によって自分の手が違うこと。研究の手の全部に候補の表の印があるものは数えない。
 // 1 か所なら［見る］でその局面の定跡帳を開く。2 か所以上なら一覧の窓（行を押すと開く・行ごとに本命を選ぶ。段階21-1）。
+// 選んだ直後は［取り消す］（段階21-2。窓が開いていれば窓の中、閉じていれば画面の下の知らせ）。
 
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import { Dialog } from '../components/Dialog';
@@ -10,7 +11,7 @@ import { bookIndexes, findConflicts, type Conflict } from '../tree/positions';
 import { moveTexts } from '../tree/studies';
 import type { Study } from '../tree/types';
 import { studyBookUrl } from './addToBook';
-import { ensurePositions, positionNotes, positionsNow, saveTable } from './positions';
+import { ensurePositions, positionNotes, positionsNow, restoreTable, saveTable, tableSnapshot, type TableSnapshot } from './positions';
 import { go } from './router';
 
 /** 「17手目 ▲5八玉 の後（☖後手）」 */
@@ -53,7 +54,50 @@ export function ConflictNotice({ studies }: { studies: readonly Study[] }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  if (conflicts.length === 0) return null;
+  /** 選んだ本命（新しいものが後ろ。［取り消す］で 1 つずつ戻す） */
+  const [done, setDone] = useState<{ conflict: Conflict; snapshot: TableSnapshot; text: string }[]>([]);
+  const [toast, setToast] = useState(false);
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(false), 8000);
+    return () => clearTimeout(timer);
+  }, [toast, done.length]);
+  // 食い違いが無くなったら一覧の窓を閉じる
+  useEffect(() => {
+    if (conflicts.length === 0) setOpen(false);
+  }, [conflicts.length]);
+  const last = done[done.length - 1];
+
+  async function undo() {
+    if (!last) return;
+    setBusy(true);
+    setError('');
+    try {
+      await restoreTable(last.conflict.side, last.conflict.sfen, last.snapshot);
+      setDone(done.slice(0, -1));
+      setToast(false);
+    } catch (e) {
+      setError(`取り消せませんでした：${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const undoLine = last && (
+    <>
+      <span class="toast-text toast-wrap">{last.text}</span>
+      <button type="button" class="btn toast-btn" data-testid="conflict-undo" disabled={busy} onClick={() => void undo()}>
+        取り消す
+      </button>
+    </>
+  );
+  const notice = toast && !open && last && (
+    <div class="toast conflict-toast" role="status" data-testid="conflict-toast">
+      {undoLine}
+      {error && <span class="status-ng">{error}</span>}
+    </div>
+  );
+  if (conflicts.length === 0) return notice || null;
   const one = conflicts.length === 1 ? conflicts[0] : null;
 
   async function choose(c: Conflict, move: string) {
@@ -65,8 +109,13 @@ export function ConflictNotice({ studies }: { studies: readonly Study[] }) {
         c.moves.map((m) => m.move),
         move,
       );
-      if (table) await saveTable(c.side, c.sfen, table);
-      else setError('候補の表がいっぱいです。その局面で、使わない手を表から外してください。');
+      if (table) {
+        const snapshot = await tableSnapshot(c.side, c.sfen);
+        await saveTable(c.side, c.sfen, table);
+        const chosen = moveText(c.sfen, move, c.ply > 0 ? c.study.moves[c.ply - 1] : undefined);
+        setDone((list) => [...list, { conflict: c, snapshot, text: `${chosen} を本命にしました` }]);
+        setToast(true);
+      } else setError('候補の表がいっぱいです。その局面で、使わない手を表から外してください。');
     } catch (e) {
       setError(`保存できませんでした：${e instanceof Error ? e.message : String(e)}`);
     } finally {
@@ -90,10 +139,16 @@ export function ConflictNotice({ studies }: { studies: readonly Study[] }) {
           見る
         </button>
       </div>
+      {notice}
       {open && (
         <Dialog title={`食い違い ${conflicts.length} か所`} onClose={() => setOpen(false)} testId="conflict-dialog" sheet>
           <p class="muted memo-sub">自分の手番の同じ局面で、研究手順によって自分の手が違います。本命を選ぶと、ほかの手は次善になります。稽古では、どちらを指してもまちがいにしません。</p>
           {error && <p class="status-ng">{error}</p>}
+          {undoLine && (
+            <div class="conflict-undo-line" role="status">
+              {undoLine}
+            </div>
+          )}
           <ul class="conflict-list">
             {conflicts.map((c) => (
               <li key={c.id} class="conflict-item" data-testid="conflict-item">

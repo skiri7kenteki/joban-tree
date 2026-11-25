@@ -11,6 +11,8 @@ export interface MoveBarProps {
   children: ComponentChildren;
   /** 真ん中を押したとき（手順の一覧を開く）。無ければ文字だけ */
   onCenter?: () => void;
+  /** onCenter が手順の一覧でないときの読み上げの名前（「▾」を付けない） */
+  centerLabel?: string;
   onFirst?: () => void;
   onPrev: () => void;
   onNext: () => void;
@@ -40,7 +42,7 @@ export function MoveBar(p: MoveBarProps) {
           ‹
         </button>
         {p.onCenter ? (
-          <button type="button" class="move-bar-center kifu-open num" aria-label="手順の一覧" data-testid={p.ids.center} onClick={p.onCenter}>
+          <button type="button" class={p.centerLabel ? 'move-bar-center move-bar-action num' : 'move-bar-center kifu-open num'} aria-label={p.centerLabel ?? '手順の一覧'} data-testid={p.ids.center} onClick={p.onCenter}>
             {p.children}
           </button>
         ) : (

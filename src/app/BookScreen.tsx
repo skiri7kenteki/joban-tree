@@ -16,16 +16,17 @@
 // - 段階20-2：一覧の見出しの行の右端に［エンジンに聞く］（src/app/AskEngine.tsx）
 // - 段階21-1：自分の手番の局面に候補の表（本命・次善・悪手。src/tree/candidates.ts、窓は src/app/CandidateDialogs.tsx）。行に印、研究手順の無い手は薄い行、
 //   見出しの行は表の要約（局面メモは候補の窓の下へ）。行の ⋯ で印を付け替える。食い違いは「どちらを本命にするか」。表の変更も「取り消す」で戻る
+// - 段階21-2：研究手順の無い悪手の行を押すと、盤の上で咎め方を ‹ › でたどる（「咎め方を見ています［戻る］」）。研究手順には入れない
 // 研究手順の画面（StudyScreen）と編集モードは段階10-2 で片付けた（古い URL は src/app/LegacyRedirect.tsx でここへ移す）。
 
-import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { Board } from '../components/Board';
 import { Dialog } from '../components/Dialog';
 import { PromotionBox, useMoveInput } from '../components/useMoveInput';
 import { STARTPOS_SFEN, moveText, sfenKey, sideToMove, type Side } from '../shogi/position';
 import { buildBookIndex } from '../games/compare';
 import { conflictAt, positionId, studyMovesAt, type Conflict } from '../tree/positions';
-import { MARK_TEXT, candidatesKifLine, chooseMain, markText, setMark, setReason, summaryText, tableOf, type Candidate, type CandidateMark } from '../tree/candidates';
+import { MARK_TEXT, candidatesKifLine, chooseMain, markText, refutation, setMark, setReason, summaryText, tableOf, type Candidate, type CandidateMark } from '../tree/candidates';
 import { ensurePositions, isMarkedBad, noteAt, positionNotes, positionsNow, restoreTable, saveNote, saveTable, tableSnapshot, type TableSnapshot } from './positions';
 import { CandidateWindow, MarkChooser, MarkTag, MemoDialog } from './CandidateDialogs';
 import { MainChoice } from './ConflictNotice';
@@ -284,20 +285,38 @@ function BookViewScreen({
   /** 盤で指した手を、足さずにエンジンで調べる（局面が変わったらやめる） */
   const [picking, setPicking] = useState(false);
   useEffect(() => setPicking(false), [sfen]);
+  /** 咎め方を見ている悪手と、何手目を見ているか（局面が変わったらやめる） */
+  const [refute, setRefute] = useState<{ sfen: string; move: string; step: number } | null>(null);
+  const refuteEntry = refute && refute.sfen === sfen ? table.find((c) => c.move === refute.move && c.mark === 'bad') : undefined;
+  const refuteLine = refuteEntry ? refutation(sfen, refuteEntry) : null;
+  const refuteStep = refuteLine ? Math.max(0, Math.min(refute!.step, refuteLine.texts.length)) : 0;
+  const showStep = (step: number) => setRefute((r) => (r ? { ...r, step } : r));
+  const refuteGone = refute !== null && !refuteEntry;
+  useEffect(() => {
+    if (refuteGone) setRefute(null);
+  }, [refuteGone]);
 
   // 段階14：1 画面に収める。「この局面からの研究」の枠の中で 3 行目まで見える盤の幅（一覧の行が少ない局面でも同じだけ空けて、盤の大きさを変えない）
   const boardRef = useRef<HTMLDivElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
   const branchesRef = useRef<HTMLDivElement>(null);
+  /** 一覧を出していたときの盤の幅（咎め方の間は、この幅のまま） */
+  const listFit = useRef<number | null>(null);
   const boardFit = useBoardFit(boardRef, (board) => {
     const frame = frameRef.current;
     const list = branchesRef.current;
     if (!frame || !list) return null;
+    if (refuteLine && listFit.current !== null) return listFit.current;
     const rows = list.querySelectorAll<HTMLElement>('.book-row:not(.book-empty)');
     // 成る・成らないの小窓は数えない（盤の大きさが変わらないように）
     const promote = frame.querySelector<HTMLElement>('.promote-box')?.getBoundingClientRect().height ?? 0;
-    return measureFitFrame(board, frame, threeRowsNeed(frame, rows, list.querySelector<HTMLElement>('.candidates-head'), ROW_GUESS) - promote);
+    const width = measureFitFrame(board, frame, threeRowsNeed(frame, rows, list.querySelector<HTMLElement>('.candidates-head'), ROW_GUESS) - promote);
+    if (!refuteLine) listFit.current = width;
+    return width;
   });
+  useLayoutEffect(() => {
+    if (refuteLine && frameRef.current) frameRef.current.scrollTop = 0;
+  }, [refuteLine !== null]);
   // 段階14：操作の結果の一言（コピーしました・読むだけ など）は、一覧の下ではなく画面の下の知らせで 5 秒（画面を広げない）
   useEffect(() => {
     if (!note) return;
@@ -314,10 +333,11 @@ function BookViewScreen({
     return () => clearTimeout(timer);
   }, [hint]);
 
-  const input = useMoveInput(sfen, (move) => void onPlay(move.usi), !busy);
+  const input = useMoveInput(sfen, (move) => void onPlay(move.usi), !busy && !refuteLine);
 
   function moveTo(i: number) {
     input.clear();
+    setRefute(null);
     setPicking(false);
     setView({ id: current?.id ?? null, line: [...line], index: Math.max(minIndex, Math.min(last, i)) });
     setNote('');
@@ -351,7 +371,8 @@ function BookViewScreen({
     const dx = t.clientX - s.x;
     const dy = t.clientY - s.y;
     if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
-    moveTo(dx > 0 ? index - 1 : index + 1);
+    if (refuteLine) showStep(refuteStep + (dx > 0 ? -1 : 1));
+    else moveTo(dx > 0 ? index - 1 : index + 1);
   };
 
   // ---- 書き込む ----
@@ -546,8 +567,20 @@ function BookViewScreen({
     else setNote(TABLE_FULL);
   }
 
+  /** 研究手順の無い手の行：悪手で読み筋があれば咎め方を盤で、ほかは候補の窓 */
+  function openTableRow(move: string) {
+    const entry = table.find((c) => c.move === move);
+    if (entry?.mark === 'bad' && (refutation(sfen, entry)?.texts.length ?? 0) > 0) {
+      input.clear();
+      setNote('');
+      setPicking(false);
+      setRefute({ sfen, move, step: 0 });
+    } else openPositionWindow();
+  }
+
   function startPicking() {
     input.clear();
+    setRefute(null);
     setNote('');
     setDialog(null);
     setPicking(true);
@@ -650,6 +683,16 @@ function BookViewScreen({
   const openPositionWindow = () => setDialog({ kind: mine ? 'cand' : 'memo' });
   const openRow = (move: string) => setDialog({ kind: 'row', move, branch: connections.branches.some((b) => b.move === move) });
   const place = index === 0 ? '初期局面' : `${index}手目 ${texts[index - 1] ?? ''} の局面`;
+  /** 局面メモの書きかけを保存する（窓は閉じない・切りかえない） */
+  async function autoSaveMemo(text: string) {
+    try {
+      await saveNote(side, sfen, text);
+      setNote('局面メモを保存しました');
+    } catch (e) {
+      setNote(`局面メモを保存できませんでした：${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+
   const outside = index > covered || pool.length === 0;
 
   return (
@@ -700,22 +743,26 @@ function BookViewScreen({
       <div class="tree-layout study-layout">
         <div class="board-col">
           <div ref={boardRef} {...boardFitProps(boardFit, 'tree-board')} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} data-testid="study-board">
-            <Board sfen={sfen} lastMove={prevMove} selection={input.selection} onSquare={input.onSquare} onHand={input.onHand} />
+            {refuteLine ? (
+              <Board sfen={refuteLine.sfens[refuteStep]} lastMove={refuteLine.moves[refuteStep]} selection={null} onSquare={input.onSquare} onHand={input.onHand} />
+            ) : (
+              <Board sfen={sfen} lastMove={prevMove} selection={input.selection} onSquare={input.onSquare} onHand={input.onHand} />
+            )}
           </div>
           {/* 盤のすぐ下の操作バー（段階14。前は画面の下に固定）：|‹（出発点へ） ‹ [n手目 ▲X ▾] › ›|（今の研究手順の終わりへ） */}
           <MoveBar
             fixed={false}
             ids={{ bar: 'study-nav', first: 'study-first', prev: 'study-prev', center: 'study-position', next: 'study-next', last: 'study-last' }}
             firstLabel={`出発点（${startName}）へ`}
-            onFirst={() => moveTo(minIndex)}
-            onPrev={() => moveTo(index - 1)}
-            onNext={() => moveTo(index + 1)}
-            onLast={() => moveTo(last)}
-            canPrev={index > minIndex}
-            canNext={index < last}
-            onCenter={wide ? undefined : () => setKifuOpen(true)}
+            onFirst={() => (refuteLine ? showStep(0) : moveTo(minIndex))}
+            onPrev={() => (refuteLine ? showStep(refuteStep - 1) : moveTo(index - 1))}
+            onNext={() => (refuteLine ? showStep(refuteStep + 1) : moveTo(index + 1))}
+            onLast={() => (refuteLine ? showStep(refuteLine.texts.length) : moveTo(last))}
+            canPrev={refuteLine ? refuteStep > 0 : index > minIndex}
+            canNext={refuteLine ? refuteStep < refuteLine.texts.length : index < last}
+            onCenter={wide || refuteLine ? undefined : () => setKifuOpen(true)}
           >
-            {index === 0 ? '初期局面' : `${index}手目 ${texts[index - 1] ?? ''}`}
+            {refuteLine ? `咎め方 ${refuteStep}／${refuteLine.texts.length}手` : index === 0 ? '初期局面' : `${index}手目 ${texts[index - 1] ?? ''}`}
           </MoveBar>
         </div>
 
@@ -725,7 +772,19 @@ function BookViewScreen({
           {/* 手順の一覧：広い画面は盤の横に常に。スマホ縦は固定バーの手数を押すと画面下から（段階11-5・11-2） */}
           {wide && <KifuPanel rows={kifuRows} current={index} onJump={moveTo} />}
 
+          {refuteLine && refuteEntry ? (
+            <RefuteCard
+              listRef={branchesRef}
+              text={moveText(sfen, refuteEntry.move, prevMove)}
+              tag={markText(table, refuteEntry)}
+              reason={refuteEntry.reason}
+              moves={refuteLine.texts}
+              step={refuteStep}
+              onClose={() => setRefute(null)}
+            />
+          ) : (
           <BookBranches
+            onTableRow={openTableRow}
             listRef={branchesRef}
             connections={connections}
             current={current}
@@ -745,6 +804,7 @@ function BookViewScreen({
             picking={picking}
             onPickCancel={() => setPicking(false)}
           />
+          )}
         </div>
       </div>
 
@@ -954,7 +1014,7 @@ function BookViewScreen({
       )}
 
       {dialog?.kind === 'memo' && (
-        <MemoDialog title={place} side={side} initial={memo} busy={busy} onSave={(t) => void doSaveMemo(t)} onClose={() => setDialog(null)} />
+        <MemoDialog title={place} side={side} initial={memo} busy={busy} onSave={(t) => void doSaveMemo(t)} onAutoSave={(t) => void autoSaveMemo(t)} onClose={() => setDialog(null)} />
       )}
 
       {dialog?.kind === 'cand' && (
@@ -970,6 +1030,7 @@ function BookViewScreen({
           onAsk={() => setDialog({ kind: 'ask' })}
           onPick={startPicking}
           onSaveMemo={(t) => void doSaveMemo(t)}
+          onAutoSaveMemo={(t) => void autoSaveMemo(t)}
           onClose={() => setDialog(null)}
         />
       )}
@@ -1029,6 +1090,49 @@ function ConflictBox({ conflict, busy, onChoose }: { conflict: Conflict; busy: b
   );
 }
 
+/** 咎め方を見ている間の一覧の枠。見出しの行の高さは一覧と同じ（盤の大きさを変えない） */
+function RefuteCard({
+  listRef,
+  text,
+  tag,
+  reason,
+  moves,
+  step,
+  onClose,
+}: {
+  listRef: { current: HTMLDivElement | null };
+  /** 悪手の文字 */
+  text: string;
+  tag: string;
+  reason: string | undefined;
+  moves: readonly string[];
+  step: number;
+  onClose: () => void;
+}) {
+  return (
+    <div class="card candidates book-list" ref={listRef} data-testid="refute-card">
+      <div class="candidates-head book-list-head">
+        <strong class="conflict-word">咎め方を見ています</strong>
+        <button type="button" class="btn btn-primary book-ask refute-close" data-testid="refute-close" onClick={onClose}>
+          戻る
+        </button>
+      </div>
+      <p class="refute-move">
+        <strong>{text}</strong>
+        <MarkTag mark="bad" text={tag} />
+      </p>
+      <ol class="refute-line" data-testid="refute-line">
+        {moves.map((m, i) => (
+          <li key={i} class={i + 1 === step ? 'on' : ''} aria-current={i + 1 === step ? 'step' : undefined}>
+            {m}
+          </li>
+        ))}
+      </ol>
+      {reason && <p class="refute-reason">{reason}</p>}
+    </div>
+  );
+}
+
 /** 消すときの説明（何本消すか・どれを残すか） */
 function CutText({ plan }: { plan: CutPlan }) {
   const removed = plan.remove.length + (plan.kept ? 1 : 0);
@@ -1070,6 +1174,7 @@ function BookBranches({
   onAsk,
   picking,
   onPickCancel,
+  onTableRow,
 }: {
   connections: BookPosition<Study>;
   current: Study | null;
@@ -1092,6 +1197,8 @@ function BookBranches({
   onAsk: () => void;
   picking: boolean;
   onPickCancel: () => void;
+  /** 研究手順の無い手の行を押した */
+  onTableRow: (move: string) => void;
 }) {
   const { branches, ending, count } = connections;
   /** 食い違いの印を付ける手（研究の手の全部に表の印があれば付けない） */
@@ -1199,13 +1306,13 @@ function BookBranches({
         ))}
         {tableOnly.map((c) => (
           <li key={`cand-${c.move}`} class="candidate-item">
-            <button type="button" class="candidate book-row book-table-only" data-testid="book-cand-row" data-move={c.move} onClick={onSummary}>
+            <button type="button" class="candidate book-row book-table-only" data-testid="book-cand-row" data-move={c.move} onClick={() => onTableRow(c.move)}>
               <span class="candidate-line">
                 <span class="candidate-move">
                   {moveText(sfen, c.move, prev)}
                   {tagOf(c.move)}
                 </span>
-                <span class="book-names">研究手順なし</span>
+                <span class="book-names">{c.mark === 'bad' && c.pv?.length ? '咎め方を見る ›' : '研究手順なし'}</span>
               </span>
             </button>
             <button type="button" class="candidate-menu" aria-label={`${moveText(sfen, c.move, prev)} の操作`} data-testid="book-cand-menu" onClick={() => onMenu(c.move)}>

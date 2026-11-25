@@ -3,7 +3,7 @@
 // - 印の付け替え：行の ⋯ の窓の中の「本命・次善・悪手・表から外す」。理由は打ちたいときだけ
 // - どれも文字を打たなくても使える
 
-import { useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import { Dialog } from '../components/Dialog';
 import { applyUsiMove, moveText, type Side } from '../shogi/position';
 import { MARK_TEXT, PV_MAX, PV_SHOW, REASON_MAX, evalText, markText, type Candidate, type CandidateMark } from '../tree/candidates';
@@ -42,9 +42,40 @@ function conditionText(table: readonly Candidate[]): string {
   return `${by.ms / 1000}秒・${by.engine}（${d.getMonth() + 1}/${d.getDate()}）`;
 }
 
-/** 局面メモを書く欄（保存・消す） */
-function MemoEditor({ initial, busy, rows, onSave }: { initial: string; busy: boolean; rows: number; onSave: (text: string) => void }) {
+/**
+ * 局面メモを書く欄（保存・消す）。書きかけのまま窓を離れたら（閉じる・ほかのボタン）自動で保存する。
+ * 全部消した書きかけは保存しない（消すのは［メモを消す］か［メモを保存］を押したときだけ）
+ */
+function MemoEditor({
+  initial,
+  busy,
+  rows,
+  onSave,
+  onAutoSave,
+}: {
+  initial: string;
+  busy: boolean;
+  rows: number;
+  onSave: (text: string) => void;
+  onAutoSave: (text: string) => void;
+}) {
   const [text, setText] = useState(initial);
+  /** 離れるときに保存する書きかけ（ボタンの保存に失敗しても残るように、保存したかは覚えない。同じ内容をもう一度書くだけ） */
+  const draft = useRef(initial);
+  /** 開いたときの局面に保存する */
+  const autoSave = useRef(onAutoSave);
+  useEffect(
+    () => () => {
+      const next = draft.current.trimEnd();
+      if (next.trim() !== '' && next !== initial) autoSave.current(next);
+    },
+    [],
+  );
+  /** ［メモを消す］：書きかけも消す（離れるときに戻さないように） */
+  const remove = () => {
+    draft.current = '';
+    onSave('');
+  };
   return (
     <>
       <textarea
@@ -54,14 +85,17 @@ function MemoEditor({ initial, busy, rows, onSave }: { initial: string; busy: bo
         maxLength={NOTE_MAX}
         rows={rows}
         value={text}
-        onInput={(e) => setText((e.target as HTMLTextAreaElement).value)}
+        onInput={(e) => {
+          draft.current = (e.target as HTMLTextAreaElement).value;
+          setText(draft.current);
+        }}
       />
       <div class="dialog-actions">
         <button type="button" class="btn" data-testid="book-memo-save" disabled={busy || text.trimEnd() === initial} onClick={() => onSave(text)}>
           メモを保存
         </button>
         {initial && (
-          <button type="button" class="btn btn-danger dialog-action-end" data-testid="book-memo-delete" disabled={busy} onClick={() => onSave('')}>
+          <button type="button" class="btn btn-danger dialog-action-end" data-testid="book-memo-delete" disabled={busy} onClick={remove}>
             メモを消す
           </button>
         )}
@@ -71,13 +105,29 @@ function MemoEditor({ initial, busy, rows, onSave }: { initial: string; busy: bo
 }
 
 /** 相手の手番の局面メモの窓（画面の下から。全文を読む・直す・消す） */
-export function MemoDialog({ title, side, initial, busy, onSave, onClose }: { title: string; side: Side; initial: string; busy: boolean; onSave: (text: string) => void; onClose: () => void }) {
+export function MemoDialog({
+  title,
+  side,
+  initial,
+  busy,
+  onSave,
+  onAutoSave,
+  onClose,
+}: {
+  title: string;
+  side: Side;
+  initial: string;
+  busy: boolean;
+  onSave: (text: string) => void;
+  onAutoSave: (text: string) => void;
+  onClose: () => void;
+}) {
   return (
     <Dialog title="局面メモ" onClose={onClose} testId="book-memo-dialog" sheet>
       <p class="muted memo-sub">
         {title}（{side === 'black' ? '☗先手' : '☖後手'}の定跡帳）。手順前後で来ても同じメモが出ます。
       </p>
-      <MemoEditor initial={initial} busy={busy} rows={5} onSave={onSave} />
+      <MemoEditor initial={initial} busy={busy} rows={5} onSave={onSave} onAutoSave={onAutoSave} />
     </Dialog>
   );
 }
@@ -95,6 +145,7 @@ export function CandidateWindow({
   onAsk,
   onPick,
   onSaveMemo,
+  onAutoSaveMemo,
   onClose,
 }: {
   /** 「17手目 ▲5八玉 の局面」 */
@@ -111,6 +162,7 @@ export function CandidateWindow({
   /** 盤で指して調べる */
   onPick: () => void;
   onSaveMemo: (text: string) => void;
+  onAutoSaveMemo: (text: string) => void;
   onClose: () => void;
 }) {
   const condition = conditionText(table);
@@ -157,7 +209,7 @@ export function CandidateWindow({
       {condition && <p class="muted memo-sub">{condition}</p>}
       <div class="cand-memo">
         <p class="menu-section-title">局面メモ</p>
-        <MemoEditor initial={memo} busy={busy} rows={2} onSave={onSaveMemo} />
+        <MemoEditor initial={memo} busy={busy} rows={2} onSave={onSaveMemo} onAutoSave={onAutoSaveMemo} />
       </div>
     </Dialog>
   );

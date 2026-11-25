@@ -71,7 +71,8 @@ test('行の印と見出しの行の要約 → 候補の窓 → 行の ⋯ で�
 
   await expect(page.getByTestId('book-table')).toHaveText('候補 3・本命 △６二玉');
   await expect(page.getByTestId('book-mark-tag')).toHaveText(['本命', '次善 −80', '悪手 −450']);
-  await expect(page.getByTestId('book-cand-row')).toContainText('研究手順なし');
+  // 段階21-2：読み筋のある悪手の行は「咎め方を見る」
+  await expect(page.getByTestId('book-cand-row')).toContainText('咎め方を見る');
   await expect(page.getByTestId('book-conflict-tag')).toHaveCount(0);
 
   // 相手の手番には表を出さない

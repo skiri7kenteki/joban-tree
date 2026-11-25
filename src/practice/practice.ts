@@ -3,11 +3,13 @@
 // - 1 回の稽古＝研究手順 1 本を、戦型の出発点（自分の側が同じ、いちばん浅い戦型。横歩取りの後手番は 16 手目 △3三角）から終わりまで通して指す。
 //   出発点の後に自分の手番が無ければ初期局面から。相手の手は研究手順の通りにアプリが指す
 // - まちがえたら正解を見せ、盤で正解を指すと続く（止めずに最後まで）。数えるのは 1 回目の答えだけ
+// - 段階21-2：候補の表の次善・本命（とほかの研究手順の手）はまちがいにしない。悪手はまちがいで、咎め方を見せる（`judgeAnswer`）
 // - 間隔反復：全部正解なら 明日 → 3日 → 1週 → 2週 → 1か月 → 2か月（あとは 2 か月ごと）。1 か所でもまちがえたら翌日から（段を最初に戻す）。
 //   「身についた」＝ 1 週以上空くところまで進んだ研究手順
 // - 今日の稽古の並び：①実戦で違う手を指した（最後の稽古より後の実戦で）→ ②前回まちがい → ③日が来た（遅れている順）→ ④はじめて（1 日 5 本まで）
 
 import { studyQuestions, reviewStart } from '../review/studyReview';
+import type { Candidate } from '../tree/candidates';
 import { startTemplate } from '../tree/studies';
 import type { OpeningTemplate } from '../tree/templates';
 import type { Study } from '../tree/types';
@@ -80,6 +82,26 @@ export function practiceStart(study: Pick<Study, 'moves' | 'mySide'>, templates:
 /** 稽古で答える手（自分の手番の手）の手数（0 始まり） */
 export function practicePlies(study: Pick<Study, 'moves' | 'mySide'>, templates: readonly OpeningTemplate[]): number[] {
   return studyQuestions(study, practiceStart(study, templates)).map((q) => q.index);
+}
+
+/** 稽古で指した手の扱い（段階21-2） */
+export type Judge =
+  /** この研究手順の手 */
+  | { kind: 'correct' }
+  /** まちがいにしない：表の本命・次善（entry）、表に無いほかの研究手順の手（次善として。other） */
+  | { kind: 'near'; mark: 'main' | 'alt'; entry: Candidate | undefined; other: Study | null }
+  /** 表の悪手：まちがい。咎め方を見せる */
+  | { kind: 'bad'; entry: Candidate }
+  /** まちがい */
+  | { kind: 'wrong' };
+
+/** move：指した手、correct：この研究手順の手、table：この局面の候補の表、other：同じ局面で指した手を通るほかの研究手順 */
+export function judgeAnswer(move: string, correct: string, table: readonly Candidate[], other: Study | null): Judge {
+  if (move === correct) return { kind: 'correct' };
+  const entry = table.find((c) => c.move === move);
+  if (entry?.mark === 'bad') return { kind: 'bad', entry };
+  if (entry) return { kind: 'near', mark: entry.mark === 'main' ? 'main' : 'alt', entry, other };
+  return other ? { kind: 'near', mark: 'alt', entry: undefined, other } : { kind: 'wrong' };
 }
 
 /** 今日の稽古に入れる理由 */

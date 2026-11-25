@@ -8,7 +8,7 @@
 // - もう一度残す：表にある手も一緒に調べ直して点と読み筋を新しくする。手・印・理由は残し、自動の印は新しい手にだけ
 
 import { formatScore, scoreToNumber, type Score } from '../engine/usi';
-import { moveText } from '../shogi/position';
+import { applyUsiMove, moveText } from '../shogi/position';
 import type { PositionNote } from './positions';
 
 export type CandidateMark = 'main' | 'alt' | 'bad';
@@ -190,6 +190,32 @@ export function summaryText(table: readonly Candidate[], sfen: string, prev?: st
 /** 評価値の文字（無ければ空） */
 export function evalText(c: Pick<Candidate, 'eval'>): string {
   return c.eval ? formatScore(c.eval) : '';
+}
+
+/** 悪手の咎め方（段階21-2） */
+export interface Refutation {
+  /** [悪手, 相手の咎める手, …] */
+  moves: string[];
+  /** sfens[0] は悪手を指した局面、sfens[i] は読み筋の i 手目の後 */
+  sfens: string[];
+  /** 読み筋の文字（texts[i-1] が sfens[i] を作った手） */
+  texts: string[];
+}
+
+/** 悪手の局面から読み筋を 1 手ずつ（指せない手があればその手前まで。悪手そのものが指せなければ null） */
+export function refutation(sfen: string, c: Pick<Candidate, 'move' | 'pv'>): Refutation | null {
+  const first = applyUsiMove(sfen, c.move);
+  if (!first) return null;
+  const line: Refutation = { moves: [c.move], sfens: [first.sfen], texts: [] };
+  for (const move of c.pv ?? []) {
+    const at = line.sfens[line.sfens.length - 1];
+    const next = applyUsiMove(at, move);
+    if (!next) break;
+    line.texts.push(moveText(at, move, line.moves[line.moves.length - 1]));
+    line.moves.push(move);
+    line.sfens.push(next.sfen);
+  }
+  return line;
 }
 
 /** 定跡帳の KIF のコメントの 1 行（表が無ければ空） */
