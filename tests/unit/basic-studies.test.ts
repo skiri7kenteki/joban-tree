@@ -6,10 +6,10 @@ import { BUNDLED_TEMPLATES } from '../../src/tree/templates';
 import { applyUsiMove, STARTPOS_SFEN } from '../../src/shogi/position';
 
 describe('基本の研究のデータ', () => {
-  it('横歩取り △3三角（後手番）の 4 本（青野流 3 本と ▲3六飛 1 本）。どれも出典があり、未確認', () => {
+  it('横歩取り △3三角（後手番）の 4 本（青野流 3 本と ▲3六飛 1 本）。どれも出典があり、持ち主の確認済み', () => {
     const set = BASIC_SETS.find((s) => s.id === 'yokofu-33kaku-gote')!;
     expect(set.mySide).toBe('white');
-    expect(set.reviewed).toBe(false);
+    expect(set.reviewed).toBe(true);
     expect(set.lines.map((l) => l.moves.split(' ')[0])).toEqual(['5i5h', '5i5h', '5i5h', '3d3f']);
     for (const line of set.lines) {
       expect(line.note).not.toBe('');
