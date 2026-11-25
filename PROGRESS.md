@@ -253,7 +253,8 @@
 
 ## 完了したこと
 
-- 2026-11-25 開発環境を整えた（`.claude/settings.json` の allow・push 前のフック・ステータスライン、サブエージェント test-runner・reviewer、スキル start-stage・finish-stage、画面の撮影 `e2e/screens.spec.ts`〔SHOTS=1〕、決まりのテスト `tests/unit/rules.test.ts`〔1 か所落ちたので今は skip〕。アプリは変えていない）
+- 2026-11-25 開発環境を整えた（`.claude/settings.json` の allow・push 前のフック・ステータスライン、サブエージェント test-runner・reviewer、スキル start-stage・finish-stage、画面の撮影 `e2e/screens.spec.ts`〔SHOTS=1〕、決まりのテスト `tests/unit/rules.test.ts`〔CSS の /* */ のコメントの中の色を拾っていたので、コメントを除くように直した〕。ユーザーの PATH に Node.js（C:SERSSKIRI	OOLS
+ODEϼ�Â�ȶ�Á�Á�。アプリは変えていない）
 - 2026-11-24 CLAUDE.md を分けた（機能ごとの仕様は `.claude/rules/*.md`、フォルダ構成と片付けた機能の記録は `docs/claude/`、段階の締めは `/finish-stage`。アプリは変えていない）
 
 ### 基本の研究の手順を入れかえ（v0.46.1）

@@ -14,6 +14,13 @@ function walk(dir: string): string[] {
   });
 }
 
+// コメントを除いた行の中身（// の行、CSS・JS の「/* … */」のコメント、その続きの * で始まる行は除く）
+function withoutComments(line: string): string {
+  const t = line.trim();
+  if (t.startsWith('//') || t.startsWith('*')) return '';
+  return line.replace(/\/\*.*?(\*\/|$)/g, '');
+}
+
 /** 決まりに合わない行を「ファイル:行 中身」で集める */
 function find(files: string[], pattern: RegExp, allow: string[] = []): string[] {
   return files
@@ -22,16 +29,14 @@ function find(files: string[], pattern: RegExp, allow: string[] = []): string[] 
       readFileSync(join(ROOT, f), 'utf8')
         .split('\n')
         .map((line, i) => ({ line, i }))
-        .filter(({ line }) => pattern.test(line) && !line.trim().startsWith('//'))
+        .filter(({ line }) => pattern.test(withoutComments(line)))
         .map(({ line, i }) => `${relative('.', f)}:${i + 1} ${line.trim()}`),
     );
 }
 
 const code = walk('src').filter((f) => /\.(ts|tsx|css)$/.test(f));
 
-// 2026-11-25 いったん飛ばす：色の直書きの確かめで 1 か所落ちた（src/components/board.css:137 の CSS のコメント /* … #8B6B4F … */ の中の色）。
-// 直し方（コードを直す・テストでコメントを除く・例外にする）は持ち主が決める。決まったら skip を外す
-describe.skip('どの作業でも守ること', () => {
+describe('どの作業でも守ること', () => {
   it('色は tokens.css の変数から使う（直書きしない）', () => {
     const ALLOW = [
       'src/styles/tokens.css', // 色の変数を決める所
