@@ -253,8 +253,8 @@
 
 ## 完了したこと
 
-- 2026-11-25 開発環境を整えた（`.claude/settings.json` の allow・push 前のフック・ステータスライン、サブエージェント test-runner・reviewer、スキル start-stage・finish-stage、画面の撮影 `e2e/screens.spec.ts`〔SHOTS=1〕、決まりのテスト `tests/unit/rules.test.ts`〔CSS の /* */ のコメントの中の色を拾っていたので、コメントを除くように直した〕。ユーザーの PATH に Node.js（C:SERSSKIRI	OOLS
-ODEϼ�Â�ȶ�Á�Á�。アプリは変えていない）
+- 2026-11-25 開発環境を整えた（`.claude/settings.json` の allow・push 前のフック・ステータスライン、サブエージェント test-runner・reviewer、スキル start-stage・finish-stage、画面の撮影 `e2e/screens.spec.ts`〔SHOTS=1〕、決まりのテスト `tests/unit/rules.test.ts`〔CSS の /* */ のコメントの中の色を拾っていたので、コメントを除くように直した〕。ユーザーの PATH に Node.js（%USERPROFILE%\tools\node）を足した。アプリは変えていない）
+- 2026-11-25 push の前のフックを PowerShell にも対応させた（`--rebase` は `git pull` と同じ区切りの中だけを数えるように直した。push を見た記録を `.claude/hooks/check-push.log` に残す〔git に入れない〕。CLAUDE.md に「コマンドは Bash で実行する」を足した。前の記録の壊れた 1 行を直した。アプリは変えていない）
 - 2026-11-24 CLAUDE.md を分けた（機能ごとの仕様は `.claude/rules/*.md`、フォルダ構成と片付けた機能の記録は `docs/claude/`、段階の締めは `/finish-stage`。アプリは変えていない）
 
 ### 基本の研究の手順を入れかえ（v0.46.1）

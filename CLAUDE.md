@@ -69,6 +69,7 @@
   - 例外：タップで打てる持ち駒は、札が小さく押せる範囲は高さ 32px（段階7-1、持ち主の判断 2026-11-17。低い画面で盤を大きくするため。`button.hand-tap`）
 
 ## テストの流し方
+- コマンドは Bash で実行する。PowerShell は Windows の設定を変えるときなど、Bash でできないときだけ使う
 - テストは **test-runner サブエージェント**に任せる（メインの会話で長い出力を読まない）
 - 作業の途中は**関係するものだけ**：`npx vitest related <直したファイル> --run`、Playwright はその段階の spec 1 つ（先に `npm run build`。`npx playwright test e2e/<spec>.spec.ts --reporter=line`）
 - **全部**を流すのは段階の締め（`/finish-stage`）だけ：
