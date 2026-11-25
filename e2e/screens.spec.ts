@@ -4,6 +4,7 @@
 //   PowerShell：$env:SHOTS=1; npx playwright test e2e/screens.spec.ts
 // 保存先は screenshots/<大きさ>-<画面>.png（.gitignore 済み）。新しい画面を作ったら、ここに撮る画面を足す
 import { expect, test, type Page } from '@playwright/test';
+import { STARTPOS_SFEN, applyUsiMove, sfenKey } from '../src/shogi/position';
 import type { Study } from '../src/tree/types';
 
 test.skip(!process.env.SHOTS, '画面の撮影は SHOTS=1 のときだけ');
@@ -70,6 +71,46 @@ for (const size of SIZES) {
       await page.goto(`./#/book/${KEY}/s-a/17`);
       await expect(page.getByTestId('study-position')).toContainText('17手目');
       await shot(page, size.name, 'book');
+
+      // 段階21-1：候補の表を直接入れて、行の印・候補の窓・行の ⋯
+      const key = sfenKey(STUDIES[0].moves.slice(0, 17).reduce((sfen, m) => applyUsiMove(sfen, m)!.sfen, STARTPOS_SFEN));
+      await page.evaluate(async (key) => {
+        const req = indexedDB.open('joban-tree');
+        const db: IDBDatabase = await new Promise((r) => (req.onsuccess = () => r(req.result)));
+        const by = { engine: 'つようら王11micro', ms: 3000, at: Date.now() };
+        await new Promise<void>((r) => {
+          const tx = db.transaction('positions', 'readwrite');
+          tx.objectStore('positions').put({
+            id: `white|${key}`,
+            side: 'white',
+            key,
+            note: '',
+            candidates: [
+              { move: '5a6b', mark: 'main', eval: { kind: 'cp', value: 45 }, by, pv: ['3g3f', '7a7b', '2i3g', '6c6d', '3i3h'] },
+              { move: '5a5b', mark: 'alt', eval: { kind: 'cp', value: -35 }, by, pv: ['3g3f', '8f7f', '8h7g'] },
+              { move: '1c1d', mark: 'bad', eval: { kind: 'cp', value: -405 }, by, pv: ['3g3f', '1d1e', '2i3g'], reason: '端が間に合わない' },
+            ],
+            updatedAt: 1,
+          });
+          tx.oncomplete = () => r();
+        });
+        db.close();
+      }, key);
+      await page.reload();
+      await expect(page.getByTestId('book-table')).toBeVisible();
+      await shot(page, size.name, 'book-table');
+      await page.getByTestId('book-table').click();
+      await shot(page, size.name, 'candidates');
+      await page.getByTestId('book-cand-dialog').getByRole('button', { name: '閉じる' }).click();
+      await page.getByTestId('book-branch-menu').nth(1).click();
+      await shot(page, size.name, 'row-menu');
+      await page.getByTestId('book-cut-dialog').getByRole('button', { name: '閉じる' }).click();
+      if (process.env.ENGINE_AVAILABLE) {
+        await page.getByTestId('book-ask').click();
+        await expect(page.getByTestId('ask-list')).toBeVisible({ timeout: 60_000 });
+        await shot(page, size.name, 'ask-save');
+        await page.getByTestId('ask-close').click();
+      }
 
       // 稽古のタブと、稽古の盤（相手の手を指して、自分の手を答える所）
       await page.goto('./#/practice');

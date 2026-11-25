@@ -28,6 +28,8 @@ export interface AskRow {
   diff: number;
   /** 定跡帳にある手 */
   inBook: boolean;
+  /** この手を指した後の読み筋（段階21-1：候補の表に残す） */
+  pv: string[];
 }
 
 /** 候補の数（相手の手番 4・自分の手番 3） */
@@ -63,6 +65,7 @@ export function askRows(sfen: string, mySide: Side, lines: readonly PvLine[], ex
       score: mine ? l.score : negateScore(l.score),
       diff: Math.max(0, best - scoreToNumber(l.score)),
       inBook: book.has(move),
+      pv: l.pv.slice(1),
     });
   }
   return rows.sort((a, b) => a.diff - b.diff);

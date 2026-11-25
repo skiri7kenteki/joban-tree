@@ -258,6 +258,7 @@ function RestoreSummary({ pending }: { pending: Pending }) {
         <li>実戦 {c.games} 局</li>
         <li>稽古の記録 {c.practice} 本</li>
         <li>局面メモ {c.positions} 個</li>
+        <li>候補の表 {c.tables} 局面</li>
         <li>設定 {c.prefs > 0 ? 'あり' : 'なし（初期値のまま）'}</li>
       </ul>
       {pending.unknownKinds.length > 0 && (

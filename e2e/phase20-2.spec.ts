@@ -25,16 +25,15 @@ async function setup(page: Page, studies: Study[]) {
   await expect(page.getByTestId('study-item')).toHaveCount(studies.length);
 }
 
-test('見出しの行に［エンジンに聞く］がある（局面メモと同じ行）', async ({ page }) => {
+test('見出しの行に［エンジンに聞く］がある（研究の本数と同じ行）', async ({ page }) => {
   await setup(page, [A, B]);
   await page.goto(`./#/book/${KEY}/s-a/17`);
   const head = page.getByTestId('study-book-head').locator('..');
   await expect(head.getByTestId('book-ask')).toHaveText('エンジンに聞く');
-  await expect(head.getByTestId('book-memo')).toBeVisible();
   // 見出しの行の中に収まる（はみ出して 2 行にならない）
   const ask = (await head.getByTestId('book-ask').boundingBox())!;
-  const memo = (await head.getByTestId('book-memo').boundingBox())!;
-  expect(Math.abs(ask.y - memo.y)).toBeLessThan(4);
+  const count = (await page.getByTestId('study-book-head').boundingBox())!;
+  expect(Math.abs(ask.y + ask.height / 2 - (count.y + count.height / 2))).toBeLessThan(6);
 });
 
 test.describe('エンジンを使う', () => {

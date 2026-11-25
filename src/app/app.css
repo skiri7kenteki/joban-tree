@@ -2935,8 +2935,8 @@ div.move-bar-center {
 
 .conflict-item {
   display: flex;
-  align-items: center;
-  gap: var(--space-2);
+  flex-direction: column;
+  padding-bottom: var(--space-2);
   border-top: 1px solid var(--color-border);
 }
 
@@ -2962,9 +2962,16 @@ div.move-bar-center {
   font-size: var(--font-size-small);
 }
 
-.conflict-item-ok {
-  flex: 0 0 auto;
-  white-space: nowrap;
+.main-choice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.main-choice-label {
+  font-size: var(--font-size-small);
+  color: var(--color-text-muted);
 }
 
 /* 稽古のカードの下の局面メモ（段階20-1） */
@@ -2974,6 +2981,150 @@ div.move-bar-center {
   color: var(--color-mark-text);
   font-size: var(--font-size-small);
   font-weight: 600;
+}
+
+/* ---- 段階21-1：自分の手の候補表 ---- */
+
+/* 印の札：本命は墨の塗り、次善は木の茶、悪手は朱 */
+.mark-tag {
+  display: inline-flex;
+  align-items: center;
+  margin-left: var(--space-1);
+  padding: 0 6px;
+  border: 1px solid;
+  border-radius: var(--radius-chip);
+  font-family: system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.5;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.mark-main {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-primary-text);
+}
+
+.mark-alt {
+  border-color: var(--color-mark);
+  background: var(--color-mark-soft);
+  color: var(--color-mark-text);
+}
+
+.mark-bad {
+  border-color: var(--color-danger);
+  background: var(--color-surface);
+  color: var(--color-danger);
+}
+
+/* 表にあるが研究手順の無い手（薄い行） */
+.book-list .book-table-only {
+  border-top: 1px dashed var(--color-border);
+}
+
+.book-list .book-table-only .candidate-move,
+.book-list .book-table-only .book-names {
+  color: var(--color-text-muted);
+  font-weight: 400;
+}
+
+/* 候補の窓 */
+.cand-list {
+  margin: 0 0 var(--space-2);
+  padding: 0;
+  list-style: none;
+}
+
+.cand-item {
+  display: flex;
+  align-items: stretch;
+  border-top: 1px solid var(--color-border);
+}
+
+.cand-item:first-child {
+  border-top: none;
+}
+
+.cand-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: var(--space-1) 0;
+}
+
+.cand-move {
+  font-weight: 700;
+}
+
+.cand-sub,
+.cand-reason {
+  display: block;
+  font-size: var(--font-size-small);
+  line-height: 1.6;
+}
+
+.cand-sub {
+  color: var(--color-text-muted);
+}
+
+.cand-memo {
+  margin-top: var(--space-3);
+}
+
+.memo-text.memo-text-short {
+  min-height: 72px;
+}
+
+/* 行の ⋯ の窓：印の付け替え */
+.mark-choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-2) 0;
+}
+
+.mark-reason {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.mark-reason .mark-reason-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: var(--touch-min);
+  font-size: 16px;
+}
+
+.mark-reason .btn {
+  flex: 0 0 auto;
+}
+
+.ask-save {
+  margin: var(--space-2) 0;
+}
+
+.cand-pick + .memo-sub {
+  margin-top: var(--space-2);
+}
+
+@media (max-width: 379px) {
+  .book-table-count {
+    display: none;
+  }
+}
+
+.ask-confirm {
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-mark);
+  border-radius: var(--radius-card);
+}
+
+.ask-picked {
+  color: var(--color-mark-text);
+  font-size: var(--font-size-small);
 }
 
 /* ---- 段階20-2：エンジンに聞く ---- */

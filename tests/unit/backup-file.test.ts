@@ -66,6 +66,17 @@ function sample(): BackupData {
     positions: [
       { id: 'white|k1', side: 'white', key: 'k1', note: '局面のメモ', updatedAt: 11 },
       { id: 'black|k2', side: 'black', key: 'k2', note: '', okMoves: ['2g2f', '7g7f'], updatedAt: 12 },
+      {
+        id: 'black|k3',
+        side: 'black',
+        key: 'k3',
+        note: '',
+        candidates: [
+          { move: '2g2f', mark: 'main', eval: { kind: 'cp', value: 40 }, by: { engine: 'e', ms: 3000, at: 13 }, pv: ['8c8d'], reason: '理由' },
+          { move: 'P*5e', mark: 'bad', eval: { kind: 'mate', plies: -5 } },
+        ],
+        updatedAt: 13,
+      },
     ],
     prefs: { 'joban-tree.settings': '{"version":1}', 'joban-tree:book-write': 'off' },
   };
@@ -81,7 +92,7 @@ describe('バックアップのファイル', () => {
     expect(parsed.file).toEqual(file);
     expect(parsed.unknownKinds).toEqual([]);
     expect(file).toMatchObject({ app: 'joban-tree', kind: 'backup', version: 1, createdAt: 1700000000000, appVersion: '0.41.0' });
-    expect(backupCounts(parsed.file.data)).toEqual({ studies: 2, trees: 1, reviewProblems: 3, templates: 1, games: 1, practice: 1, positions: 1, prefs: 2 });
+    expect(backupCounts(parsed.file.data)).toEqual({ studies: 2, trees: 1, reviewProblems: 3, templates: 1, games: 1, practice: 1, positions: 1, tables: 1, prefs: 2 });
   });
 
   it('空のデータも作って読める', () => {
@@ -144,6 +155,16 @@ describe('「しばらくバックアップしていません」を出す時機'
     const hidden = nudgeHiddenUntil(now);
     expect(shouldNudge(now + 29 * DAY, [{ createdAt: 0 }], null, hidden)).toBe(false);
     expect(shouldNudge(now + 30 * DAY, [{ createdAt: 0 }], null, hidden)).toBe(true);
+  });
+});
+
+describe('段階21-1：候補の表', () => {
+  it('形のおかしい候補の表があれば、全体を読まない', () => {
+    const f = JSON.parse(backupToJson(makeBackup(sample(), 1, '0.47.0')));
+    f.data.positions[2].candidates[1].mark = 'best';
+    const parsed = parseBackupJson(JSON.stringify(f));
+    expect(parsed.ok).toBe(false);
+    expect(!parsed.ok && parsed.message).toContain('候補の表の印');
   });
 });
 

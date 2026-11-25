@@ -45,6 +45,11 @@ describe('エンジンに聞く', () => {
     ]);
   });
 
+  it('段階21-1：表に残すための読み筋（その手を指した後の手）', () => {
+    const rows = askRows(STARTPOS_SFEN, 'black', [line(1, 60, ['2g2f', '8c8d', '2f2e'])], [], []);
+    expect(rows[0].pv).toEqual(['8c8d', '2f2e']);
+  });
+
   it('候補が無ければ空', () => {
     expect(askRows(STARTPOS_SFEN, 'black', [], [], [])).toEqual([]);
   });

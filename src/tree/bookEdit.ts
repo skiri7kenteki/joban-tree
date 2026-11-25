@@ -20,7 +20,8 @@
 import { nameFromTexts, moveTexts, startsWith, startTemplate, studyTemplate, findSameStudy, defaultStudyName } from './studies';
 import { closestTemplate, type OpeningTemplate } from './templates';
 import type { Study } from './types';
-import type { Side } from '../shogi/position';
+import { sfenKey, type Side } from '../shogi/position';
+import { studyPositions } from '../review/studyReview';
 
 /**
  * 手順から付け直す戦型：**自分の側が同じ戦型**のうち、いちばん長く一致するもの。無ければ付けない
@@ -268,6 +269,45 @@ function removeKeepingHere(pool: readonly Study[], here: readonly string[], remo
 export function cutBranch(pool: readonly Study[], here: readonly string[], move: string, currentId: string | null, ctx: Pick<BookCtx, 'templates' | 'now' | 'start' | 'side'>): CutPlan | null {
   const removed = pool.filter((s) => startsWith(s.moves, [...here, move]));
   return removed.length > 0 ? removeKeepingHere(pool, here, removed, currentId, ctx) : null;
+}
+
+/** その研究手順が、局面 key で move を指すときの、そこまでの手順（指さなければ null） */
+function prefixPlaying(study: Study, key: string, move: string): string[] | null {
+  const positions = studyPositions(study.moves);
+  const ply = study.moves.findIndex((m, i) => m === move && positions[i] !== undefined && sfenKey(positions[i]) === key);
+  return ply < 0 ? null : study.moves.slice(0, ply);
+}
+
+/** 局面 key で move を指す、自分の側が同じ研究手順（手順前後も） */
+export function studiesPlaying(studies: readonly Study[], side: Side, key: string, move: string): Study[] {
+  return studies.filter((s) => s.mySide === side && prefixPlaying(s, key, move) !== null);
+}
+
+/**
+ * 局面 key の move から先を消す（段階21-1：研究手順が通っている手を悪手にするとき）。手順前後で来る研究手順も。
+ * 手順ごとに「この手から先を消す」と同じ決まり。count はその手を指していた研究手順の数。無ければ null
+ */
+export function cutMoveAt(
+  studies: readonly Study[],
+  side: Side,
+  key: string,
+  move: string,
+  currentId: string | null,
+  ctx: Pick<BookCtx, 'templates' | 'now' | 'start' | 'side'>,
+): (BookChange & { count: number }) | null {
+  const targets = studiesPlaying(studies, side, key, move);
+  if (targets.length === 0) return null;
+  let same = studies.filter((s) => s.mySide === side);
+  let all = [...studies];
+  for (const target of targets) {
+    const prefix = prefixPlaying(target, key, move)!;
+    const plan = cutBranch(same, prefix, move, currentId, ctx);
+    if (!plan) continue;
+    same = applyChange(same, plan);
+    all = applyChange(all, plan);
+  }
+  const change = diffChange(studies, all);
+  return change ? { ...change, count: targets.length } : null;
 }
 
 /** ここで終わりにする（here より先へ進む研究手順をまとめて）。消すものが無ければ null */

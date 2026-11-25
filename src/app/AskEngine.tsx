@@ -1,9 +1,10 @@
 // 「エンジンに聞く」の窓（段階20-2、v0.45.0〜。持ち主の判断 2026-11-24「全ておすすめの通りで」。計算は src/tree/ask.ts）。
-// 定跡帳の今の局面だけを数秒調べて、候補を画面の下の窓に出す。結果は保存しない。
+// 定跡帳の今の局面だけを数秒調べて、候補を画面の下の窓に出す。自分の手番は［表に残す］で候補の表に残せる（段階21-1。ほかは保存しない）。
 //
 // - 相手の手番：相手の候補 4 つ（本線・有力・疑問手・評価値・自分の対応）。研究にある手は［進む］、無い手は［足す］（相手の手と自分の対応の 2 手）
 // - 自分の手番：自分の候補 3 つ（最善・最善から −n）。研究にある手は［進む］、無い手は［足す］（その 1 手）
-// - 研究の手が候補に入っていなければ、その手だけをもう一度調べて並べる（2 秒まで）
+// - 研究の手が候補に入っていなければ、その手だけをもう一度調べて並べる（2 秒まで）。候補の表の手も同じ（もう一度残すとき、同じ条件の点にする）
+// - 盤で指して調べる手（picked）が候補に無ければ、その手だけを調べる（読み筋を長くするため、1 手で）
 // - 窓を閉じたら探索を止める。ツリーの生成中は使えない（同じエンジンを使うため）
 
 import { useEffect, useRef, useState } from 'preact/hooks';
@@ -14,6 +15,8 @@ import type { UsiEngine } from '../engine/engine';
 import { applyUsiMove, moveText, positionCommand, sideToMove, type Side } from '../shogi/position';
 import { ASK_EXTRA_MAX_MS, ASK_MORE_MS, ASK_MS, askMultiPV, askRows, lossText, missingBookMoves, type AskRow } from '../tree/ask';
 import { LABEL_TEXT, labelOf } from '../tree/labels';
+import { MARK_TEXT, mergeResults, type Candidate } from '../tree/candidates';
+import { MarkTag } from './CandidateDialogs';
 import { getEngine, pcEngine } from './engineService';
 import { isGenerating } from './generation';
 import { settings } from './settings';
@@ -23,7 +26,7 @@ type Phase =
   | { kind: 'load' }
   | { kind: 'search'; ms: number; run: number }
   | { kind: 'extra'; ms: number; run: number }
-  | { kind: 'done'; ms: number; rows: AskRow[] }
+  | { kind: 'done'; ms: number; rows: AskRow[]; by: NonNullable<Candidate['by']> }
   | { kind: 'error'; text: string };
 
 export function AskEngine({
@@ -32,9 +35,14 @@ export function AskEngine({
   prev,
   place,
   bookMoves,
+  table,
+  picked,
+  goodMax,
   write,
   onAdvance,
   onAdd,
+  onSave,
+  onPick,
   onClose,
 }: {
   sfen: string;
@@ -46,11 +54,21 @@ export function AskEngine({
   place: string;
   /** この局面からの研究の手（手順前後の手も含む） */
   bookMoves: readonly string[];
-  /** 盤で指して書き込む（切なら［足す］は使えない） */
+  /** この局面の候補の表（自分の手番） */
+  table: readonly Candidate[];
+  /** 盤で指して調べる手 */
+  picked: string | undefined;
+  /** 次善と悪手の境目 */
+  goodMax: number;
+  /** 盤で指して書き込む（切なら［足す］は使えない。表は残せる） */
   write: boolean;
   onAdvance: (move: string) => void;
   /** 手順を足す（相手の手番なら相手の手と自分の対応の 2 手） */
   onAdd: (moves: string[]) => void;
+  /** 候補の表に残す（dropped：8 手を超えて入らなかった数） */
+  onSave: (table: Candidate[], dropped: number) => void;
+  /** 盤で指して調べる */
+  onPick: () => void;
   onClose: () => void;
 }) {
   const mine = sideToMove(sfen) === mySide;
@@ -59,11 +77,15 @@ export function AskEngine({
   /** 何回目の探索か（窓を閉じた・調べ直したら、前の探索の結果は使わない） */
   const runId = useRef(0);
   const engineRef = useRef<UsiEngine | null>(null);
+  /** 表を書きかえる前の確認を出している */
+  const [confirming, setConfirming] = useState(false);
+  const evalName = pcEngine.value ? `PC・${EVALS[settings.value.evalId].label}` : EVALS[settings.value.evalId].label;
 
   async function run(ms: number) {
     const run = ++runId.current;
     const alive = () => runId.current === run;
     setPhase({ kind: 'load' });
+    setConfirming(false);
     try {
       const engine = await getEngine();
       if (!alive()) return;
@@ -72,16 +94,19 @@ export function AskEngine({
       setPhase({ kind: 'search', ms, run });
       const r = await engine.analyze(position, { movetimeMs: ms, multiPV: askMultiPV(sfen, mySide) });
       if (!alive()) return;
-      // 研究の手が候補に入っていなければ、その手だけを調べ直す
-      const missing = missingBookMoves(r.lines, bookMoves);
-      let extra: typeof r.lines = [];
-      if (missing.length > 0 && r.lines.length > 0) {
+      // 研究の手・候補の表の手が候補に入っていなければ、その手だけを調べ直す
+      const wanted = [...new Set([...bookMoves, ...table.map((c) => c.move)])];
+      const missing = missingBookMoves(r.lines, wanted).filter((m) => m !== picked);
+      const extra: typeof r.lines = [];
+      const alone = picked ? missingBookMoves(r.lines, [picked]) : [];
+      for (const moves of [alone, missing]) {
+        if (moves.length === 0 || r.lines.length === 0) continue;
         const extraMs = Math.min(ASK_EXTRA_MAX_MS, ms);
-        setPhase({ kind: 'extra', ms: extraMs, run });
-        extra = (await engine.analyze(position, { movetimeMs: extraMs, multiPV: missing.length, searchMoves: missing })).lines;
+        setPhase({ kind: 'extra', ms: extraMs, run: run });
+        extra.push(...(await engine.analyze(position, { movetimeMs: extraMs, multiPV: moves.length, searchMoves: moves })).lines);
         if (!alive()) return;
       }
-      setPhase({ kind: 'done', ms, rows: askRows(sfen, mySide, r.lines, extra, bookMoves) });
+      setPhase({ kind: 'done', ms, rows: askRows(sfen, mySide, r.lines, extra, bookMoves), by: { engine: evalName, ms, at: Date.now() } });
     } catch (e) {
       if (alive()) setPhase({ kind: 'error', text: `エンジンを使えませんでした（${e instanceof Error ? e.message : String(e)}）` });
     }
@@ -98,7 +123,9 @@ export function AskEngine({
   }, []);
 
   const running = phase.kind === 'load' || phase.kind === 'search' || phase.kind === 'extra';
-  const evalName = pcEngine.value ? `PC・${EVALS[settings.value.evalId].label}` : EVALS[settings.value.evalId].label;
+  /** ［表に残す］とどうなるか（自分の手番で、結果が出たとき） */
+  const preview = mine && phase.kind === 'done' && phase.rows.length > 0 ? mergeResults(table, phase.rows, { goodMax, by: phase.by, picked }) : null;
+  const examined = preview && phase.kind === 'done' ? preview.table.filter((c) => phase.rows.some((r) => r.move === c.move)).length : 0;
   const sec = phase.kind === 'done' || phase.kind === 'search' ? `${phase.ms / 1000}秒・` : '';
   const sideName = mySide === 'black' ? '☗先手' : '☖後手';
 
@@ -130,10 +157,53 @@ export function AskEngine({
           {!write && <p class="muted ask-status">読むだけにしているので、足せません（⋯ の「書き込む」で入にできます）。</p>}
           <ul class="ask-list" data-testid="ask-list">
             {phase.rows.map((row) => (
-              <AskRowItem key={row.move} row={row} sfen={sfen} prev={prev} mine={mine} write={write} onAdvance={onAdvance} onAdd={onAdd} />
+              <AskRowItem
+                key={row.move}
+                row={row}
+                sfen={sfen}
+                prev={prev}
+                mine={mine}
+                write={write}
+                picked={row.move === picked}
+                saved={preview?.table.find((c) => c.move === row.move)}
+                kept={table.some((c) => c.move === row.move)}
+                onAdvance={onAdvance}
+                onAdd={onAdd}
+              />
             ))}
           </ul>
         </>
+      )}
+      {preview && !confirming && (
+        <>
+          <button
+            type="button"
+            class="btn btn-primary btn-wide ask-save"
+            data-testid="ask-save"
+            onClick={() => (table.length > 0 ? setConfirming(true) : onSave(preview.table, preview.dropped))}
+          >
+            {table.length > 0 ? '表を書きかえる' : '表に残す'}（{examined}手）
+          </button>
+          {preview.dropped > 0 && <p class="muted memo-sub">表は 8 手までなので、{preview.dropped}手は入りません。</p>}
+        </>
+      )}
+      {preview && confirming && (
+        <div class="ask-confirm" data-testid="ask-save-confirm">
+          <p>この局面の表を、新しい結果で書きかえます。手・印・理由は残し、点と読み筋を新しくします。</p>
+          <div class="dialog-actions">
+            <button type="button" class="btn btn-primary" data-testid="ask-save-ok" onClick={() => onSave(preview.table, preview.dropped)}>
+              書きかえる
+            </button>
+            <button type="button" class="btn" onClick={() => setConfirming(false)}>
+              やめる
+            </button>
+          </div>
+        </div>
+      )}
+      {mine && !generating && (
+        <button type="button" class="btn btn-wide" data-testid="ask-pick" onClick={onPick}>
+          ほかの手を盤で指して調べる
+        </button>
       )}
       <div class="dialog-actions">
         {!generating && (
@@ -155,6 +225,9 @@ function AskRowItem({
   prev,
   mine,
   write,
+  picked,
+  saved,
+  kept,
   onAdvance,
   onAdd,
 }: {
@@ -163,6 +236,12 @@ function AskRowItem({
   prev: string | undefined;
   mine: boolean;
   write: boolean;
+  /** 盤で指して調べた手 */
+  picked: boolean;
+  /** 残したときの表のこの手 */
+  saved: Candidate | undefined;
+  /** もう表にある手 */
+  kept: boolean;
   onAdvance: (move: string) => void;
   onAdd: (moves: string[]) => void;
 }) {
@@ -180,6 +259,8 @@ function AskRowItem({
           <span class={`chip chip-${label} chip-small`}>{LABEL_TEXT[label]}</span>
         )}
         {row.inBook && <span class="ask-has">研究あり</span>}
+        {picked && <span class="ask-picked">指した手</span>}
+        {saved && <MarkTag mark={saved.mark} text={kept ? `表：${MARK_TEXT[saved.mark]}` : `${MARK_TEXT[saved.mark]}にする`} testId="ask-mark" />}
         {reply && <span class="ask-reply">→ {reply}</span>}
       </div>
       <span class="ask-score num">{formatScore(row.score)}</span>

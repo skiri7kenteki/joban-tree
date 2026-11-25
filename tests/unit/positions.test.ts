@@ -2,7 +2,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildBookIndex } from '../../src/games/compare';
 import { studyPositions } from '../../src/review/studyReview';
-import { bookIndexes, conflictAt, findConflicts, isAcknowledged, isEmptyRecord, otherStudyAt, positionId, positionProblem, type PositionNote } from '../../src/tree/positions';
+import { bookIndexes, conflictAt, findConflicts, isEmptyRecord, otherStudyAt, positionId, positionProblem, type PositionNote } from '../../src/tree/positions';
 import { studiesToKif } from '../../src/tree/studyFile';
 import type { Study } from '../../src/tree/types';
 
@@ -46,7 +46,15 @@ describe('食い違い', () => {
     expect(findConflicts(bookIndexes([a, b]), new Map([[rec.id, rec]]))[0].ok).toBe(true);
     const e = study('e', [...G1, '5i5h', '7a7b'], 1);
     expect(findConflicts(bookIndexes([a, b, e]), new Map([[rec.id, rec]]))[0].ok).toBe(false);
-    expect(isAcknowledged(undefined, ['x'])).toBe(false);
+  });
+
+  it('段階21-1：研究の手に全部印があれば知らせない。印の無い手が残っていれば知らせる', () => {
+    const [conf] = findConflicts(bookIndexes([a, b]), new Map());
+    const base = { id: conf.id, side: 'white' as const, key: conf.id.slice(6), note: '', updatedAt: 1 };
+    const one: PositionNote = { ...base, candidates: [{ move: '5a6b', mark: 'main' }] };
+    expect(findConflicts(bookIndexes([a, b]), new Map([[base.id, one]]))[0]).toMatchObject({ ok: false });
+    const both: PositionNote = { ...base, candidates: [{ move: '5a6b', mark: 'main' }, { move: '5a5b', mark: 'alt' }] };
+    expect(findConflicts(bookIndexes([a, b]), new Map([[base.id, both]]))[0]).toMatchObject({ ok: true });
   });
 
   it('稽古：ほかの研究手順の自分の手なら、その研究手順（自分自身は除く）', () => {
@@ -73,6 +81,10 @@ describe('局面メモ', () => {
     expect(positionProblem({ ...ok, updatedAt: 'x' })).toBe('日時');
     expect(isEmptyRecord({ note: ' ', okMoves: [] })).toBe(true);
     expect(isEmptyRecord({ note: '', okMoves: ['7g7f'] })).toBe(false);
+    expect(isEmptyRecord({ note: '', candidates: [{ move: '7g7f', mark: 'main' }] })).toBe(false);
+    expect(isEmptyRecord({ note: '', candidates: [] })).toBe(true);
+    expect(positionProblem({ ...ok, candidates: [{ move: '7g7f', mark: 'main' }] })).toBeNull();
+    expect(positionProblem({ ...ok, candidates: [{ move: '7g7f', mark: 'x' }] })).toBe('候補の表の印');
   });
 
   it('定跡帳の KIF の書き出しに局面メモ（手順前後の 2 回目は書かない）。★名前はコメントの先頭', () => {
@@ -82,5 +94,14 @@ describe('局面メモ', () => {
     const kif = studiesToKif([s1, s2], '定跡帳', (sfen) => (sfen.replace(/ \d+$/, '') === target ? '大事な局面' : ''));
     expect(kif.match(/局面メモ：大事な局面/g)).toHaveLength(1);
     expect(kif).toMatch(/\*★s1\n\*局面メモ：大事な局面/);
+  });
+
+  it('段階21-1：定跡帳の KIF の書き出しに候補の行。悪手は変化にしない', () => {
+    const s1 = study('s1', ['7g7f', '3c3d', '2g2f']);
+    const target = studyPositions(s1.moves)[1].replace(/ \d+$/, '');
+    const text = '候補：△３四歩（本命）、△９四歩（悪手 −450）';
+    const kif = studiesToKif([s1], '定跡帳', undefined, (sfen) => (sfen.replace(/ \d+$/, '') === target ? text : ''));
+    expect(kif.split(text)).toHaveLength(2);
+    expect(kif).not.toContain('変化');
   });
 });

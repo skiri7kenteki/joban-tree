@@ -146,8 +146,9 @@ export const KIF_NAME_MARK = '★';
 /**
  * noteOf：局面メモ（段階20-1。定跡帳の書き出し）。その局面に来た手のコメントに「局面メモ：…」（手順前後の 2 回目からは書かない）。
  * 研究手順の終わりの「★名前」はコメントの先頭に置く（KIF から取り込むとき、★ で始まるコメントを研究手順の終わりとして読むため）
+ * candidatesOf：その局面の候補の行（段階21-1「候補：▲２四歩（本命）、…」）。コメントに書くだけで、悪手は変化にしない
  */
-export function studiesToKif(list: readonly Study[], title?: string, noteOf?: (sfen: string) => string): string {
+export function studiesToKif(list: readonly Study[], title?: string, noteOf?: (sfen: string) => string, candidatesOf?: (sfen: string) => string): string {
   const position = Position.newBySFEN(STARTPOS_SFEN)!;
   const record = new Record(position);
   record.metadata.setStandardMetadata(RecordMetadataKey.TITLE, title ?? (list.length === 1 ? list[0].name : `研究手順（${list.length} 本）`));
@@ -158,11 +159,14 @@ export function studiesToKif(list: readonly Study[], title?: string, noteOf?: (s
       const move = record.position.createMoveByUSI(usi);
       // 既に同じ手があれば、その手へ進む（tsshogi の append）。共通の部分は 1 つにまとまる
       if (!move || !record.append(move)) throw new Error(`「${s.name}」の指し手 ${usi} を棋譜に入れられませんでした`);
-      const memo = noteOf?.(record.position.sfen).trim();
-      const key = record.position.sfen.replace(/ \d+$/, '');
-      if (memo && !noted.has(key)) {
+      const sfen = record.position.sfen;
+      const key = sfen.replace(/ \d+$/, '');
+      if (noted.has(key)) continue;
+      const memo = noteOf?.(sfen).trim();
+      const lines = [candidatesOf?.(sfen) ?? '', memo ? `局面メモ：${memo}` : ''].filter(Boolean);
+      if (lines.length > 0) {
         noted.add(key);
-        record.current.comment = record.current.comment ? `${record.current.comment}\n局面メモ：${memo}` : `局面メモ：${memo}`;
+        record.current.comment = [record.current.comment, ...lines].filter(Boolean).join('\n');
       }
     }
     const text = [`${KIF_NAME_MARK}${s.name}`, ...(s.note.trim() ? [s.note.trimEnd()] : [])].join('\n');

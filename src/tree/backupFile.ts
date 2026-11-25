@@ -242,6 +242,8 @@ export interface BackupCounts {
   practice: number;
   /** 局面メモの数（メモの入っているものだけ） */
   positions: number;
+  /** 候補の表のある局面の数（段階21-1） */
+  tables: number;
   /** 入っている設定の数 */
   prefs: number;
 }
@@ -255,6 +257,7 @@ export function backupCounts(data: BackupData): BackupCounts {
     games: (data.games ?? []).length,
     practice: (data.practice ?? []).length,
     positions: (data.positions ?? []).filter((p) => p.note.trim() !== '').length,
+    tables: (data.positions ?? []).filter((p) => (p.candidates?.length ?? 0) > 0).length,
     prefs: Object.keys(data.prefs).length,
   };
 }
