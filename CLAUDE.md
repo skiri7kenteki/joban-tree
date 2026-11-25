@@ -20,6 +20,7 @@
 - **仕様を変えたら、その機能の `.claude/rules/*.md` を直す**（下の「機能ごとの仕様の場所」）。CLAUDE.md には、どの作業でも守る決まりだけを書く。
   片付けた機能の記録は `docs/claude/history.md` へ移す（CLAUDE.md・rules に「段階◯ でやめた」の説明を残さない）
 - 新しい段階の設計を始めるときは、関係する `.claude/rules/*.md` を先に読む（rules はそのファイルを触るまで読み込まれないため）
+- 段階の始め（依頼を読む → 関係する rules を読む → 設計案と判断してほしいことを出して止まる）は `/start-stage` スキルの手順で行う
 - 段階の締め（テスト → version → PROGRESS.md → commit → pull --rebase → push → 報告）は `/finish-stage` スキルの手順で行う
 
 ## これからの方針（段階17〜、持ち主と機能を見直して決めた。2026-11-23、依頼書 stage17-prompt.md）
@@ -67,13 +68,17 @@
 - iPhone/iPad：押せるもの 44px 以上、候補手リストの 1 行 48px 以上、入力欄の文字 16px 以上、`env(safe-area-inset-*)` で画面の端を避ける
   - 例外：タップで打てる持ち駒は、札が小さく押せる範囲は高さ 32px（段階7-1、持ち主の判断 2026-11-17。低い画面で盤を大きくするため。`button.hand-tap`）
 
-## テストの出力は失敗だけを見る
-- テストやビルドの出力をそのまま全部読まない（トークンの無駄になる）。失敗した所だけを絞って読む
-  - 型チェック：`npm run typecheck 2>&1 | tail -20`（通れば npm の見出しの行だけ）
-  - ロジック（Vitest）：`npm test -- --reporter=dot 2>&1 | tail -30`
-  - 画面（Playwright）：先に `npm run build`（`vite preview` でビルド済みのファイルを配信して確かめるため）。`ENGINE_AVAILABLE=1 npm run test:e2e -- --reporter=line 2>&1 | grep -E "^ +[0-9]+\) |Error:|passed|failed|flaky" | head -40`
+## テストの流し方
+- テストは **test-runner サブエージェント**に任せる（メインの会話で長い出力を読まない）
+- 作業の途中は**関係するものだけ**：`npx vitest related <直したファイル> --run`、Playwright はその段階の spec 1 つ（先に `npm run build`。`npx playwright test e2e/<spec>.spec.ts --reporter=line`）
+- **全部**を流すのは段階の締め（`/finish-stage`）だけ：
+  - 型チェック：`npm run typecheck 2>&1 | tail -20`
+  - Vitest：`npm test -- --reporter=dot 2>&1 | tail -30`
+  - Playwright：先に `npm run build`（`vite preview` でビルド済みのファイルを配信して確かめるため）。`ENGINE_AVAILABLE=1 npm run test:e2e -- --reporter=line 2>&1 | grep -E "^ +[0-9]+\) |Error:|passed|failed|flaky" | head -40`
     （`ENGINE_AVAILABLE=1` はエンジンを使うテストも流す。付けないとそのテストは省略される）
-- 調べものは `rg` で対象のファイルを先に絞ってから読む
+- `tests/unit/rules.test.ts` が「どの作業でも守ること」の一部を確かめる。落ちたらコードの方を直す（例外にするときは持ち主に聞く）
+- 画面の撮影は `e2e/screens.spec.ts`（`SHOTS=1` のときだけ動く）
+- 調べものは `rg` で対象のファイルを先に絞ってから読む。広く調べるときは Explore のサブエージェントに任せる
 
 ## 機能ごとの仕様の場所（`.claude/rules/`。そのファイルを触ったときだけ読み込まれる）
 | ファイル | 中身 |

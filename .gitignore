@@ -15,3 +15,5 @@ test-results/
 *.tsbuildinfo
 # 同梱ツリーを作るコマンドをまとめたもの（pc/bake.bat が毎回作る）
 pc/bake/dist/
+# 画面の撮影（e2e/screens.spec.ts、SHOTS=1 のときだけ）
+screenshots/
