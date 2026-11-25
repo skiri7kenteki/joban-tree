@@ -161,6 +161,18 @@ export class UsiEngine implements AnalysisEngine {
     this.transport.send(`setoption name Threads value ${settings.threads}`);
   }
 
+  /**
+   * 前の探索で覚えたこと（置換表など）を消す。浅い読みが、前の深い読みの結果を使わないように（段階21-3）。
+   * やねうら王は isready で消す
+   */
+  clearHash(): Promise<void> {
+    return this.enqueue(async () => {
+      this.transport.send('isready');
+      await this.waitFor((l) => l === 'readyok');
+      this.transport.send('usinewgame');
+    });
+  }
+
   analyze(position: string, options: AnalyzeOptions): Promise<AnalysisResult> {
     return this.enqueue(async () => {
       const collector = new MultiPvCollector();

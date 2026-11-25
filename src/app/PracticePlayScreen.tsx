@@ -27,7 +27,7 @@ import { ensurePractice, planNow, practiceRecords, savePractice } from './practi
 import { back, go } from './router';
 import { ensureStudies, library } from './studies';
 import { buildBookIndex } from '../games/compare';
-import { markText, refutation, tableOf, type Candidate, type Refutation } from '../tree/candidates';
+import { hardMove, markText, refutation, tableOf, type Candidate, type Refutation } from '../tree/candidates';
 import { otherStudyAt, positionId, studyMovesAt } from '../tree/positions';
 import { ensurePositions, noteAt, positionNotes, positionsNow } from './positions';
 import { MarkTag } from './CandidateDialogs';
@@ -184,6 +184,14 @@ function StudyPlay({
   const allStudies = library.value;
   const bookIndex = useMemo(() => buildBookIndex(allStudies ?? [study], study.mySide), [allStudies, study]);
 
+  /** p 手目（0 始まり）の局面の候補の表 */
+  const tableAt = (p: number) => {
+    const at = positions[p] ?? STARTPOS_SFEN;
+    return tableOf(positionsNow().get(positionId(study.mySide, at)), studyMovesAt(bookIndex, at));
+  };
+  /** その局面の正解が、見えにくい手の本命（段階21-3） */
+  const hardAt = (p: number) => hardMove(tableAt(p)) === study.moves[p];
+
   // 相手の手番ならアプリが指す。最後まで来たら記録を保存して終わり
   useEffect(() => {
     if (phase.kind !== 'play') return;
@@ -197,8 +205,8 @@ function StudyPlay({
   }, [ply, phase.kind]);
 
   async function finish() {
-    const mistakes = [...answers.values()].filter((ok) => !ok).length;
-    const record = nextRecord(practiceRecords.value?.get(study.id), study.id, mistakes, Date.now());
+    const wrongAt = [...answers].filter(([, ok]) => !ok).map(([p]) => p);
+    const record = nextRecord(practiceRecords.value?.get(study.id), study.id, wrongAt.length, Date.now(), wrongAt.some(hardAt));
     try {
       await savePractice(record);
       setPhase({ kind: 'end', record });
@@ -215,7 +223,7 @@ function StudyPlay({
     sfen,
     (move) => {
       const prev = ply > 0 ? study.moves[ply - 1] : undefined;
-      const table = tableOf(positionsNow().get(positionId(study.mySide, sfen)), studyMovesAt(bookIndex, sfen));
+      const table = tableAt(ply);
       const other = otherStudyAt(bookIndex, sfen, move.usi, study.id);
       const judge = judgeAnswer(move.usi, study.moves[ply], table, other);
       if (judge.kind === 'correct') {
@@ -315,7 +323,13 @@ function StudyPlay({
       </div>
 
       <div class="study-head">
-        <p class="study-title study-title-line practice-head">
+        <p class={asking && hardAt(ply) ? 'study-title study-title-line practice-head practice-head-hard' : 'study-title study-title-line practice-head'}>
+          {/* 見えにくい手の局面では、理由の印と丸の場所をそのままに隠して、上に重ねる（行の高さを変えず、盤が動かないように） */}
+          {asking && hardAt(ply) && (
+            <span class="kind-tag kind-hard" data-testid="practice-hard">
+              ここは知らないと指せない手
+            </span>
+          )}
           {item.reason && (
             <span class={item.reason === 'game' ? 'kind-tag kind-mine' : item.reason === 'wrong' ? 'kind-tag kind-opp' : 'kind-tag'} data-testid="practice-reason">
               {REASON_TEXT[item.reason]}

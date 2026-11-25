@@ -2527,10 +2527,25 @@ button.move-bar-center.move-bar-action {
 }
 
 .practice-head {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-2);
   min-width: 0;
+  /* 重ねる知らせが入る高さ（理由の印が無くても同じ） */
+  min-height: 26px;
+}
+
+/* 見えにくい手の局面（段階21-3）：理由の印と丸は場所を保って隠し、知らせを上に重ねる */
+.practice-head-hard > :not(.kind-hard) {
+  visibility: hidden;
+}
+
+.practice-head > .kind-hard {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
 }
 
 /* 自分の手の数だけの丸（正解＝木の茶、まちがい＝朱、今答える手＝太い縁） */
@@ -2751,6 +2766,15 @@ button.move-bar-center.move-bar-action {
 .kind-mine {
   border-color: var(--color-danger);
   color: var(--color-danger);
+}
+
+/* 稽古の「ここは知らないと指せない手」（段階21-3）：白い地に灰の太めの縁と太字（ほかの理由の印と見分ける） */
+.kind-hard {
+  border: 2px solid var(--color-text-muted);
+  padding-block: 1px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-weight: 700;
 }
 
 .kind-beyond {
@@ -3131,6 +3155,23 @@ button.move-bar-center.move-bar-action {
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--color-mark);
   border-radius: var(--radius-card);
+}
+
+/* 段階21-3：見えにくい手の札（候補の窓・エンジンに聞くの窓） */
+.hard-tag {
+  display: inline-flex;
+  margin-left: var(--space-1);
+  padding: 0 6px;
+  border: 1px solid var(--color-text-muted);
+  border-radius: var(--radius-chip);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-family: system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.5;
+  white-space: nowrap;
+  vertical-align: middle;
 }
 
 .ask-picked {

@@ -25,7 +25,7 @@ export interface Candidate {
   by?: { engine: string; ms: number; at: number };
   /** 読み筋：この手を指した後の手（相手の手から） */
   pv?: string[];
-  /** 見えにくい手（段階21-3） */
+  /** 見えにくい手（段階21-3）。エンジンの浅い読みの手より、はっきり良い手。使うのは本命のときだけ（`hardMove`） */
   hard?: boolean;
   /** 理由（打ちたいときだけ） */
   reason?: string;
@@ -92,15 +92,40 @@ export interface MergeOptions {
   by: NonNullable<Candidate['by']>;
   /** 盤で指して調べた手（8 手を超えるとき、先に残す） */
   picked?: string;
+  /** 浅い読みの最善と、それを深く読んだ点（段階21-3）。分からないときは、見えにくい手の印を変えない */
+  shallow?: Shallow;
+}
+
+/** 浅い読み（0.1 秒）の最善手と、深く読んだときのその手の点（自分の側から） */
+export interface Shallow {
+  move: string;
+  score: Score;
+}
+
+/** 見えにくい手か：浅い読みでは別の手が最善で、深く読むとその手より境目を超えて良い */
+function isHard(r: ExamResult, shallow: Shallow, margin: number): boolean {
+  return r.move !== shallow.move && scoreToNumber(r.score) - scoreToNumber(shallow.score) > margin;
+}
+
+/** 本命が見えにくい手なら、その手 */
+export function hardMove(table: readonly Candidate[]): string | undefined {
+  return table.find((c) => c.mark === 'main' && c.hard)?.move;
 }
 
 /** 調べた結果を表にまとめる。dropped は、8 手を超えて入らなかった数 */
 export function mergeResults(table: readonly Candidate[], results: readonly ExamResult[], opts: MergeOptions): { table: Candidate[]; dropped: number } {
   const examined = new Map(results.map((r) => [r.move, r]));
   const detail = (r: ExamResult) => ({ eval: r.score, by: opts.by, pv: cleanPv(r.pv) });
+  /** 調べた結果で手を新しくする。浅い読みが分かれば、見えにくい手の印も付け直す */
+  const withResult = (c: Candidate, r: ExamResult): Candidate => {
+    const next: Candidate = { ...c, ...detail(r) };
+    if (!opts.shallow) return next;
+    delete next.hard;
+    return isHard(r, opts.shallow, opts.goodMax) ? { ...next, hard: true } : next;
+  };
   const kept: Candidate[] = table.map((c) => {
     const r = examined.get(c.move);
-    return r ? { ...c, ...detail(r) } : { ...c };
+    return r ? withResult(c, r) : { ...c };
   });
   const num = (r: ExamResult) => scoreToNumber(r.score);
   const bestOf = (list: readonly ExamResult[]) => list.reduce<ExamResult | undefined>((a, r) => (!a || num(r) > num(a) ? r : a), undefined);
@@ -115,9 +140,7 @@ export function mergeResults(table: readonly Candidate[], results: readonly Exam
   const fresh = results
     .filter((r) => !known.has(r.move))
     .map((r): Candidate & { rank: number } => ({
-      move: r.move,
-      mark: r.move === newMain ? 'main' : !r.inBook && base - num(r) > opts.goodMax ? 'bad' : 'alt',
-      ...detail(r),
+      ...withResult({ move: r.move, mark: r.move === newMain ? 'main' : !r.inBook && base - num(r) > opts.goodMax ? 'bad' : 'alt' }, r),
       rank: r.move === newMain ? 0 : r.move === opts.picked ? 1 : r.inBook ? 2 : 3,
     }))
     .sort((a, b) => a.rank - b.rank);

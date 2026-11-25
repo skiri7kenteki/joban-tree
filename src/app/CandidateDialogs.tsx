@@ -6,7 +6,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { Dialog } from '../components/Dialog';
 import { applyUsiMove, moveText, type Side } from '../shogi/position';
-import { MARK_TEXT, PV_MAX, PV_SHOW, REASON_MAX, evalText, markText, type Candidate, type CandidateMark } from '../tree/candidates';
+import { MARK_TEXT, PV_MAX, PV_SHOW, REASON_MAX, evalText, hardMove, markText, type Candidate, type CandidateMark } from '../tree/candidates';
 import { NOTE_MAX } from '../tree/positions';
 
 /** 印の札（本命は墨の塗り、次善は木の茶、悪手は朱） */
@@ -15,6 +15,24 @@ export function MarkTag({ mark, text, testId }: { mark: CandidateMark; text: str
     <span class={`mark-tag mark-${mark}`} data-testid={testId} data-mark={mark}>
       {text}
     </span>
+  );
+}
+
+/** 見えにくい手の札（段階21-3） */
+export function HardTag() {
+  return (
+    <span class="hard-tag" data-testid="hard-tag">
+      見えにくい
+    </span>
+  );
+}
+
+/** 「見えにくい」の説明（目安であること） */
+export function HardNote() {
+  return (
+    <p class="muted memo-sub" data-testid="hard-note">
+      「見えにくい」は目安です：エンジンの浅い読みでは見つからない手。
+    </p>
   );
 }
 
@@ -189,6 +207,7 @@ export function CandidateWindow({
                 <div class="cand-main">
                   <span class="cand-move">{moveText(sfen, c.move, prev)}</span>
                   <MarkTag mark={c.mark} text={markText(table, c)} />
+                  {c.move === hardMove(table) && <HardTag />}
                   <span class="cand-sub">
                     <span class="num">{evalText(c)}</span>
                     {pv && ` ${c.mark === 'bad' ? '咎め方：' : ''}${pv}`}
@@ -203,6 +222,7 @@ export function CandidateWindow({
           })}
         </ul>
       )}
+      {hardMove(table) && <HardNote />}
       <button type="button" class="btn btn-wide cand-pick" data-testid="cand-pick" onClick={onPick}>
         ほかの手を盤で指して調べる
       </button>

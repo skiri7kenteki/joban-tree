@@ -6,6 +6,7 @@ import {
   candidatesKifLine,
   candidatesProblem,
   chooseMain,
+  hardMove,
   isUsiMove,
   markText,
   mergeResults,
@@ -59,6 +60,41 @@ describe('自動の印', () => {
     expect(r.table[0]).toMatchObject({ eval: cp(50), by });
     expect(r.table[0].pv).toHaveLength(10);
     expect(r.table[1].pv).toEqual(['8c8d']);
+  });
+});
+
+describe('見えにくい手（段階21-3）', () => {
+  const results = [res('7g7f', 100), res('2g2f', -50), res('5g5f', -51)];
+  const hardOf = (shallow: { move: string; score: ReturnType<typeof cp> } | undefined, table: Candidate[] = []) =>
+    hardMove(mergeResults(table, results, { goodMax: 150, by, ...(shallow ? { shallow } : {}) }).table);
+
+  it('浅い読みの最善が違っていて、深く読んだ差が境目より大きければ、本命に印', () => {
+    expect(hardOf({ move: '5g5f', score: cp(-51) })).toBe('7g7f');
+  });
+  it('差が境目ちょうど・浅い読みでも同じ手・浅い読みが分からないときは付けない', () => {
+    expect(hardOf({ move: '2g2f', score: cp(-50) })).toBeUndefined();
+    expect(hardOf({ move: '7g7f', score: cp(100) })).toBeUndefined();
+    expect(hardOf(undefined)).toBeUndefined();
+  });
+  it('詰ます手を浅い読みが見つけなければ付く', () => {
+    const mate: ExamResult = { move: '7g7f', score: { kind: 'mate', plies: 7 }, inBook: false, pv: [] };
+    const t = mergeResults([], [mate, res('2g2f', 300)], { goodMax: 150, by, shallow: { move: '2g2f', score: cp(300) } }).table;
+    expect(hardMove(t)).toBe('7g7f');
+  });
+  it('もう一度残すと付け直す。浅い読みが分からないときは前の印のまま', () => {
+    const old: Candidate[] = [{ move: '7g7f', mark: 'main', eval: cp(100), hard: true }];
+    expect(hardOf({ move: '7g7f', score: cp(100) }, old)).toBeUndefined();
+    expect(hardOf(undefined, old)).toBe('7g7f');
+  });
+  it('あとで本命を付け替えると、その手の印が使われる（本命でない手の印は出さない）', () => {
+    const old: Candidate[] = [
+      { move: '7g7f', mark: 'alt' },
+      { move: '2g2f', mark: 'main' },
+    ];
+    const t = mergeResults(old, results, { goodMax: 150, by, shallow: { move: '5g5f', score: cp(-300) } }).table;
+    expect(hardMove(t)).toBe('2g2f');
+    expect(hardMove(setMark(t, '7g7f', 'main')!)).toBe('7g7f');
+    expect(hardMove(setMark(t, '2g2f', 'alt')!)).toBeUndefined();
   });
 });
 

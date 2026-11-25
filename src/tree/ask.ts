@@ -17,6 +17,18 @@ export const ASK_MS = 3000;
 export const ASK_MORE_MS = 10000;
 export const ASK_EXTRA_MAX_MS = 2000;
 
+/** 「すぐの最善」を調べる時間（段階21-3。見えにくい手の目安） */
+export const ASK_SHALLOW_MS = 100;
+
+/**
+ * 浅い読みの最善手を深く読んだ点（自分の手番。lines は候補、extra は調べ直した読み筋）。
+ * 浅い読みの手が無い・深く読めていないときは undefined
+ */
+export function shallowOf(move: string, lines: readonly PvLine[], extra: readonly PvLine[]): { move: string; score: Score } | undefined {
+  const line = [...lines, ...extra].find((l) => l.pv[0] === move);
+  return line ? { move, score: line.score } : undefined;
+}
+
 /** 結果の 1 行 */
 export interface AskRow {
   move: string;

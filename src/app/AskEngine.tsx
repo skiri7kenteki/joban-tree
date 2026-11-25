@@ -13,10 +13,10 @@ import { EVALS } from '../engine/config';
 import { formatScore } from '../engine/usi';
 import type { UsiEngine } from '../engine/engine';
 import { applyUsiMove, moveText, positionCommand, sideToMove, type Side } from '../shogi/position';
-import { ASK_EXTRA_MAX_MS, ASK_MORE_MS, ASK_MS, askMultiPV, askRows, lossText, missingBookMoves, type AskRow } from '../tree/ask';
+import { ASK_EXTRA_MAX_MS, ASK_MORE_MS, ASK_MS, ASK_SHALLOW_MS, askMultiPV, askRows, lossText, missingBookMoves, shallowOf, type AskRow } from '../tree/ask';
 import { LABEL_TEXT, labelOf } from '../tree/labels';
-import { MARK_TEXT, mergeResults, type Candidate } from '../tree/candidates';
-import { MarkTag } from './CandidateDialogs';
+import { MARK_TEXT, hardMove, isUsiMove, mergeResults, type Candidate, type Shallow } from '../tree/candidates';
+import { HardNote, HardTag, MarkTag } from './CandidateDialogs';
 import { getEngine, pcEngine } from './engineService';
 import { isGenerating } from './generation';
 import { settings } from './settings';
@@ -26,7 +26,7 @@ type Phase =
   | { kind: 'load' }
   | { kind: 'search'; ms: number; run: number }
   | { kind: 'extra'; ms: number; run: number }
-  | { kind: 'done'; ms: number; rows: AskRow[]; by: NonNullable<Candidate['by']> }
+  | { kind: 'done'; ms: number; rows: AskRow[]; by: NonNullable<Candidate['by']>; shallow: Shallow | undefined }
   | { kind: 'error'; text: string };
 
 export function AskEngine({
@@ -92,6 +92,14 @@ export function AskEngine({
       engineRef.current = engine;
       const position = positionCommand(sfen);
       setPhase({ kind: 'search', ms, run });
+      // 自分の手番は、先に「すぐの最善」を調べる（見えにくい手の目安。深い読みの前でないと意味がない）
+      let quick = '';
+      if (mine) {
+        await engine.clearHash();
+        if (!alive()) return;
+        quick = (await engine.analyze(position, { movetimeMs: ASK_SHALLOW_MS, multiPV: 1 })).bestmove;
+        if (!alive()) return;
+      }
       const r = await engine.analyze(position, { movetimeMs: ms, multiPV: askMultiPV(sfen, mySide) });
       if (!alive()) return;
       // 研究の手・候補の表の手が候補に入っていなければ、その手だけを調べ直す
@@ -99,14 +107,23 @@ export function AskEngine({
       const missing = missingBookMoves(r.lines, wanted).filter((m) => m !== picked);
       const extra: typeof r.lines = [];
       const alone = picked ? missingBookMoves(r.lines, [picked]) : [];
-      for (const moves of [alone, missing]) {
+      // 浅い読みの手がどこにも入らなければ、点を比べるためだけに調べる（一覧と表には出さない）
+      const compare = isUsiMove(quick) && quick !== picked && !missing.includes(quick) ? missingBookMoves(r.lines, [quick]) : [];
+      for (const moves of [alone, [...missing, ...compare]]) {
         if (moves.length === 0 || r.lines.length === 0) continue;
         const extraMs = Math.min(ASK_EXTRA_MAX_MS, ms);
         setPhase({ kind: 'extra', ms: extraMs, run: run });
         extra.push(...(await engine.analyze(position, { movetimeMs: extraMs, multiPV: moves.length, searchMoves: moves })).lines);
         if (!alive()) return;
       }
-      setPhase({ kind: 'done', ms, rows: askRows(sfen, mySide, r.lines, extra, bookMoves), by: { engine: evalName, ms, at: Date.now() } });
+      const listed = extra.filter((l) => !compare.includes(l.pv[0]));
+      setPhase({
+        kind: 'done',
+        ms,
+        rows: askRows(sfen, mySide, r.lines, listed, bookMoves),
+        by: { engine: evalName, ms, at: Date.now() },
+        shallow: mine ? shallowOf(quick, r.lines, extra) : undefined,
+      });
     } catch (e) {
       if (alive()) setPhase({ kind: 'error', text: `エンジンを使えませんでした（${e instanceof Error ? e.message : String(e)}）` });
     }
@@ -124,7 +141,9 @@ export function AskEngine({
 
   const running = phase.kind === 'load' || phase.kind === 'search' || phase.kind === 'extra';
   /** ［表に残す］とどうなるか（自分の手番で、結果が出たとき） */
-  const preview = mine && phase.kind === 'done' && phase.rows.length > 0 ? mergeResults(table, phase.rows, { goodMax, by: phase.by, picked }) : null;
+  const preview = mine && phase.kind === 'done' && phase.rows.length > 0 ? mergeResults(table, phase.rows, { goodMax, by: phase.by, picked, shallow: phase.shallow }) : null;
+  /** 残すと本命になる手が、見えにくい手 */
+  const hard = preview ? hardMove(preview.table) : undefined;
   const examined = preview && phase.kind === 'done' ? preview.table.filter((c) => phase.rows.some((r) => r.move === c.move)).length : 0;
   const sec = phase.kind === 'done' || phase.kind === 'search' ? `${phase.ms / 1000}秒・` : '';
   const sideName = mySide === 'black' ? '☗先手' : '☖後手';
@@ -167,11 +186,13 @@ export function AskEngine({
                 picked={row.move === picked}
                 saved={preview?.table.find((c) => c.move === row.move)}
                 kept={table.some((c) => c.move === row.move)}
+                hard={row.move === hard}
                 onAdvance={onAdvance}
                 onAdd={onAdd}
               />
             ))}
           </ul>
+          {hard && <HardNote />}
         </>
       )}
       {preview && !confirming && (
@@ -228,6 +249,7 @@ function AskRowItem({
   picked,
   saved,
   kept,
+  hard,
   onAdvance,
   onAdd,
 }: {
@@ -242,6 +264,8 @@ function AskRowItem({
   saved: Candidate | undefined;
   /** もう表にある手 */
   kept: boolean;
+  /** 見えにくい手（残すと本命） */
+  hard: boolean;
   onAdvance: (move: string) => void;
   onAdd: (moves: string[]) => void;
 }) {
@@ -261,6 +285,7 @@ function AskRowItem({
         {row.inBook && <span class="ask-has">研究あり</span>}
         {picked && <span class="ask-picked">指した手</span>}
         {saved && <MarkTag mark={saved.mark} text={kept ? `表：${MARK_TEXT[saved.mark]}` : `${MARK_TEXT[saved.mark]}にする`} testId="ask-mark" />}
+        {hard && <HardTag />}
         {reply && <span class="ask-reply">→ {reply}</span>}
       </div>
       <span class="ask-score num">{formatScore(row.score)}</span>

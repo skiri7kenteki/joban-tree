@@ -1,7 +1,7 @@
 // 段階20-2：エンジンに聞く（src/tree/ask.ts）の並べ方・評価値の向き・研究の手の調べ直し
 import { describe, expect, it } from 'vitest';
 import type { PvLine } from '../../src/engine/usi';
-import { ASK_MULTIPV_MINE, ASK_MULTIPV_OPP, askMultiPV, askRows, lossText, missingBookMoves } from '../../src/tree/ask';
+import { ASK_MULTIPV_MINE, ASK_MULTIPV_OPP, askMultiPV, askRows, lossText, missingBookMoves, shallowOf } from '../../src/tree/ask';
 import { STARTPOS_SFEN } from '../../src/shogi/position';
 
 const line = (multipv: number, cp: number, pv: string[]): PvLine => ({ multipv, score: { kind: 'cp', value: cp }, depth: 10, pv });
@@ -57,5 +57,19 @@ describe('エンジンに聞く', () => {
   it('差の言葉', () => {
     expect(lossText(0)).toBe('最善');
     expect(lossText(45)).toBe('最善から −45');
+  });
+});
+
+describe('浅い読みの手の点（段階21-3）', () => {
+  const lines = [line(1, 60, ['2g2f']), line(2, 30, ['7g7f'])];
+  const extra = [line(1, -200, ['9g9f'])];
+  it('候補か、調べ直した読み筋の点を使う', () => {
+    expect(shallowOf('7g7f', lines, extra)).toEqual({ move: '7g7f', score: { kind: 'cp', value: 30 } });
+    expect(shallowOf('9g9f', lines, extra)).toEqual({ move: '9g9f', score: { kind: 'cp', value: -200 } });
+  });
+  it('深く読めていない手・指し手でないものは undefined', () => {
+    expect(shallowOf('1g1f', lines, extra)).toBeUndefined();
+    expect(shallowOf('resign', lines, extra)).toBeUndefined();
+    expect(shallowOf('', lines, extra)).toBeUndefined();
   });
 });

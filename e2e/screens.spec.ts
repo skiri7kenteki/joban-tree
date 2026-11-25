@@ -86,7 +86,7 @@ for (const size of SIZES) {
             key,
             note: '',
             candidates: [
-              { move: '5a6b', mark: 'main', eval: { kind: 'cp', value: 45 }, by, pv: ['3g3f', '7a7b', '2i3g', '6c6d', '3i3h'] },
+              { move: '5a6b', mark: 'main', eval: { kind: 'cp', value: 45 }, by, pv: ['3g3f', '7a7b', '2i3g', '6c6d', '3i3h'], hard: true },
               { move: '5a5b', mark: 'alt', eval: { kind: 'cp', value: -35 }, by, pv: ['3g3f', '8f7f', '8h7g'] },
               { move: '1c1d', mark: 'bad', eval: { kind: 'cp', value: -405 }, by, pv: ['3g3f', '1d1e', '2i3g'], reason: '端が間に合わない' },
             ],

@@ -29,6 +29,8 @@ export interface PracticeRecord {
   lastMistakes: number;
   /** 稽古した回数 */
   count: number;
+  /** 最後の稽古で、見えにくい手（候補の表の印。段階21-3）をまちがえた。まちがえていなければ項目なし */
+  hardMistake?: boolean;
 }
 
 /** 間隔（日）。最後の 60 日はくり返す */
@@ -55,7 +57,7 @@ function dayAfter(t: number, days: number): number {
 }
 
 /** 稽古を 1 本終えたあとの記録（まちがい 0 なら段を 1 つ進め、1 つでもあれば最初の段に戻す） */
-export function nextRecord(prev: PracticeRecord | undefined, studyId: string, mistakes: number, now: number): PracticeRecord {
+export function nextRecord(prev: PracticeRecord | undefined, studyId: string, mistakes: number, now: number, hardMistake = false): PracticeRecord {
   const step = mistakes > 0 || !prev ? 0 : Math.min(prev.step + 1, STEP_DAYS.length - 1);
   return {
     studyId,
@@ -65,6 +67,7 @@ export function nextRecord(prev: PracticeRecord | undefined, studyId: string, mi
     firstAt: prev?.firstAt ?? now,
     lastMistakes: mistakes,
     count: (prev?.count ?? 0) + 1,
+    ...(hardMistake ? { hardMistake: true } : {}),
   };
 }
 
@@ -163,7 +166,8 @@ export function practicePlan(
     }
   }
   game.sort((a, b) => b.gameAt! - a.gameAt!);
-  wrong.sort((a, b) => a.record!.dueAt - b.record!.dueAt);
+  // 前回まちがいは、見えにくい手をまちがえた研究手順が先（段階21-3）
+  wrong.sort((a, b) => Number(b.record!.hardMistake ?? false) - Number(a.record!.hardMistake ?? false) || a.record!.dueAt - b.record!.dueAt);
   due.sort((a, b) => a.record!.dueAt - b.record!.dueAt);
   fresh.sort((a, b) => b.study.updatedAt - a.study.updatedAt);
   later.sort((a, b) => a.record.dueAt - b.record.dueAt);
@@ -215,5 +219,6 @@ export function practiceProblem(raw: unknown): string | null {
   if (!num(r.step) || (r.step as number) < 0 || !Number.isInteger(r.step)) return '段';
   if (!num(r.dueAt) || !num(r.lastAt) || !num(r.firstAt)) return '日時';
   if (!num(r.lastMistakes) || !num(r.count)) return '数';
+  if (r.hardMistake !== undefined && typeof r.hardMistake !== 'boolean') return '見えにくい手';
   return null;
 }

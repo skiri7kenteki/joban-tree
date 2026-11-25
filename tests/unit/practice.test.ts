@@ -109,6 +109,24 @@ describe('今日の稽古の並び', () => {
     expect([old.today.length, old.later.map((l) => l.study.id)]).toEqual([0, ['a']]);
   });
 
+  it('前回まちがいの中では、見えにくい手をまちがえた研究手順が先（段階21-3）', () => {
+    const records = new Map([
+      ['a', rec('a', { dueAt: startOfDay(NOW) - 2 * DAY, lastMistakes: 1 })],
+      ['b', rec('b', { dueAt: startOfDay(NOW), lastMistakes: 1, hardMistake: true })],
+      ['c', rec('c', { dueAt: startOfDay(NOW) - 5 * DAY })],
+    ]);
+    const plan = practicePlan([a, b, c], records, new Map(), T, NOW);
+    expect(plan.today.map((i) => i.study.id)).toEqual(['b', 'a', 'c']);
+  });
+
+  it('見えにくい手のまちがいは記録に残し、次に正解すれば消える', () => {
+    const wrong = nextRecord(undefined, 's', 1, NOW, true);
+    expect(wrong.hardMistake).toBe(true);
+    expect('hardMistake' in nextRecord(wrong, 's', 0, NOW + DAY)).toBe(false);
+    expect(practiceProblem(wrong)).toBeNull();
+    expect(practiceProblem({ ...wrong, hardMistake: 'yes' })).toBe('見えにくい手');
+  });
+
   it('はじめての研究手順は 1 日 5 本まで（今日はじめて稽古した分を引く）', () => {
     const many = Array.from({ length: 8 }, (_, i) => study(`n${i}`, [...base, '5i5h', i % 2 ? '5a5b' : '5a6b', '9g9f', `${(i % 4) + 1}c${(i % 4) + 1}d`], i));
     expect(practicePlan(many, new Map(), new Map(), T, NOW).today).toHaveLength(NEW_PER_DAY);
