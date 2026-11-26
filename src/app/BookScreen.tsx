@@ -54,15 +54,16 @@ import {
   type BookView,
   type RowCut,
 } from '../tree/bookEdit';
-import { bookKeyOfGroup, bookLabel, bookPool, bookSide, fitsBook, isHirateBook } from '../tree/organize';
+import { OTHER_GROUP, STUDY_GROUP_PREFIX, bookKeyOfGroup, bookLabel, bookPool, bookSide, fitsBook, isHirateBook, studyGroupKey } from '../tree/organize';
+import { destinations, movedStudies, startName as templateStartName } from '../tree/importTemplate';
 import { firstLine, moveTexts, newStudyId, startsWith, studyMovesText } from '../tree/studies';
 import { bookAtPosition, bookOrder, bookStart, branchTarget, type BookBranch, type BookPosition } from '../tree/studyBook';
 import { studiesToKif } from '../tree/studyFile';
-import { listName, type OpeningTemplate } from '../tree/templates';
+import { closestTemplate, listName, type OpeningTemplate } from '../tree/templates';
 import type { Study } from '../tree/types';
 import { boardFitProps, measureFitFrame, threeRowsNeed, useBoardFit } from './boardFit';
 import { takeHint } from './recent';
-import { back, bookPath, go, groupPracticePath } from './router';
+import { back, bookPath, bookTemplatePath, go, groupPracticePath } from './router';
 import { bookFromGame } from './games';
 import { OUTCOME_TEXT, copyText, shareFile } from './share';
 import { StudyEditDialog } from './StudyDialogs';
@@ -71,7 +72,7 @@ import { applyStudyChange, ensureStudies, library, studiesNow } from './studies'
 import { KifuPanel, KifuSheet, useWideLayout, type KifuRow } from '../components/KifuList';
 import { MoveBar } from '../components/MoveBar';
 import { AskEngine } from './AskEngine';
-import { allTemplates, myTemplates, refreshMyTemplates } from './TemplateDialogs';
+import { RegisterTemplateDialog, allTemplates, myTemplates, refreshMyTemplates } from './TemplateDialogs';
 
 /** 「書き込む」の入／切（端末ごとに覚える。初期値は入） */
 const WRITE_KEY = 'joban-tree:book-write';
@@ -187,6 +188,10 @@ type BookDialog =
   | { kind: 'end' }
   | { kind: 'delete' }
   | { kind: 'memo' }
+  /** 段階25-1：この局面を戦型として登録 */
+  | { kind: 'register' }
+  /** 「その他」から登録した後：その戦型の定跡帳へ移るか聞く */
+  | { kind: 'registered'; name: string; label: string; path: string; moved: number }
   /** picked：盤で指して調べる手 */
   | { kind: 'ask'; picked?: string };
 
@@ -671,6 +676,21 @@ function BookViewScreen({
     saveWrite(on);
   }
 
+  /** 段階25-1：戦型を登録した後。「その他」から開いていたら移るかを聞き、それ以外は知らせるだけ */
+  function afterRegister(t: OpeningTemplate) {
+    const key = `${STUDY_GROUP_PREFIX}${t.group}|${side}`;
+    const before = templates.filter((x) => x.id !== t.id);
+    const moved = movedStudies(studiesNow(), before, t).filter((s) => studyGroupKey(s, [...before, t]) === key).length;
+    const to = bookLabel(key);
+    if (urlKey.startsWith(`${STUDY_GROUP_PREFIX}${OTHER_GROUP}|`)) {
+      const path = bookPool(key, studiesNow(), [...before, t]).length > 0 ? bookPath(key) : bookTemplatePath(key, t.id);
+      setDialog({ kind: 'registered', name: t.name, label: to, path, moved });
+      return;
+    }
+    setDialog(null);
+    setNote(`「${t.name}」を戦型として登録しました${moved > 0 ? `（研究手順 ${moved} 本が「${to}」に移りました）` : ''}`);
+  }
+
   async function copyKif() {
     if (!current) return;
     setDialog(null);
@@ -918,6 +938,10 @@ function BookViewScreen({
             <button type="button" class="btn" data-testid="book-open-cand" onClick={openPositionWindow}>
               {mine ? '候補・局面メモ' : '局面メモ'}
             </button>
+            {/* 段階25-1：定跡帳から新しい戦型を作る道（グループは戦型から決まる） */}
+            <button type="button" class="btn" data-testid="book-register-template" disabled={index === 0} onClick={() => setDialog({ kind: 'register' })}>
+              この局面を戦型として登録
+            </button>
           </div>
           <p class="menu-section-title">定跡帳</p>
           <div class="dialog-actions dialog-actions-column">
@@ -967,6 +991,49 @@ function BookViewScreen({
                 {on ? '入' : '切（読むだけ）'}
               </button>
             ))}
+          </div>
+        </Dialog>
+      )}
+
+      {dialog?.kind === 'register' && (
+        <RegisterTemplateDialog
+          moves={here}
+          mySide={side}
+          defaultName={templateStartName(here)}
+          defaultGroup={closestTemplate(templates, here)?.group ?? ''}
+          sheet
+          extra={(f) => {
+            const group = f.group.trim();
+            const draft: OpeningTemplate = { id: 'draft', name: f.name, group, mySide: side, moves: here, note: '', reviewed: true };
+            const moved = group ? movedStudies(studiesNow(), templates, draft) : [];
+            // 自分の側が違う研究手順も移るので、行き先ごとの本数を出す
+            return moved.length > 0 ? (
+              <p class="muted" data-testid="book-register-moved">
+                今ある研究手順が移ります：
+                {destinations(moved, [...templates, draft])
+                  .map((d) => `「${d.label}」へ ${d.count} 本`)
+                  .join('・')}
+              </p>
+            ) : null;
+          }}
+          onSaved={afterRegister}
+          onClose={() => setDialog(null)}
+        />
+      )}
+
+      {dialog?.kind === 'registered' && (
+        <Dialog title="定跡帳を移りますか？" onClose={() => setDialog(null)} testId="book-registered-dialog">
+          <p>
+            「{dialog.name}」を登録しました。
+            {dialog.moved > 0 && `研究手順 ${dialog.moved} 本が「${dialog.label}」に移りました。`}
+          </p>
+          <div class="dialog-actions">
+            <button type="button" class="btn btn-primary" data-testid="book-registered-go" onClick={() => go(dialog.path)}>
+              「{dialog.label}」へ
+            </button>
+            <button type="button" class="btn" data-testid="book-registered-stay" onClick={() => setDialog(null)}>
+              このまま
+            </button>
           </div>
         </Dialog>
       )}

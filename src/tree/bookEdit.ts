@@ -157,9 +157,20 @@ export function fixStudies(list: readonly Study[], templates: readonly OpeningTe
   return out;
 }
 
+/**
+ * 手順を変えたときの戦型：自分の側が同じ、いちばん長いもの。ただし記録していた戦型をまだ通り、
+ * いちばん長いものが別のグループなら、記録していた戦型のまま（取り込みで選んだグループから出ないように。段階25-1）
+ */
+function reshapedTemplateId(original: Pick<Study, 'templateId' | 'mySide'>, moves: readonly string[], templates: readonly OpeningTemplate[]): string | undefined {
+  const longest = templateIdFor(moves, templates, original.mySide);
+  const kept = templates.find((t) => t.id === original.templateId);
+  if (!kept || kept.mySide !== original.mySide || !startsWith(moves, kept.moves)) return longest;
+  return templates.find((t) => t.id === longest)?.group === kept.group ? longest : kept.id;
+}
+
 /** 手順を変えた研究手順（戦型は付け直す。名前は初期値のままなら付け直す。メモ・側・作った日時はそのまま） */
 export function reshaped(original: Study, moves: readonly string[], pool: readonly Study[], ctx: Pick<BookCtx, 'templates' | 'now'>): Study {
-  const templateId = templateIdFor(moves, ctx.templates, original.mySide);
+  const templateId = reshapedTemplateId(original, moves, ctx.templates);
   const { templateId: _old, ...rest } = original;
   void _old;
   const next: Study = { ...rest, moves: [...moves], ...(templateId ? { templateId } : {}), updatedAt: ctx.now };
@@ -168,7 +179,9 @@ export function reshaped(original: Study, moves: readonly string[], pool: readon
 
 /** 新しい研究手順（名前は自動、メモは空、側は定跡帳の側） */
 export function createdStudy(moves: readonly string[], pool: readonly Study[], ctx: BookCtx): Study {
-  const templateId = templateIdFor(moves, ctx.templates, ctx.side);
+  // 戦型は、分かれ元（手順がいちばん長く同じ研究手順。同じ長さなら最近直したもの）の記録を引き継ぐ（決まりは reshapedTemplateId）
+  const source = [...pool].sort((a, b) => commonLength(b.moves, moves) - commonLength(a.moves, moves) || byLatest(a, b))[0];
+  const templateId = reshapedTemplateId({ templateId: source?.templateId, mySide: ctx.side }, moves, ctx.templates);
   const shape = { id: ctx.newId(), moves: [...moves], ...(templateId ? { templateId } : {}), mySide: ctx.side, createdAt: ctx.now };
   return { ...shape, name: autoName(shape, pool, ctx.templates), note: '', updatedAt: ctx.now };
 }

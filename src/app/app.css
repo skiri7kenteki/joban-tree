@@ -1330,6 +1330,38 @@
   overflow-wrap: anywhere;
 }
 
+/* 段階25-1：戦型の行の下の段（分かれるときは折り返す）と、新しい戦型の出発点の盤 */
+.kif-bulk-template-detail {
+  overflow-wrap: anywhere;
+  font-size: var(--font-size-small);
+}
+
+.template-item:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.mini-board.start-board {
+  width: min(220px, 70vw);
+  margin: 0 auto;
+}
+
+.start-step {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-2) 0;
+  text-align: center;
+}
+
+.start-step strong {
+  flex: 1 1 auto;
+}
+
+.start-step .btn {
+  width: 56px;
+}
+
 .kif-bulk-meta {
   display: flex;
   flex-wrap: wrap;

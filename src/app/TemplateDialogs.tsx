@@ -7,6 +7,7 @@
 // 登録した戦型は端末の中（IndexedDB）にだけ保存する。
 
 import { signal } from '@preact/signals';
+import type { ComponentChildren } from 'preact';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { Dialog } from '../components/Dialog';
 import type { Side } from '../shogi/position';
@@ -44,7 +45,7 @@ export function allTemplates(): OpeningTemplate[] {
 }
 
 /** 保存する（同じ id があれば、登録した日はそのまま） */
-async function saveMine(list: readonly OpeningTemplate[]): Promise<void> {
+export async function saveMine(list: readonly OpeningTemplate[]): Promise<void> {
   const now = Date.now();
   const current = myTemplates.value ?? (await refreshMyTemplates());
   await putMyTemplates(
@@ -293,16 +294,41 @@ export function TemplatePicker({ onPick, onClose }: { onPick: (t: OpeningTemplat
 
 type Fields = { name: string; group: string; note: string };
 
+/** 今あるグループは押すだけで選べる（新しいグループは入力欄に入れる）。「登録する」と紛らわしくないよう、枠線だけのチップ */
+export function GroupChoices({ value, onPick }: { value: string; onPick: (group: string) => void }) {
+  const groups = groupTemplates(allTemplates()).map((g) => g.group);
+  if (groups.length === 0) return null;
+  return (
+    <div class="template-group-choices" role="group" aria-label="今あるグループ">
+      {groups.map((g) => (
+        <button
+          type="button"
+          key={g}
+          class={g === value.trim() ? 'group-choice on' : 'group-choice'}
+          aria-pressed={g === value.trim()}
+          data-testid="group-choice"
+          onClick={() => onPick(g)}
+        >
+          {g}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 /** 名前・グループ・メモの入力欄 */
 function TemplateForm({
   initial,
   saveLabel,
   blocked = false,
+  extra,
   onSave,
   onCancel,
 }: {
   initial: Fields;
   saveLabel: string;
+  /** 入力中の中身に合わせて、ボタンの上に出すもの */
+  extra?: (f: Fields) => ComponentChildren;
   /** 保存できない（理由は呼ぶ側が上に出す） */
   blocked?: boolean;
   /** 保存する（失敗したら例外） */
@@ -314,7 +340,6 @@ function TemplateForm({
   const [note, setNote] = useState(initial.note);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
-  const groups = groupTemplates(allTemplates()).map((g) => g.group);
 
   useEffect(() => {
     if (!myTemplates.value) void refreshMyTemplates().catch(() => undefined);
@@ -353,27 +378,12 @@ function TemplateForm({
           onInput={(e) => setGroup((e.target as HTMLInputElement).value)}
         />
       </label>
-      {/* 今あるグループは押すだけで選べる（新しいグループは上の欄に入れる）。「登録する」と紛らわしくないよう、枠線だけのチップ */}
-      {groups.length > 0 && (
-        <div class="template-group-choices" role="group" aria-label="今あるグループ">
-          {groups.map((g) => (
-            <button
-              type="button"
-              key={g}
-              class={g === group.trim() ? 'group-choice on' : 'group-choice'}
-              aria-pressed={g === group.trim()}
-              data-testid="group-choice"
-              onClick={() => setGroup(g)}
-            >
-              {g}
-            </button>
-          ))}
-        </div>
-      )}
+      <GroupChoices value={group} onPick={setGroup} />
       <label class="form-field">
         <span>メモ（なくてもよい）</span>
         <textarea class="template-note-input" rows={3} maxLength={1000} value={note} data-testid="template-note-input" onInput={(e) => setNote((e.target as HTMLTextAreaElement).value)} />
       </label>
+      {extra?.({ name, group, note })}
       {error && (
         <p class="notice notice-danger" role="alert" data-testid="template-error">
           {error}
@@ -397,6 +407,8 @@ export function RegisterTemplateDialog({
   mySide,
   defaultName,
   defaultGroup,
+  sheet,
+  extra,
   onSaved,
   onClose,
 }: {
@@ -405,6 +417,10 @@ export function RegisterTemplateDialog({
   mySide: Side;
   defaultName: string;
   defaultGroup: string;
+  /** 画面の下から出す（定跡帳の ⋯ から。段階25-1） */
+  sheet?: boolean;
+  /** 入力中のグループに合わせた一言（同じ手順の戦型があるときは出さない） */
+  extra?: (f: Fields) => ComponentChildren;
   onSaved: (t: OpeningTemplate) => void;
   onClose: () => void;
 }) {
@@ -416,7 +432,7 @@ export function RegisterTemplateDialog({
   const sameIsMine = same !== null && (myTemplates.value ?? []).some((t) => t.id === same.id);
 
   return (
-    <Dialog title="この局面を戦型として登録" onClose={onClose} testId="template-register">
+    <Dialog title="この局面を戦型として登録" onClose={onClose} testId="template-register" sheet={sheet}>
       <p class="muted">
         平手の初期局面から {moves.length} 手の局面を、自分は{mySide === 'black' ? '☗先手' : '☖後手'}の戦型として登録します。「戦型から選ぶ」に出ます。
       </p>
@@ -432,6 +448,7 @@ export function RegisterTemplateDialog({
         initial={{ name: defaultName, group: defaultGroup, note: '' }}
         saveLabel="登録する"
         blocked={same !== null}
+        extra={same ? undefined : extra}
         onSave={async (f) => {
           const t: OpeningTemplate = { id: newTemplateId(), ...f, mySide, moves: [...moves], reviewed: true };
           await saveMine([t]);

@@ -14,7 +14,7 @@
 import { Move, type ImmutableNode } from 'tsshogi';
 import { toRecord } from '../shogi/kifu';
 import { STARTPOS_SFEN, type Side } from '../shogi/position';
-import { guessSide, nameFromTexts, newStudyId, startTemplate } from './studies';
+import { guessSide, nameFromTexts, newStudyId, startTemplate, startsWith } from './studies';
 import { templateIdFor } from './bookEdit';
 import type { OpeningTemplate } from './templates';
 import { KIF_NAME_MARK } from './studyFile';
@@ -211,6 +211,20 @@ export function kifSide(read: Extract<KifReadResult, { ok: true }>, templates: r
   return guessSide(read.mainMoves, templates);
 }
 
+/**
+ * 取り込みで記録する戦型。chosen（取り込みの画面で選んだ・作った戦型。段階25-1）を手順が通り、側が同じならそれ。
+ * 側が違う戦型は記録できない（開き直すと外れる）ので、同じグループの側が同じ戦型があれば記録し、無ければ付けない（グループは手順から決まる）
+ */
+function importTemplateId(moves: readonly string[], templates: readonly OpeningTemplate[], side: Side, chosen?: OpeningTemplate): string | undefined {
+  if (!chosen || !startsWith(moves, chosen.moves)) return templateIdFor(moves, templates, side);
+  if (chosen.mySide === side) return chosen.id;
+  return templateIdFor(
+    moves,
+    templates.filter((t) => t.group === chosen.group),
+    side,
+  );
+}
+
 /** 選んだ候補を研究手順にする（並びを保つよう、日時を 1 ミリ秒ずつずらす：KIF の最初のものが一覧のいちばん上） */
 export function candidatesToStudies(
   list: readonly KifCandidate[],
@@ -218,9 +232,10 @@ export function candidatesToStudies(
   templates: readonly OpeningTemplate[],
   now: number,
   newId: () => string = newStudyId,
+  chosen?: OpeningTemplate,
 ): Study[] {
   return list.map((c, i) => {
-    const templateId = templateIdFor(c.moves, templates, mySide);
+    const templateId = importTemplateId(c.moves, templates, mySide, chosen);
     const at = now + (list.length - i);
     return {
       id: newId(),

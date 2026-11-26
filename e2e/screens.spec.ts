@@ -226,5 +226,49 @@ for (const size of SIZES) {
       await expect(page.getByTestId('book-toast')).toBeVisible();
       await shot(page, size.name, 'book-switched');
     });
+
+    test(`${size.name}：戦型を選ぶ・作る（段階25-1）`, async ({ page }) => {
+      await page.goto('./');
+      await expect(page.getByTestId('isolation')).toHaveAttribute('data-state', 'isolated', { timeout: 30_000 });
+      await page.goto('./#/study-import');
+      // 角換わりの形。13 手目で分かれる 2 本
+      const mv = (n: number, m: string) => `${n} ${m}`;
+      const kif = [
+        '手合割：平手',
+        '手数----指手---------消費時間--',
+        ...['７六歩(77)', '８四歩(83)', '２六歩(27)', '８五歩(84)', '７七角(88)', '３四歩(33)', '８八銀(79)', '３二金(41)', '７八金(69)', '７七角成(22)', '同　銀(88)', '４二銀(31)', '４八銀(39)', '７二銀(71)', '４六歩(47)'].map(
+          (m, i) => mv(i + 1, m),
+        ),
+        '',
+        '変化：13手',
+        mv(13, '３八銀(39)'),
+        mv(14, '７二銀(71)'),
+        mv(15, '２七銀(38)'),
+      ].join('\n');
+      await page.getByTestId('kif-bulk-input').fill(kif);
+      await page.getByTestId('kif-bulk-read').click();
+      await shot(page, size.name, 'import-template-row');
+      await page.getByTestId('kif-bulk-template').click();
+      await shot(page, size.name, 'import-template-pick');
+      await page.getByTestId('import-pick-new').click();
+      await page.getByTestId('import-create-group').fill('角換わり');
+      await shot(page, size.name, 'import-template-create');
+      await page.getByTestId('import-create-ok').scrollIntoViewIfNeeded();
+      await shot(page, size.name, 'import-template-create-bottom');
+      await page.getByTestId('import-create-ok').click();
+      await shot(page, size.name, 'import-template-chosen');
+      // 戦型を作らずに取り込み、定跡帳の ⋯ から登録する
+      await page.getByTestId('kif-bulk-template').click();
+      await page.getByTestId('import-pick-auto').click();
+      await page.getByTestId('kif-bulk-import').click();
+      await page.getByTestId('book-group-open').first().click();
+      for (let i = 0; i < 12; i++) await page.getByRole('button', { name: '1手進む' }).click();
+      await page.getByTestId('book-menu').click();
+      await page.getByTestId('book-register-template').click();
+      await page.getByTestId('template-group-input').fill('角換わり');
+      await shot(page, size.name, 'book-register-template');
+      await page.getByTestId('template-save').click();
+      await shot(page, size.name, 'book-registered');
+    });
   });
 }
