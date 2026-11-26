@@ -3,7 +3,7 @@
 // （service worker は別の場所への通信に触らないので、キャッシュされない。sw.ts）
 
 import { acceptLoginReturn, buildAuthUrl, parseLoginReturn, usableToken, type DriveToken } from './auth';
-import { driveClientId } from './config';
+import { GOOGLE_CLIENT_ID } from './config';
 
 const TOKEN_KEY = 'joban-tree.drive-token';
 const LOGIN_KEY = 'joban-tree.drive-login';
@@ -37,7 +37,7 @@ export function startLogin(): void {
   const bytes = crypto.getRandomValues(new Uint8Array(16));
   const state = [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
   write(LOGIN_KEY, JSON.stringify({ state, at: Date.now() }));
-  location.assign(buildAuthUrl(driveClientId(), redirectUri(), state));
+  location.assign(buildAuthUrl(GOOGLE_CLIENT_ID, redirectUri(), state));
 }
 
 /**
@@ -108,6 +108,7 @@ export async function checkDrive(): Promise<DriveCheck> {
   }
   if (res.status === 401) {
     forgetToken();
+    clearLoginNote(); // 開き直したときに「ログインできました」が残らないように
     return { ok: false, message: 'ログインの期限が切れました。もう一度ログインしてください。', loggedOut: true };
   }
   if (!res.ok) {

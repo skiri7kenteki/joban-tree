@@ -1,9 +1,7 @@
 // 設定の「データ」の中の Google ドライブの欄（段階22-3。今は**ログインの確認だけ**：研究のデータは読み書きしない）。
-// クライアント ID（src/drive/config.ts）が入るまで出さない。
 // iPhone のホーム画面のアプリでログインから戻れるかを、持ち主が実機で確かめてから、同期を作る
 
 import { useEffect, useState } from 'preact/hooks';
-import { driveClientId } from '../drive/config';
 import { checkDrive, clearLoginNote, currentToken, forgetToken, loginNote, startLogin } from '../drive/session';
 
 /** ホーム画面のアプリとして開いているか（実機の確かめで、どちらかを知るため） */
@@ -29,7 +27,6 @@ export function DriveSection() {
     if (note?.ok && token) void check();
   }, []);
 
-  if (!driveClientId()) return null;
   const minutes = token ? Math.floor((token.expiresAt - Date.now()) / 60_000) : 0;
   return (
     <div class="drive-box" data-testid="drive-section">
