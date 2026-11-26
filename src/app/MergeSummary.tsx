@@ -63,7 +63,7 @@ export function MergeSummary({ file, unknownKinds, result, when }: { file: Backu
       )}
       {result.shortened.length > 0 && (
         <div data-testid="merge-shortened">
-          <p>手順が短くなる研究手順（ほかの端末で手を消したもの）：</p>
+          <p>この端末の手が消える研究手順（ほかの端末で短くした・指し直したもの）：</p>
           <ul class="merge-removed">
             {result.shortened.map((s, i) => (
               <li key={i}>

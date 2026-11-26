@@ -12,7 +12,7 @@
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { Dialog } from '../components/Dialog';
 import { APP_VERSION } from '../components/Footer';
-import { currentBackup, hideNudgeUntil, lastBackupAt, loadSnapshot, markBackedUp, mergeFromBackup, nudgeHiddenUntilStored, readAllData, restoreFromBackup } from '../storage/backup';
+import { currentBackup, hideNudgeUntil, lastBackupAt, loadSnapshot, markBackedUp, mergeFromBackups, nudgeHiddenUntilStored, readAllData, restoreFromBackup } from '../storage/backup';
 import { mergeBackups, type MergeResult } from '../tree/merge';
 import { MergeSummary } from './MergeSummary';
 import { DriveSection } from './DriveSection';
@@ -177,7 +177,7 @@ export function DataSection() {
     }
     setBusy(true);
     try {
-      await mergeFromBackup(merging.file.data, APP_VERSION);
+      await mergeFromBackups([merging.file.data], APP_VERSION);
       try {
         sessionStorage.setItem(MERGED_NOTE_KEY, 'ほかの端末のバックアップを合わせました。');
       } catch {
@@ -353,7 +353,9 @@ function RestoreSummary({ pending }: { pending: Pending }) {
         今の研究手順・ツリー・復習と稽古の記録・戦型・実戦・設定は、全部このデータに置きかわります。
         {pending.fromSnapshot ? '今のデータは、また［戻す前のデータに戻す］で元に戻せます。' : '戻す前のデータは端末の中に取っておき、［戻す前のデータに戻す］で元に戻せます。'}
       </p>
-      <p class="muted">このあと、ほかの端末のバックアップを合わせると、相手にあるものはまた入ります。</p>
+      <p class="muted">
+        このあと同期やほかの端末と合わせると、相手にあるものはまた入り、名前やメモは後で直した方になります。消したものや短くした手順を戻した分は残ります。
+      </p>
     </div>
   );
 }

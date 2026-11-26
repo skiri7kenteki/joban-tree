@@ -23,6 +23,7 @@ import { fixStudiesOnStart } from './app/studyFix';
 import { askPersistIfData } from './storage/persist';
 import { GamesScreen } from './app/GamesScreen';
 import { GameScreen } from './app/GameScreen';
+import { SyncOverlay, syncing } from './app/syncing';
 
 function App() {
   const [isolation, setIsolation] = useState<IsolationState | 'checking'>('checking');
@@ -39,7 +40,8 @@ function App() {
   const tab = tabOf(r);
   return (
     <div class={tab ? 'app has-tabs' : 'app'} data-testid="isolation" data-state={isolation}>
-      <main class="main">
+      {/* 同期している間は、キーボードでも操作できないようにする */}
+      <main class="main" inert={syncing.value}>
         {r.name === 'home' && <HomeScreen key="studies" list="studies" isolationMessage={isolationMessage(isolation)} />}
         {r.name === 'trees' && <HomeScreen key="trees" list="trees" isolationMessage={isolationMessage(isolation)} />}
         {r.name === 'practice' && <PracticeScreen />}
@@ -63,6 +65,7 @@ function App() {
         {r.name === 'review' && r.studies && <StudyReviewScreen key={`tree/${r.id}`} target={{ kind: 'tree', treeId: r.id }} />}
       </main>
       {tab && <TabBar current={tab} />}
+      <SyncOverlay />
     </div>
   );
 }

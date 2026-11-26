@@ -9,6 +9,8 @@ const TOKEN_KEY = 'joban-tree.drive-token';
 const LOGIN_KEY = 'joban-tree.drive-login';
 /** 戻った直後に設定の画面で出す結果 */
 const NOTE_KEY = 'joban-tree.drive-note';
+/** ログインから戻ったら同期する（［Google ドライブで同期］を押してログインに移ったとき） */
+const PENDING_KEY = 'joban-tree.drive-sync-pending';
 
 const read = (key: string): string | null => {
   try {
@@ -31,9 +33,10 @@ export function redirectUri(): string {
   return new URL(import.meta.env.BASE_URL, location.origin).href;
 }
 
-/** Google のログインの画面へ移る */
+/** Google のログインの画面へ移る（戻ったら同期する） */
 export function startLogin(): void {
-  clearLoginNote();
+  clearDriveNote();
+  clearSyncPending();
   const bytes = crypto.getRandomValues(new Uint8Array(16));
   const state = [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
   write(LOGIN_KEY, JSON.stringify({ state, at: Date.now() }));
@@ -56,31 +59,53 @@ export function takeLoginReturn(): boolean {
     sent = null;
   }
   const result = acceptLoginReturn(r, sent, Date.now());
-  if (result.ok) write(TOKEN_KEY, JSON.stringify(result.token));
+  if (result.ok) {
+    write(TOKEN_KEY, JSON.stringify(result.token));
+    write(PENDING_KEY, String(Date.now()));
+  }
   // 送った印は 1 回で使い切る（このアプリのログインの戻りだったときは、失敗でも）
   if (sent && sent.state === r.state) write(LOGIN_KEY, null);
-  write(NOTE_KEY, JSON.stringify({ ...(result.ok ? { ok: true, message: 'ログインできました。' } : { ok: false, message: result.message }), at: Date.now() }));
+  if (!result.ok) saveDriveNote({ ok: false, message: result.message });
   return true;
 }
 
-/** 戻った結果を出しておく時間 */
+export interface DriveNote {
+  ok: boolean;
+  message: string;
+}
+
+/** 結果を出しておく時間 */
 const NOTE_MS = 2 * 60 * 1000;
 
+export function saveDriveNote(note: DriveNote, now = Date.now()): void {
+  write(NOTE_KEY, JSON.stringify({ ...note, at: now }));
+}
+
 /**
- * 戻った直後の結果。**読んでも消さない**：初めて開いたときは、準備（isolation）のためにアプリが 1 回読み込み直すので、
- * 消すと結果が出ないまま終わる。次に操作したとき（clearLoginNote）か、2 分たったら出さない
+ * ログインの戻り・同期の結果。**読んでも消さない**：ログインの直後や同期のあとはアプリが読み込み直すことがあり、
+ * 消すと結果が出ないまま終わる。次に操作したとき（clearDriveNote）か、2 分たったら出さない
  */
-export function loginNote(now = Date.now()): { ok: boolean; message: string } | null {
+export function driveNote(now = Date.now()): DriveNote | null {
   try {
-    const note = JSON.parse(read(NOTE_KEY) ?? 'null') as { ok: boolean; message: string; at: number } | null;
+    const note = JSON.parse(read(NOTE_KEY) ?? 'null') as (DriveNote & { at: number }) | null;
     return note && now - note.at < NOTE_MS ? { ok: note.ok, message: note.message } : null;
   } catch {
     return null;
   }
 }
 
-export function clearLoginNote(): void {
+export function clearDriveNote(): void {
   write(NOTE_KEY, null);
+}
+
+/** ログインから戻って、まだ同期が終わっていない（途中で読み込み直しても、もう一度同期する） */
+export function syncPending(now = Date.now()): boolean {
+  const at = Number(read(PENDING_KEY));
+  return at > 0 && now - at < NOTE_MS;
+}
+
+export function clearSyncPending(): void {
+  write(PENDING_KEY, null);
 }
 
 export function currentToken(now = Date.now()): DriveToken | null {
@@ -89,35 +114,4 @@ export function currentToken(now = Date.now()): DriveToken | null {
 
 export function forgetToken(): void {
   write(TOKEN_KEY, null);
-}
-
-export type DriveCheck = { ok: true; files: number } | { ok: false; message: string; loggedOut?: boolean };
-
-/** ドライブに届くかを確かめる（このアプリ専用の場所の一覧を読むだけ。何も書かない・研究のデータは送らない） */
-export async function checkDrive(): Promise<DriveCheck> {
-  const t = currentToken();
-  if (!t) return { ok: false, message: 'ログインの期限が切れました。もう一度ログインしてください。', loggedOut: true };
-  let res: Response;
-  try {
-    res = await fetch('https://www.googleapis.com/drive/v3/files?spaces=appDataFolder&fields=files(id)&pageSize=100', {
-      headers: { Authorization: `Bearer ${t.token}` },
-      cache: 'no-store',
-    });
-  } catch {
-    return { ok: false, message: 'Google ドライブにつながりませんでした。ネットにつながっているか確かめてください。' };
-  }
-  if (res.status === 401) {
-    forgetToken();
-    clearLoginNote(); // 開き直したときに「ログインできました」が残らないように
-    return { ok: false, message: 'ログインの期限が切れました。もう一度ログインしてください。', loggedOut: true };
-  }
-  if (!res.ok) {
-    return { ok: false, message: `Google ドライブが使えませんでした（${res.status}）。Google Cloud で「Google Drive API」を有効にしたか確かめてください。` };
-  }
-  try {
-    const body = (await res.json()) as { files?: unknown };
-    return Array.isArray(body.files) ? { ok: true, files: body.files.length } : { ok: false, message: 'Google ドライブの返事が読めませんでした。' };
-  } catch {
-    return { ok: false, message: 'Google ドライブの返事が読めませんでした。' };
-  }
 }

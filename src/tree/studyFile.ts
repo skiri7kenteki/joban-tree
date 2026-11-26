@@ -47,6 +47,11 @@ const isObject = (v: unknown): v is { [k: string]: unknown } => typeof v === 'ob
 const isString = (v: unknown): v is string => typeof v === 'string';
 const isNumber = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 
+/** 手を消した記録 1 件の形 */
+function isCut(c: unknown): boolean {
+  return isObject(c) && isNumber(c.at) && isNumber(c.keep) && c.keep >= 0 && Array.isArray(c.from) && c.from.length <= 2000 && c.from.every((x) => isString(x) && x.length <= 8);
+}
+
 /** 研究手順 1 本の形と手順を確かめる。問題が無ければ null、あれば理由 */
 export function checkStudy(s: unknown): string | null {
   if (!isObject(s)) return '形';
@@ -56,8 +61,8 @@ export function checkStudy(s: unknown): string | null {
   if (s.mySide !== 'black' && s.mySide !== 'white') return '自分の側';
   if (s.templateId !== undefined && (!isString(s.templateId) || s.templateId.length > 200)) return '戦型';
   if (!isNumber(s.createdAt) || !isNumber(s.updatedAt)) return '日付';
-  if ([s.movesAt, s.cutAt, s.noteAt, s.restoredAt].some((t) => t !== undefined && !isNumber(t))) return '日付';
-  if (s.cutFrom !== undefined && (!Array.isArray(s.cutFrom) || s.cutFrom.length > 2000 || !s.cutFrom.every(isString))) return '消した手順';
+  if ([s.movesAt, s.noteAt, s.restoredAt].some((t) => t !== undefined && !isNumber(t))) return '日付';
+  if (s.cuts !== undefined && !(Array.isArray(s.cuts) && s.cuts.length <= 100 && s.cuts.every(isCut))) return '消した手順';
   if (!Array.isArray(s.moves) || s.moves.length === 0 || !s.moves.every(isString)) return '手順';
   const line = templateLine(s.moves as string[]);
   if (!line.ok) return `${line.index + 1} 手目が指せません`;

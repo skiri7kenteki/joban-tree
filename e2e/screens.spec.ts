@@ -190,6 +190,12 @@ for (const size of SIZES) {
       // 段階22-3：Google ドライブの欄
       await page.getByTestId('drive-section').scrollIntoViewIfNeeded();
       await shot(page, size.name, 'settings-drive');
+      // 前の同期から 1 日以上の一言（定跡帳のタブ）
+      await page.evaluate(() => localStorage.setItem('joban-tree.last-sync', String(Date.now() - 2 * 24 * 60 * 60 * 1000)));
+      await page.goto('./#/');
+      await page.reload();
+      await expect(page.getByTestId('sync-nudge')).toBeVisible();
+      await shot(page, size.name, 'sync-nudge');
     });
   });
 }

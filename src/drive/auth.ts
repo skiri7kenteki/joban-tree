@@ -51,7 +51,7 @@ export type LoginResult = { ok: true; token: DriveToken } | { ok: false; message
 /** 戻りを受け付けるか。sent は、ログインの画面へ行くときに覚えた印 */
 export function acceptLoginReturn(r: LoginReturn, sent: { state: string; at: number } | null, now: number): LoginResult {
   if (!sent || sent.state !== r.state || now - sent.at > LOGIN_WAIT_MS) {
-    return { ok: false, message: 'このアプリから始めたログインか確かめられませんでした。もう一度［Google にログインして確かめる］を押してください。' };
+    return { ok: false, message: 'このアプリから始めたログインか確かめられませんでした。もう一度［Google ドライブで同期］を押してください。' };
   }
   if (r.error === 'access_denied') return { ok: false, message: 'ログイン（または許可）が取りやめられました。' };
   if (r.error) return { ok: false, message: `Google からエラーが返りました（${r.error}）。` };

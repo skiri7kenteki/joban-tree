@@ -96,6 +96,13 @@ export interface TreeSource {
   finishedAt: number;
 }
 
+/** 手を消した記録 1 件：from の手順を、先頭の keep 手を残して消した（消した形は「keep 手より長い、from の途中まで」） */
+export interface StudyCut {
+  at: number;
+  keep: number;
+  from: string[];
+}
+
 /**
  * 研究手順（段階8-1〜。ツリーから独立したデータ。IndexedDB の studies に保存する。src/tree/studies.ts）。
  * 手順は**平手の初期局面からの**指し手（USI）の並び。同じ手順（moves がまったく同じ）は 1 つだけにする
@@ -115,10 +122,11 @@ export interface Study {
   updatedAt: number;
   /** 手順を最後に変えた日時（段階22-2。端末どうしで合わせるときに使う。無ければ updatedAt。`src/tree/deleted.ts`） */
   movesAt?: number;
-  /** 手を最後に消した（短くした）日時（段階22-2。合わせるとき短い方の手順が勝つのは、これが相手の手の変更より新しいときだけ） */
-  cutAt?: number;
-  /** 手を消したときに見ていた手順（消す前の手順。段階22-2。この中に入る手だけが消える） */
-  cutFrom?: string[];
+  /**
+   * 手を消した記録（段階22-2・22-3。短くした・指し直したときに 1 件ずつ足す。`src/tree/deleted.ts`）。
+   * 合わせるとき、この記録が消した手の形は、ほかの端末に残っていても使わない
+   */
+  cuts?: StudyCut[];
   /** メモを最後に変えた日時（段階22-2。無ければ、メモがあるとき updatedAt） */
   noteAt?: number;
   /** 取り消し・戻すで復活させた日時（段階22-2。消した記録より勝つ。並び順には使わない） */

@@ -20,17 +20,19 @@ import {
   candidateDeletionId,
   contentTime,
   deletionHits,
+  isCutAway,
   isHeadOf,
   movesTime,
   noteTime,
   sameList,
   storedTable,
+  unionCuts,
   unionDeleted,
   type DeletedKind,
   type DeletedRecord,
 } from './deleted';
 import type { PositionNote } from './positions';
-import type { Study, TreeData } from './types';
+import type { Study, StudyCut, TreeData } from './types';
 
 /** 種類ごとの、この端末で変わる数 */
 export interface MergeCount {
@@ -49,7 +51,7 @@ export interface MergeResult {
   removedStudies: string[];
   /** 別々に枝分かれしていたので両方残した数 */
   split: number;
-  /** この端末で手順が短くなる研究手順（ほかの端末で手を消した） */
+  /** この端末の手が消える研究手順（ほかの端末で短くした・指し直した）。from・to は手数 */
   shortened: { name: string; from: number; to: number }[];
 }
 
@@ -86,48 +88,62 @@ function renameStudy(side: Side_, from: Study, to: string): void {
   side.practice = side.practice.map((p) => (p.studyId === from.id ? { ...p, studyId: to } : p));
 }
 
+/**
+ * 同じ id の版から、残る手順の枝の先（1 本なら枝分かれしていない）。
+ * どれかの版の「手を消した記録」が消した形は除いて、ほかの手順の途中までのものは、その手順に含まれる
+ */
+function leavesOf(copies: readonly Study[]): string[][] {
+  const lines = new Map(aliveOf(copies).map((s) => [s.moves.join(' '), s.moves]));
+  const all = [...lines.values()];
+  return all
+    .filter((a) => !all.some((b) => b.length > a.length && isHeadOf(a, b)))
+    .sort((a, b) => a.join(' ').localeCompare(b.join(' ')));
+}
+
+/** 消した形でない版（全部消した形なら、消さずに全部使う） */
+function aliveOf(copies: readonly Study[]): readonly Study[] {
+  const cuts = unionCuts(...copies.map((s) => s.cuts));
+  const alive = copies.filter((s) => !isCutAway(s, cuts));
+  return alive.length > 0 ? alive : copies;
+}
+
 /** 同じ id が別々に枝分かれしていたら、片方に別の id を付ける。付け替えた数を返す */
-function splitDiverged(a: Side_, b: Side_): number {
+function splitDiverged(sides: readonly Side_[]): number {
   let split = 0;
-  for (let again = true; again; ) {
-    again = false;
-    for (const x of a.studies) {
-      const y = b.studies.find((s) => s.id === x.id);
-      if (!y || isHeadOf(x.moves, y.moves) || isHeadOf(y.moves, x.moves)) continue;
-      // 分かれた最初の手で、どちらに新しい id を付けるか決める（後で手が延びても変わらない）
-      let at = 0;
-      while (x.moves[at] === y.moves[at]) at++;
-      const moveX = x.moves[at];
-      const loser = moveX > y.moves[at] ? { side: a, study: x } : { side: b, study: y };
-      const branch = loser.study.moves.slice(0, at + 1).join(' ');
-      let id = `${x.id.slice(0, 60)}-x${mark(branch)}`;
-      // その id が、どちらかの端末で続きでない研究手順に使われていたら、別の id にする（同じ id になると 1 本が消える）
-      // （改名する側にすでにある id は、続きの手順でも使わない。1 本にまとまると、片方の名前とメモが消える）
-      const other = loser.side === a ? b : a;
-      const taken = (to: string) =>
-        loser.side.studies.some((s) => s.id === to) || other.studies.some((s) => s.id === to && !isHeadOf(s.moves, loser.study.moves) && !isHeadOf(loser.study.moves, s.moves));
-      while (taken(id)) id = `${id.slice(0, 68)}-y${mark(`${id} ${branch}`)}`;
-      renameStudy(loser.side, loser.study, id);
-      split++;
-      again = true;
-      break;
-    }
-  }
+  while (splitOne(sides)) split++;
   return split;
 }
 
 /**
- * 手順の勝つ方。長さが違えば（短い方は長い方の途中まで）長い方。
- * 短い方が勝つのは、長い方の手が全部「消したときに見ていた手順」（cutFrom）の中で、消した日時が長い方の手の変更より新しいときだけ
- * （見ていない手は消さない）
+ * 枝分かれを 1 つ見つけて、片方の id を付け替える（無ければ false）。
+ * 全部の端末の版をまとめて見るので、読む順で結果が変わらない
  */
-function winningMoves(a: Study, b: Study, content: Study): Study {
-  if (a.moves.length === b.moves.length) {
-    const diff = movesTime(a) - movesTime(b);
-    return diff > 0 ? a : diff < 0 ? b : content;
+function splitOne(sides: readonly Side_[]): boolean {
+  const ids = [...new Set(sides.flatMap((side) => side.studies.map((s) => s.id)))].sort();
+  for (const id of ids) {
+    const copies = sides.flatMap((side) => side.studies.filter((s) => s.id === id).map((study) => ({ side, study })));
+    const [keep, other] = leavesOf(copies.map((c) => c.study));
+    if (!other) continue;
+    // 手を消した記録は、分かれた両方に持たせる（分けた後も、消した形が戻らないように）
+    const cuts = unionCuts(...copies.map((c) => c.study.cuts));
+    for (const c of copies) {
+      if (cuts.length === 0) break;
+      c.study = { ...c.study, cuts };
+      c.side.studies = c.side.studies.map((s) => (s.id === id ? c.study : s));
+    }
+    // 分かれた最初の手から、新しい id を決める（後で手が延びても変わらない）
+    let at = 0;
+    while (keep[at] === other[at]) at++;
+    const branch = other.slice(0, at + 1).join(' ');
+    const alive = aliveOf(copies.map((c) => c.study));
+    const moving = copies.filter((c) => alive.includes(c.study) && isHeadOf(c.study.moves, other) && !isHeadOf(c.study.moves, keep));
+    let next = `${id.slice(0, 60)}-x${mark(branch)}`;
+    // 改名する側にすでにある id は使わない（1 本にまとまると、片方の名前とメモが消える）
+    while (moving.some((c) => c.side.studies.some((s) => s.id === next))) next = `${next.slice(0, 68)}-y${mark(`${next} ${branch}`)}`;
+    for (const c of moving) renameStudy(c.side, c.study, next);
+    return true;
   }
-  const [long, short] = a.moves.length > b.moves.length ? [a, b] : [b, a];
-  return short.cutAt !== undefined && short.cutFrom && isHeadOf(long.moves, short.cutFrom) && short.cutAt > movesTime(long) ? short : long;
+  return false;
 }
 
 /** メモの勝つ方：後でメモを直した方。日時が同じなら、もう片方を含む方 */
@@ -141,25 +157,43 @@ function winningNote(a: Study, b: Study, content: Study): Study {
   return content;
 }
 
-/** 同じ研究手順の 2 つの版を 1 つに（id は a のもの） */
-function joinStudy(a: Study, b: Study): Study {
+/** 手順の他（名前・メモ・日時）を 1 つに（id は a のもの） */
+function joinMeta(a: Study, b: Study): Study {
   const content = newer(a, b, contentTime);
-  const moved = winningMoves(a, b, content);
-  const out: Study = { ...content, id: a.id, moves: [...moved.moves], createdAt: Math.min(a.createdAt, b.createdAt) };
-  if (!sameList(a.moves, b.moves) || a.movesAt !== undefined || b.movesAt !== undefined) out.movesAt = movesTime(moved);
-  if (moved.cutAt !== undefined && moved.cutFrom) {
-    out.cutAt = moved.cutAt;
-    out.cutFrom = [...moved.cutFrom];
-  } else {
-    delete out.cutAt;
-    delete out.cutFrom;
-  }
+  const out: Study = { ...content, id: a.id, createdAt: Math.min(a.createdAt, b.createdAt) };
   const noted = winningNote(a, b, content);
   out.note = noted.note;
   if (a.note !== b.note || a.noteAt !== undefined || b.noteAt !== undefined) out.noteAt = noteTime(noted);
   const restored = Math.max(a.restoredAt ?? 0, b.restoredAt ?? 0);
   if (restored > 0) out.restoredAt = restored;
   return out;
+}
+
+/** out の手順・手を変えた日時・手を消した記録を入れる。versions のどれかに日時があるか、手が違うときだけ日時を書く */
+function withMoves(out: Study, versions: readonly Study[], moves: string[], time: number, cuts: StudyCut[]): Study {
+  const next: Study = { ...out, moves: [...moves] };
+  if (versions.some((s) => s.movesAt !== undefined || !sameList(s.moves, moves))) next.movesAt = time;
+  if (cuts.length > 0) next.cuts = cuts;
+  else delete next.cuts;
+  return next;
+}
+
+/** 同じ id の版（枝分かれを分けた後）を 1 本に：手順は、消した形を除いた中でいちばん長いもの */
+function joinVersions(copies: readonly Study[]): Study {
+  if (copies.length === 1) return copies[0];
+  const alive = aliveOf(copies);
+  const length = Math.max(...alive.map((s) => s.moves.length));
+  const longest = alive.filter((s) => s.moves.length === length);
+  const meta = copies.reduce(joinMeta);
+  return withMoves(meta, copies, longest[0].moves, Math.max(...longest.map(movesTime)), unionCuts(...copies.map((s) => s.cuts)));
+}
+
+/**
+ * 手順が同じで id の違う 2 本を 1 本に（keeper の id）。
+ * **手を消した記録は keeper のものだけ**（別の id の記録を移すと、消していない研究手順の手が消える）
+ */
+function joinTwins(keeper: Study, other: Study): Study {
+  return withMoves(joinMeta(keeper, other), [keeper, other], keeper.moves, Math.max(movesTime(keeper), movesTime(other)), unionCuts(keeper.cuts));
 }
 
 /** つないだメモの区切り */
@@ -178,20 +212,17 @@ function bothNotes(a: string, b: string): string {
 /** 研究手順のメモの長さの上限（取り込みの確かめと同じ） */
 const NOTE_LIMIT = 20000;
 
-function mergeStudies(local: Side_, incoming: Side_, deleted: readonly DeletedRecord[]) {
-  const split = splitDiverged(local, incoming);
-  const hereIds = new Set(local.studies.map((s) => s.id));
-  const thereIds = new Set(incoming.studies.map((s) => s.id));
-  /** どちらかの端末に、元から両方ある */
-  const together = (x: string, y: string) => (hereIds.has(x) && hereIds.has(y)) || (thereIds.has(x) && thereIds.has(y));
-  // 同じ id を 1 本に
-  const byId = new Map<string, Study>();
-  for (const s of [...local.studies, ...incoming.studies]) {
-    const old = byId.get(s.id);
-    byId.set(s.id, old ? joinStudy(old, s) : s);
-  }
+function mergeStudies(sides: readonly Side_[], deleted: readonly DeletedRecord[]) {
+  const split = splitDiverged(sides);
+  const idSets = sides.map((side) => new Set(side.studies.map((s) => s.id)));
+  /** どれかの端末に、元から両方ある */
+  const together = (x: string, y: string) => idSets.some((ids) => ids.has(x) && ids.has(y));
+  const originals = sides.flatMap((side) => side.studies);
+  // 同じ id を 1 本に（分けた後の中身で）
+  const versions = new Map<string, Study[]>();
+  for (const s of sides.flatMap((side) => side.studies)) versions.set(s.id, [...(versions.get(s.id) ?? []), s]);
+  const byId = new Map([...versions].map(([id, list]) => [id, joinVersions(list)]));
   // 消した記録を当てる（手順でまとめる前に。まとめた後だと、消した方の記録が、残した方まで消す）
-  const originals = [...local.studies, ...incoming.studies];
   const sigOf = (s: Study) => `${s.mySide} ${s.moves.join(' ')}`;
   /** どちらかの端末に、同じ手順の別の研究手順が一緒にある（「両方残す」。id が違う記録では消さない） */
   const hasTwin = (s: Study) => originals.some((x) => x.id !== s.id && together(x.id, s.id) && sigOf(x) === sigOf(s));
@@ -210,7 +241,7 @@ function mergeStudies(local: Side_, incoming: Side_, deleted: readonly DeletedRe
     else {
       const note = bothNotes(keeper.study.note, s.note);
       const noted = Math.max(noteTime(keeper.study), noteTime(s));
-      keeper.study = { ...joinStudy(keeper.study, s), note, ...(noted > 0 ? { noteAt: noted } : {}) };
+      keeper.study = { ...joinTwins(keeper.study, s), note, ...(noted > 0 ? { noteAt: noted } : {}) };
       keeper.ids.push(s.id);
       idMap.set(s.id, keeper.study.id);
     }
@@ -258,7 +289,7 @@ function joinPosition(a: PositionNote | undefined, b: PositionNote | undefined, 
 
 /** 印（日時）を除いた中身（「新しくする」に数えるかどうか） */
 function body(x: unknown): string {
-  const marks = new Set(['movesAt', 'cutAt', 'cutFrom', 'restoredAt', 'renamedAt', 'updatedAt', 'noteAt', 'at']);
+  const marks = new Set(['movesAt', 'cuts', 'restoredAt', 'renamedAt', 'updatedAt', 'noteAt', 'at']);
   const walk = (v: unknown): unknown => {
     if (Array.isArray(v)) return v.map(walk);
     if (typeof v !== 'object' || v === null) return v;
@@ -308,28 +339,40 @@ function mergeTrees(a: readonly TreeData[], b: readonly TreeData[], deletedAt: (
 
 /** local（この端末）に incoming（ほかの端末のバックアップ）を合わせる */
 export function mergeBackups(local: BackupData, incoming: BackupData): MergeResult {
-  const deleted = unionDeleted(local.deleted, incoming.deleted);
+  return mergeAll(local, [incoming]);
+}
+
+/**
+ * local（この端末）に、ほかの端末の中身を何台分でも一度に合わせる（段階22-3 の同期）。
+ * 1 台ずつ順に合わせないのは、先に入った相手の研究が「この端末に元からある」扱いになって、読む順で結果が変わるため
+ */
+export function mergeAll(local: BackupData, others: readonly BackupData[]): MergeResult {
+  const deleted = others.reduce((all, o) => unionDeleted(all, o.deleted), unionDeleted(local.deleted, []));
+  const sources = [local, ...others];
   /** その種類・id を消した、いちばん新しい日時（消していなければ 0） */
   const lastDeleted = new Map<string, number>();
   for (const d of deleted) lastDeleted.set(`${d.kind} ${d.id}`, Math.max(d.at, lastDeleted.get(`${d.kind} ${d.id}`) ?? 0));
   const deletedAt = (kind: DeletedKind, id: string) => lastDeleted.get(`${kind} ${id}`) ?? 0;
 
-  const here: Side_ = { studies: [...local.studies], practice: [...local.practice], deleted: local.deleted };
-  const there: Side_ = { studies: [...incoming.studies], practice: [...incoming.practice], deleted: incoming.deleted };
-  const merged = mergeStudies(here, there, deleted);
+  const sides: Side_[] = sources.map((d) => ({ studies: [...d.studies], practice: [...d.practice], deleted: d.deleted }));
+  const here = sides[0];
+  const merged = mergeStudies(sides, deleted);
   const finalId = (id: string) => merged.idMap.get(id) ?? id;
 
   const practice = new Map<string, PracticeRecord>();
-  for (const p of [...here.practice, ...there.practice]) {
+  for (const p of sides.flatMap((side) => side.practice)) {
     const next = { ...p, studyId: finalId(p.studyId) };
     const old = practice.get(next.studyId);
     practice.set(next.studyId, old ? { ...newer(old, next, (r) => r.lastAt), firstAt: Math.min(old.firstAt, next.firstAt) } : next);
   }
 
   const positionsA = keyed(local.positions, (p) => p.id);
-  const positionsB = keyed(incoming.positions, (p) => p.id);
-  const positions = [...new Set([...positionsA.keys(), ...positionsB.keys()])]
-    .map((id) => joinPosition(positionsA.get(id), positionsB.get(id), deletedAt))
+  const positionMaps = sources.map((d) => keyed(d.positions, (p) => p.id));
+  const positions = [...new Set(positionMaps.flatMap((map) => [...map.keys()]))]
+    .map((id) => {
+      const [first, second, ...rest] = positionMaps.flatMap((map) => map.get(id) ?? []);
+      return rest.reduce<PositionNote | null>((acc, p) => joinPosition(acc ?? undefined, p, deletedAt), joinPosition(first, second, deletedAt));
+    })
     .filter((p): p is PositionNote => p !== null);
 
   /** id ごとに新しい方。消した記録の方が新しければ消す */
@@ -341,19 +384,20 @@ export function mergeBackups(local: BackupData, incoming: BackupData): MergeResu
     }
     return [...map.values()].filter((x) => !(deletedAt(kind, x.id) > time(x)));
   };
-  const trees = mergeTrees(local.trees, incoming.trees, (id) => deletedAt('tree', id));
-  const templates = byId<BackupTemplate>('template', local.templates, incoming.templates, contentTime);
+  const theirs = <T,>(list: (d: BackupData) => readonly T[]) => others.flatMap(list);
+  const trees = mergeTrees(local.trees, theirs((d) => d.trees), (id) => deletedAt('tree', id));
+  const templates = byId<BackupTemplate>('template', local.templates, theirs((d) => d.templates), contentTime);
   const gameTimeOf = (g: Game) => Math.max(g.updatedAt ?? g.addedAt, g.restoredAt ?? 0);
   // 同じ中身の実戦は 1 局（先に貼った方の id）
   const games: Game[] = [];
-  for (const g of byId<Game>('game', local.games, incoming.games, gameTimeOf).sort((a, b) => a.addedAt - b.addedAt || a.id.localeCompare(b.id))) {
+  for (const g of byId<Game>('game', local.games, theirs((d) => d.games), gameTimeOf).sort((a, b) => a.addedAt - b.addedAt || a.id.localeCompare(b.id))) {
     const i = games.findIndex((x) => sameGame(x, g));
     if (i < 0) games.push(g);
     else games[i] = { ...newer(games[i], g, gameTimeOf), id: games[i].id, addedAt: games[i].addedAt };
   }
 
   const reviewMap = new Map<string, ReviewRecord>();
-  for (const r of [...local.reviews, ...incoming.reviews]) {
+  for (const r of sources.flatMap((d) => d.reviews)) {
     const old = reviewMap.get(r.treeId);
     const nodes = { ...(old?.nodes ?? {}) };
     for (const [key, n] of Object.entries(r.nodes)) nodes[key] = nodes[key] ? newer(nodes[key], n, (x) => x.lastAt) : n;
@@ -397,7 +441,7 @@ export function mergeBackups(local: BackupData, incoming: BackupData): MergeResu
   const removedStudies = [...localStudies].filter(([id]) => !studiesAfter.has(id)).map(([, s]) => s.name);
   const shortened = [...localStudies].flatMap(([id, before]) => {
     const after = studiesAfter.get(id);
-    return after && after.moves.length < before.moves.length ? [{ name: after.name, from: before.moves.length, to: after.moves.length }] : [];
+    return after && !isHeadOf(before.moves, after.moves) ? [{ name: after.name, from: before.moves.length, to: after.moves.length }] : [];
   });
   return { data, summary, removedStudies, split: merged.split, shortened };
 }

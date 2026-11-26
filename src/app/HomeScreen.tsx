@@ -57,6 +57,7 @@ import { BasicStudiesDialog } from './BasicStudiesDialog';
 import { ensureStudies, homeNotice, importLiftedStudies, library, removeStudy, saveStudies, updateStudyFields } from './studies';
 import { Words } from '../components/Words';
 import { BackupNudge } from './DataSection';
+import { SyncNudge } from './DriveSection';
 import { ConflictNotice } from './ConflictNotice';
 
 export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'trees'; isolationMessage: string | null }) {
@@ -257,6 +258,7 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
         <span class="spacer" />
       </div>
       {isolationMessage && <p class="notice notice-danger">{isolationMessage}</p>}
+      {tab === 'studies' && studies && <SyncNudge />}
       {tab === 'studies' && studies && <BackupNudge studies={studies} />}
       {tab === 'studies' && studies && studyCount > 0 && <StudySummary summary={practiceSummary} />}
       {tab === 'studies' && studies && studyCount > 1 && <ConflictNotice studies={studies} />}

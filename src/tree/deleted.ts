@@ -11,7 +11,7 @@ import type { Side } from '../shogi/position';
 import type { BackupData } from './backupFile';
 import type { Candidate } from './candidates';
 import type { PositionNote } from './positions';
-import type { Study } from './types';
+import type { Study, StudyCut } from './types';
 
 export const DELETED_KINDS = ['study', 'game', 'template', 'tree', 'review', 'note', 'candidate'] as const;
 export type DeletedKind = (typeof DELETED_KINDS)[number];
@@ -60,6 +60,26 @@ export function movesTime(s: Study): number {
   return s.movesAt ?? s.updatedAt;
 }
 
+/** 覚えておく「手を消した記録」の数（超えたら古いものから忘れる。忘れた分は、消した手が戻る側に倒れる） */
+const CUT_MAX = 40;
+
+/** s の手は、記録 cuts のどれかが消した形か（消した方が、s がその手になったより後のときだけ） */
+export function isCutAway(s: Study, cuts: readonly StudyCut[]): boolean {
+  return cuts.some((c) => s.moves.length > c.keep && isHeadOf(s.moves, c.from) && c.at > movesTime(s));
+}
+
+/** 手を消した記録を合わせる（ほかの記録が消す形に含まれるものは省く。どの順で合わせても同じになる） */
+export function unionCuts(...lists: (readonly StudyCut[] | undefined)[]): StudyCut[] {
+  const all = lists.flatMap((list) => list ?? []);
+  const text = (c: StudyCut) => c.from.join(' ');
+  all.sort((a, b) => b.at - a.at || b.from.length - a.from.length || a.keep - b.keep || text(a).localeCompare(text(b)));
+  const out: StudyCut[] = [];
+  for (const c of all) {
+    if (!out.some((k) => k.at >= c.at && k.keep <= c.keep && isHeadOf(c.from, k.from))) out.push(c);
+  }
+  return out.slice(0, CUT_MAX);
+}
+
 /** メモを最後に変えた日時（分からなければ、メモがあるとき直した日時） */
 export function noteTime(s: Study): number {
   return s.noteAt ?? (s.note === '' ? 0 : s.updatedAt);
@@ -68,7 +88,7 @@ export function noteTime(s: Study): number {
 /**
  * 研究手順を保存するときの印。prev：保存してある前の版、revived：消した記録があるものをもう一度保存する。
  *   - 手が変われば movesAt＝今。変わらなければ前の日時を覚えておく（名前を直した日時を手の日時にしないため）
- *   - 手が短くなれば（この手から先を消す・ここで終わりにする・取り消し）cutAt＝今、cutFrom＝消す前の手順（続けて短くしたら、最初に見ていた長い方のまま）
+ *   - 手が減る・変わる（この手から先を消す・ここで終わりにする・取り消し・置き換え）→ 手を消した記録を 1 件足す（残した手数と、消す前の手順）
  *   - メモが変われば noteAt＝今。変わらなければ前の日時を覚えておく
  *   - 直した日時が前より古い（取り消し・古いファイルで置き換え）・消したものが戻る → restoredAt＝今
  */
@@ -76,17 +96,15 @@ export function stampStudy(prev: Study | undefined, next: Study, revived: boolea
   const out: Study = { ...next };
   if (prev) {
     out.movesAt = sameList(prev.moves, next.moves) ? movesTime(prev) : now;
-    // 手が短くなった（この手から先を消す・ここで終わりにする・取り消し）
-    if (next.moves.length < prev.moves.length && isHeadOf(next.moves, prev.moves)) {
-      out.cutAt = now;
-      out.cutFrom = [...(prev.cutFrom && isHeadOf(prev.moves, prev.cutFrom) ? prev.cutFrom : prev.moves)];
-    } else if (prev.cutAt !== undefined && prev.cutFrom) {
-      out.cutAt = prev.cutAt;
-      out.cutFrom = [...prev.cutFrom];
-    } else {
-      delete out.cutAt;
-      delete out.cutFrom;
+    // 前の手順の途中が消える（短くする・指し直す）
+    let cuts = unionCuts(prev.cuts);
+    if (!isHeadOf(prev.moves, next.moves)) {
+      let keep = 0;
+      while (keep < next.moves.length && prev.moves[keep] === next.moves[keep]) keep++;
+      cuts = unionCuts(cuts, [{ at: now, keep, from: [...prev.moves] }]);
     }
+    if (cuts.length > 0) out.cuts = cuts;
+    else delete out.cuts;
     const noted = prev.note !== next.note ? now : noteTime(prev);
     if (noted > 0) out.noteAt = noted;
     const kept = Math.max(prev.restoredAt ?? 0, next.restoredAt ?? 0);
@@ -141,9 +159,10 @@ export function stampPosition(prev: PositionNote | undefined, next: PositionNote
 
 /**
  * 戻す（全部置きかえ・戻す前のデータに戻す）中身。消した記録のあるものを戻すときは、戻した日時を付けて、その記録を消す
- * （次に合わせたときに、また消されないように）。deleted：今の端末と、戻すファイルの消した記録
+ * （次に合わせたときに、また消されないように）。deleted：今の端末と、戻すファイルの消した記録。
+ * current：今の端末の研究手順。短くする・指し直す前の手順に戻るものには手を変えた日時を付けて、その記録より勝つようにする
  */
-export function reviveForRestore(data: BackupData, deleted: readonly DeletedRecord[], now: number): BackupData {
+export function reviveForRestore(data: BackupData, deleted: readonly DeletedRecord[], now: number, current: readonly Study[] = []): BackupData {
   const used = new Set<DeletedRecord>();
   const take = (hit: (d: DeletedRecord) => boolean): boolean => {
     const found = deleted.filter(hit);
@@ -154,7 +173,14 @@ export function reviveForRestore(data: BackupData, deleted: readonly DeletedReco
     // 前の版で取っておいた「戻す前のデータ」には、後から足した種類の欄が無い（空として扱う）
     (list ?? []).map((x) => (take((d) => d.kind === kind && d.id === x.id) ? { ...x, restoredAt: now } : x));
 
-  const studies = data.studies.map((s) => (take((d) => d.kind === 'study' && (d.id === s.id || deletionHits(d, s))) ? { ...s, restoredAt: now } : s));
+  const nowMoves = new Map(current.map((s) => [s.id, s.moves]));
+  const studies = data.studies.map((s) => {
+    const revived = take((d) => d.kind === 'study' && (d.id === s.id || deletionHits(d, s)));
+    const moves = nowMoves.get(s.id);
+    // 今の手順の途中まで（同じも含む）でなければ、戻すと手が増えるか変わる。今は無くても、消した記録のある id は同じ扱い
+    const back = revived || (moves !== undefined ? !isHeadOf(s.moves, moves) : deleted.some((d) => d.kind === 'study' && d.id === s.id));
+    return { ...s, ...(revived ? { restoredAt: now } : {}), ...(back ? { movesAt: now } : {}) };
+  });
   const positions = (data.positions ?? []).map((stored) => {
     // 前の版の「このままでよい」の手に消した記録があれば、候補の表の形にして日時を付けられるようにする
     const old = !stored.candidates && (stored.okMoves ?? []).some((move) => deleted.some((d) => d.kind === 'candidate' && d.id === candidateDeletionId(stored.id, move)));

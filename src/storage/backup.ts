@@ -13,9 +13,10 @@ import type { Game } from '../games/game';
 import type { PracticeRecord } from '../practice/practice';
 import type { PositionNote } from '../tree/positions';
 import { reviveForRestore, unionDeleted } from '../tree/deleted';
-import { changesNothing, mergeBackups } from '../tree/merge';
+import { changesNothing, mergeAll, type MergeResult } from '../tree/merge';
 import { GAMES, POSITIONS, PRACTICE, REVIEW, STUDIES, TEMPLATES, TREES, done, finished, openDb } from './db';
 import { readDeleted, writeDeleted } from './deleted';
+import { forgetSyncMemory } from '../drive/state';
 
 const LAST_BACKUP_KEY = 'joban-tree.last-backup';
 const NUDGE_HIDDEN_KEY = 'joban-tree.backup-nudge-hidden-until';
@@ -78,19 +79,22 @@ export async function writeAllData(data: BackupData): Promise<void> {
 export async function restoreFromBackup(data: BackupData, appVersion: string): Promise<void> {
   const current = await currentBackup(appVersion);
   await saveSnapshot(current);
-  await writeAllData(reviveForRestore(data, unionDeleted(current.data.deleted, data.deleted ?? []), Date.now()));
+  // 同期（段階22-3）：次はドライブのファイルを全部読み直してから送る
+  forgetSyncMemory();
+  await writeAllData(reviveForRestore(data, unionDeleted(current.data.deleted, data.deleted ?? []), Date.now(), current.data.studies));
 }
 
 /**
- * ほかの端末のバックアップを合わせる（段階22-2）：今のデータを端末の中に取っておいてから、合わせた結果を書く。
- * 確認の窓を出している間に変わったかもしれないので、ここでもう一度合わせる
+ * ほかの端末のバックアップを合わせる（段階22-2。段階22-3 の同期は何台分かを一度に）：今のデータを端末の中に取っておいてから、合わせた結果を書く。
+ * 確認の窓を出している間・ドライブから読んでいる間に変わったかもしれないので、ここで今のデータを読んで合わせる
  */
-export async function mergeFromBackup(incoming: BackupData, appVersion: string): Promise<void> {
+export async function mergeFromBackups(incoming: readonly BackupData[], appVersion: string): Promise<{ before: BackupData; after: BackupData; result: MergeResult }> {
   const current = await currentBackup(appVersion);
-  const result = mergeBackups(current.data, incoming);
+  const result = mergeAll(current.data, incoming);
   // 中身が変わらないときは、取っておいた「戻す前のデータ」を上書きしない（同じファイルをもう一度合わせても、前に戻せるように）
   if (!changesNothing(result)) await saveSnapshot(current);
   await writeAllData(result.data);
+  return { before: current.data, after: await readAllData(), result };
 }
 
 // ---- 戻す前のデータ（端末の中に最新の 1 回分） ----

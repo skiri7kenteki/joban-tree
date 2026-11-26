@@ -6,7 +6,7 @@ import type { ReviewRecord } from '../../src/review/review';
 import { backupToJson, makeBackup, parseBackupJson, type BackupData } from '../../src/tree/backupFile';
 import type { Candidate } from '../../src/tree/candidates';
 import { reviveForRestore, stampPosition, stampStudy, studyDeletion, type DeletedRecord } from '../../src/tree/deleted';
-import { changesNothing, mergeBackups } from '../../src/tree/merge';
+import { changesNothing, mergeAll, mergeBackups } from '../../src/tree/merge';
 import type { PositionNote } from '../../src/tree/positions';
 import type { Study, TreeData } from '../../src/tree/types';
 
@@ -533,4 +533,162 @@ describe('バックアップのファイル', () => {
     expect(bad(data({ deleted: [{ kind: 'study', id: 's', at: 1 }] }))).toBe(false);
     expect(bad(data({ studies: [{ ...study('s', BASE), movesAt: 'x' } as never] }))).toBe(false);
   });
+});
+
+describe('何台かで同期するときの道筋（段階22-3 の見直し）', () => {
+  /** [7g7f 3c3d 2g2f] を、最後の 1 手を消して 6g6f に指し直す（保存の印つき） */
+  const old = study('s1', `${BASE} 2g2f`);
+  const cut = stampStudy(old, { ...old, moves: BASE.split(' '), updatedAt: 20 }, false, 20);
+  const redone = stampStudy(cut, { ...cut, moves: `${BASE} 6g6f`.split(' '), updatedAt: 21 }, false, 21);
+
+  it('指し直した手順は、前の形をまだ持つ端末と合わせても 2 本にならない', () => {
+    const r = both(data({ studies: [redone] }), data({ studies: [old] }));
+    expect(r.data.studies.map((s) => [s.id, s.moves.join(' ')])).toEqual([['s1', `${BASE} 6g6f`]]);
+    expect(r.split).toBe(0);
+  });
+
+  it('指し直した方の手順が短くても、指し直した方が残る', () => {
+    const long = study('s1', `${BASE} 2g2f 8c8d`);
+    const short = stampStudy(long, { ...long, moves: BASE.split(' '), updatedAt: 20 }, false, 20);
+    const again = stampStudy(short, { ...short, moves: `${BASE} 6g6f`.split(' '), updatedAt: 21 }, false, 21);
+    const r = both(data({ studies: [again] }), data({ studies: [long] }));
+    expect(r.data.studies.map((s) => s.moves.join(' '))).toEqual([`${BASE} 6g6f`]);
+  });
+
+  it('消したときに見ていない手が相手にあれば、今まで通り両方残す', () => {
+    const unseen = study('s1', `${BASE} 2g2f 8c8d`, { movesAt: 12, updatedAt: 12 });
+    const r = both(data({ studies: [redone] }), data({ studies: [unseen] }));
+    expect(r.data.studies).toHaveLength(2);
+  });
+
+  it('相手が、消した後の日時で手を足し直したものは、今まで通り両方残す', () => {
+    const later = { ...old, movesAt: 30, updatedAt: 30 };
+    const r = both(data({ studies: [redone] }), data({ studies: [later] }));
+    expect(r.data.studies).toHaveLength(2);
+  });
+
+  it('短くしたのを戻すと、短くした記録のある端末と合わせても、短くならない', () => {
+    const full = study('s1', `${BASE} 2g2f 8c8d`);
+    const shortened = stampStudy(full, { ...full, moves: BASE.split(' '), updatedAt: 20 }, false, 20);
+    const restored = reviveForRestore(data({ studies: [full] }), [], 90, [shortened]);
+    const r = both(restored, data({ studies: [shortened] }));
+    expect(r.data.studies.map((s) => s.moves.length)).toEqual([4]);
+  });
+
+  it('戻して中身が変わらない研究手順には、印を足さない', () => {
+    const full = study('s1', `${BASE} 2g2f`);
+    expect(reviveForRestore(data({ studies: [full] }), [], 90, [full]).studies[0]).toEqual(full);
+  });
+
+  it('何台分かを一度に合わせると、読む順で結果が変わらない', () => {
+    const mine = data({ studies: [study('id1', BASE, { createdAt: 1 })] });
+    const two = data({ studies: [study('id2', `${BASE} 2g2f`, { createdAt: 2 })] });
+    const ext = data({ studies: [study('id1', `${BASE} 2g2f`, { createdAt: 1, movesAt: 15, updatedAt: 15 })] });
+    expect(shape(mergeAll(mine, [two, ext]).data.studies)).toEqual(shape(mergeAll(mine, [ext, two]).data.studies));
+    expect(mergeAll(mine, [two, ext]).data.studies).toHaveLength(1);
+  });
+});
+
+describe('手を消した記録（段階22-3 の 2 回目の見直し）', () => {
+  const at = (moves: string, time: number) => study('s', moves, { movesAt: time, updatedAt: time });
+  const edit = (prev: Study, moves: string, time: number) => stampStudy(prev, { ...prev, moves: moves.split(' '), updatedAt: time }, false, time);
+  const seqs = (list: readonly Study[]) => list.map((s) => s.moves.join(' ')).sort();
+  const one = (s: Study) => data({ studies: [s] });
+
+  it('3 つの版を、どの順で読んでも同じになる（消した後に指した手は残る）', () => {
+    const old = at('A B C D', 10);
+    const cut = edit(old, 'A B', 20);
+    const after = edit(cut, 'A B C', 30);
+    const all = [cut, old, after];
+    for (const first of all) {
+      const rest = all.filter((x) => x !== first);
+      for (const order of [rest, [...rest].reverse()]) expect(seqs(mergeAll(one(first), order.map(one)).data.studies)).toEqual(['A B C']);
+    }
+  });
+
+  it('別の id の同じ手順を 1 本にしても、手を消した記録は移らない', () => {
+    const q = study('q', 'A B', { createdAt: 1, movesAt: 5, updatedAt: 5 });
+    const long = study('p', 'A B C D', { createdAt: 2, movesAt: 10, updatedAt: 10 });
+    const p = stampStudy(long, { ...long, moves: ['A', 'B'], updatedAt: 20 }, false, 20);
+    const joined = mergeBackups(one(q), one(p)).data;
+    const grown = stampStudy(q, { ...q, moves: ['A', 'B', 'C', 'D'], updatedAt: 15 }, false, 15);
+    expect(seqs(mergeAll(one(grown), [joined, one(p)]).data.studies)).toContain('A B C D');
+  });
+
+  it('1 手試して取り消した記録は、前に消したあとで相手が指し直した手までは消さない', () => {
+    const cut = edit(at('A B C D', 10), 'A B', 20);
+    const theirs = edit(cut, 'A B C D', 25);
+    const tried = edit(edit(cut, 'A B C', 30), 'A B', 31);
+    const r = both(one(tried), one(theirs));
+    expect(seqs(r.data.studies)).toEqual(['A B C D']);
+  });
+
+  it('短くしてから研究手順ごと消した後に戻すと、短い版を持つ端末と合わせても短くならない', () => {
+    const full = at('A B C D', 10);
+    const cut = edit(full, 'A B', 20);
+    const deleted = [studyDeletion(cut, 30)];
+    const restored = reviveForRestore(one(full), deleted, 90, []);
+    expect(seqs(both(restored, one(cut)).data.studies)).toEqual(['A B C D']);
+  });
+
+  it('指し直した手順で置きかわる研究手順は、手が減らなくても知らせる', () => {
+    const old = at('A B C D', 10);
+    const redone = edit(edit(old, 'A B', 20), 'A B E F', 21);
+    expect(mergeBackups(one(old), one(redone)).shortened).toEqual([{ name: 's', from: 4, to: 4 }]);
+  });
+
+  it('3 台で延ばす・消す・指し直す・合わせるをくり返しても、読む順で変わらず、2 回目で変わらず、誰も消していない手は残る（1500 通り）', () => {
+    const isHead = (a: readonly string[], b: readonly string[]) => a.length <= b.length && a.every((x, i) => b[i] === x);
+    for (let seed = 1; seed <= 1500; seed++) {
+      let n = seed;
+      const pick = (k: number) => {
+        n = (n * 48271) % 2147483647;
+        return n % k;
+      };
+      let time = 100;
+      const base = at('A', 50);
+      const devices = [one(base), one(base), one(base)];
+      /** できた手順（手と、その手になった日時）と、消した操作 */
+      const made: { moves: string[]; time: number }[] = [{ moves: base.moves, time: 50 }];
+      const cuts: { from: string[]; keep: number; time: number }[] = [];
+      for (let step = 0; step < 18; step++) {
+        time += 10;
+        const i = pick(3);
+        const d = devices[i];
+        const kind = pick(5);
+        if (kind === 4) {
+          const others = [(i + 1) % 3, (i + 2) % 3].filter(() => pick(3) > 0).map((j) => devices[j]);
+          if (others.length > 0) devices[i] = mergeAll(d, others).data;
+          continue;
+        }
+        if (d.studies.length === 0) continue;
+        const k = pick(d.studies.length);
+        const prev = d.studies[k];
+        let moves: string[];
+        if (kind <= 1 || prev.moves.length === 1) moves = [...prev.moves, 'BC'[pick(2)]];
+        else {
+          const keep = 1 + pick(prev.moves.length - 1);
+          moves = prev.moves.slice(0, keep);
+          cuts.push({ from: prev.moves, keep, time });
+        }
+        made.push({ moves, time });
+        const next = stampStudy(prev, { ...prev, moves, updatedAt: time }, false, time);
+        devices[i] = { ...d, studies: d.studies.map((s, j) => (j === k ? next : s)) };
+      }
+      const [a, b, c] = devices;
+      const result = mergeAll(a, [b, c]).data;
+      const want = seqs(result.studies);
+      expect(seqs(mergeAll(a, [c, b]).data.studies), `seed ${seed} 順`).toEqual(want);
+      expect(seqs(mergeAll(b, [a, c]).data.studies), `seed ${seed} 向き b`).toEqual(want);
+      expect(seqs(mergeAll(c, [b, a]).data.studies), `seed ${seed} 向き c`).toEqual(want);
+      expect(seqs(mergeAll(result, [a, b, c]).data.studies), `seed ${seed} 2 回目`).toEqual(want);
+      expect(new Set(result.studies.map((s) => s.id)).size, `seed ${seed} id`).toBe(result.studies.length);
+      // 今どこかの端末にある手順は、その後の「消す」操作で消されたものでなければ、結果に残る
+      for (const s of devices.flatMap((d) => d.studies)) {
+        const when = s.movesAt ?? s.updatedAt;
+        const removed = cuts.some((x) => s.moves.length > x.keep && isHead(s.moves, x.from) && x.time > when);
+        if (!removed) expect(result.studies.some((r) => isHead(s.moves, r.moves)), `seed ${seed} 手順 ${s.moves.join(' ')}`).toBe(true);
+      }
+    }
+  }, 30_000);
 });
