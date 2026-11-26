@@ -29,7 +29,7 @@ async function setup(page: Page, candidates: Candidate[], study: Study = A) {
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies: [study] })),
   });
-  await expect(page.getByTestId('study-item')).toHaveCount(1);
+  await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${1} 本`);
   await page.evaluate(
     async ({ key, candidates }) => {
       const req = indexedDB.open('joban-tree');

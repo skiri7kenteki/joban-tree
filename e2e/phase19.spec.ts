@@ -6,6 +6,7 @@
 // - 稽古の画面も 1 画面に収める
 import { expect, test, type Page } from '@playwright/test';
 import type { Study } from '../src/tree/types';
+import { openStudyList } from './study-list';
 
 test.use({ hasTouch: true });
 
@@ -23,7 +24,7 @@ async function setup(page: Page, studies: Study[]) {
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies })),
   });
-  await expect(page.getByTestId('study-item')).toHaveCount(studies.length);
+  await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${studies.length} 本`);
 }
 
 /** 盤で指す（51 → 62 のように筋と段） */
@@ -123,14 +124,15 @@ test('定跡帳：集計・★ の行の［稽古］・グループの ⋯ の�
   await expect(page.getByTestId('book-summary-today')).toContainText('2');
   await expect(page.getByTestId('book-summary-learned')).toContainText('0');
   // ★ の行の［稽古］：その 1 本
-  await page.getByTestId('study-item').first().click();
+  await (await openStudyList(page)).getByTestId('study-item').first().click();
   await page.getByTestId('book-head-review').click();
   await expect(page.getByTestId('practice-title')).toContainText('稽古 1／1本');
   await page.getByTestId('practice-back').click();
   // グループの ⋯ の［稽古］：グループの研究手順を続けて
   await page.goto('./');
-  await page.getByTestId('study-group-menu-open').first().click();
-  await page.getByTestId('study-group-review').click();
+  await page.getByTestId('book-group-open').first().click();
+  await page.getByTestId('book-menu').click();
+  await page.getByTestId('book-review').click();
   await expect(page.getByTestId('practice-title')).toContainText('稽古 1／2本');
 });
 

@@ -114,7 +114,7 @@ async function seed(page: Page) {
     name: 's.json', mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies: STUDIES })),
   });
-  await expect(page.getByTestId('study-item')).toHaveCount(2);
+  await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${2} 本`);
   await page.goto('./#/trees');
   await page.getByTestId('import-file').setInputFiles({ name: 't.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(tree())) });
   await expect(page.getByTestId('tree-item')).toHaveCount(1);
@@ -166,7 +166,7 @@ test.describe('段階17 データを守る', () => {
     await wipe(page);
     await page.goto('./');
     await page.reload();
-    await expect(page.getByTestId('study-item')).toHaveCount(0);
+    await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${0} 本`);
 
     // 戻す：中身の数を見せて、置きかえることを確かめてから
     await page.goto('./#/settings');
@@ -185,7 +185,7 @@ test.describe('段階17 データを守る', () => {
     // 設定も元どおり（復習の 1 回は 5 問）
     await expect(page.getByTestId('review-batch-5')).toHaveAttribute('aria-checked', 'true');
     await page.goto('./');
-    await expect(page.getByTestId('study-item')).toHaveCount(2);
+    await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${2} 本`);
 
     // 戻す前のデータ（全部消した状態）に戻せる。戻したら今のデータが、また戻す前のデータになる
     await page.goto('./#/settings');
@@ -193,7 +193,7 @@ test.describe('段階17 データを守る', () => {
     await expect(page.getByTestId('backup-restore-summary')).toContainText('研究手順 0 本');
     await Promise.all([page.waitForEvent('load'), page.getByTestId('backup-restore-confirm').click()]);
     await page.goto('./');
-    await expect(page.getByTestId('study-item')).toHaveCount(0);
+    await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${0} 本`);
     await page.goto('./#/settings');
     await page.getByTestId('snapshot-restore').click();
     await expect(page.getByTestId('backup-restore-summary')).toContainText('研究手順 2 本');
@@ -228,7 +228,7 @@ test.describe('段階17 データを守る', () => {
       name: 's.json', mimeType: 'application/json',
       buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies: STUDIES.map((s) => ({ ...s, createdAt: old, updatedAt: old })) })),
     });
-    await expect(page.getByTestId('study-item')).toHaveCount(2);
+    await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${2} 本`);
     await page.reload();
     const nudge = page.getByTestId('backup-nudge');
     await expect(nudge).toBeVisible();
@@ -241,7 +241,7 @@ test.describe('段階17 データを守る', () => {
     await page.getByTestId('backup-nudge-close').click();
     await expect(nudge).toHaveCount(0);
     await page.reload();
-    await expect(page.getByTestId('study-item')).toHaveCount(2);
+    await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${2} 本`);
     await expect(nudge).toHaveCount(0);
     // 最近バックアップしていれば出さない
     await page.evaluate(() => {
@@ -249,7 +249,7 @@ test.describe('段階17 データを守る', () => {
       localStorage.setItem('joban-tree.last-backup', String(Date.now() - 1000));
     });
     await page.reload();
-    await expect(page.getByTestId('study-item')).toHaveCount(2);
+    await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${2} 本`);
     await expect(nudge).toHaveCount(0);
   });
 });

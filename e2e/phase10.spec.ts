@@ -1,6 +1,7 @@
 // 段階10-1：定跡帳で直接指して研究を足す（新しい研究・枝を足す・取り消し・消す・読むだけ）
 import { expect, test, type Page } from '@playwright/test';
 import type { Study } from '../src/tree/types';
+import { openStudyList } from './study-list';
 
 /**
  * 開いている窓を × で閉じる（窓が本当に開くまで待ってから押し、閉じたのを確かめる）。
@@ -27,7 +28,7 @@ async function importStudies(page: Page, studies: Study[]) {
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies })),
   });
-  await expect(page.getByTestId('study-item')).toHaveCount(studies.length);
+  await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${studies.length} 本`);
 }
 
 async function play(page: Page, from: string, to: string) {
@@ -90,10 +91,11 @@ test.describe('10-1 定跡帳で直接指して研究を足す', () => {
     await expect(page).toHaveURL(/#\/book\/[^/]+\/s-[\w-]+\/19$/);
 
     await backHome(page);
-    await expect(page.getByTestId('study-item')).toHaveCount(1);
-    await expect(page.getByTestId('study-item')).toContainText('△３三角 ▲３六飛 △８四飛 ▲２六飛');
-    await expect(page.getByTestId('study-item')).toContainText('19 手');
-    await expect(page.getByTestId('tree-group-head')).toHaveText([/横歩取り（先手番）\s*1/]);
+    await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${1} 本`);
+    await expect(page.getByTestId('book-group')).toHaveText([/横歩取り（先手番）\s*研究 1本/]);
+    const list = await openStudyList(page);
+    await expect(list.getByTestId('study-item')).toContainText('△３三角 ▲３六飛 △８四飛 ▲２六飛');
+    await expect(list.getByTestId('study-item')).toContainText('19 手');
   });
 
   test('新しい研究（平手から）：初期値は先手。初手を指すと 1 本目ができ、「その他（先手番）」に入る', async ({ page }) => {
@@ -108,9 +110,9 @@ test.describe('10-1 定跡帳で直接指して研究を足す', () => {
     await play(page, '27', '26'); // ▲2六歩
     await expect(page.getByTestId('study-title')).toHaveText('▲２六歩');
     await backHome(page);
-    await expect(page.getByTestId('tree-group-head')).toHaveText([/その他（先手番）\s*1/]);
+    await expect(page.getByTestId('book-group')).toHaveText([/その他（先手番）\s*研究 1本/]);
     // 一覧の研究手順を押すと、その終わりの局面で定跡帳（平手から）が開く
-    await page.getByTestId('study-item').click();
+    await (await openStudyList(page)).getByTestId('study-item').click();
     await expect(page.getByTestId('book-title')).toHaveText('定跡帳平手から（先手番）');
     await expect(page.getByTestId('study-position')).toContainText('1手目 ▲２六歩');
   });
@@ -119,7 +121,7 @@ test.describe('10-1 定跡帳で直接指して研究を足す', () => {
     await openHome(page);
     await importStudies(page, [A]);
     // 一覧から押すと、その研究手順の終わりの局面で定跡帳が開く
-    await page.getByTestId('study-item').click();
+    await (await openStudyList(page)).getByTestId('study-item').click();
     await expect(page.getByTestId('book-title')).toHaveText('定跡帳横歩取り（先手番）');
     await expect(page.getByTestId('study-title')).toHaveText('研究A');
     await expect(page.getByTestId('study-position')).toContainText('19手目');
@@ -139,13 +141,13 @@ test.describe('10-1 定跡帳で直接指して研究を足す', () => {
     await expect(page.getByTestId('study-book-head')).toHaveText('研究 2本');
     await expect(page.getByTestId('study-book-branch')).toHaveCount(2);
     await backHome(page);
-    await expect(page.getByTestId('study-item')).toHaveCount(2);
+    await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${2} 本`);
   });
 
   test('取り消し：手を足す → 取り消す → 元に戻る。続けて足したものを続けて取り消せる。読むだけにすると足さない', async ({ page }) => {
     await openHome(page);
     await importStudies(page, [A]);
-    await page.getByTestId('study-item').click();
+    await (await openStudyList(page)).getByTestId('study-item').click();
     await expect(page.getByTestId('study-position')).toContainText('19手目');
     // 終わりの局面で指す → 研究A が延びる（名前は自分で付けたものなので変えない）
     await play(page, '31', '22'); // △2二銀
@@ -177,13 +179,13 @@ test.describe('10-1 定跡帳で直接指して研究を足す', () => {
     await expect(page.getByTestId('study-position')).toContainText('19手目');
     await expect(page.getByTestId('study-screen-status')).toContainText('読むだけ');
     await backHome(page);
-    await expect(page.getByTestId('study-item')).toContainText('19 手');
+    await expect((await openStudyList(page)).getByTestId('study-item')).toContainText('19 手');
   });
 
   test('消す：この手から先を消す → その枝の研究手順が消え、手前の研究は残る。取り消しで戻る', async ({ page }) => {
     await openHome(page);
     await importStudies(page, [A, B, C]);
-    await page.getByTestId('study-item').filter({ hasText: '研究A' }).click();
+    await (await openStudyList(page)).getByTestId('study-item').filter({ hasText: '研究A' }).click();
     await page.getByTestId('study-prev').click();
     await expect(page.getByTestId('study-position')).toContainText('18手目');
     const rows = page.getByTestId('study-book-branch');
@@ -211,14 +213,14 @@ test.describe('10-1 定跡帳で直接指して研究を足す', () => {
     await expect(rows).toContainText('研究A');
 
     await backHome(page);
-    await expect(page.getByTestId('study-item')).toHaveCount(2);
-    await expect(page.getByTestId('study-item').filter({ hasText: '研究A' })).toContainText('19 手');
+    await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${2} 本`);
+    await expect((await openStudyList(page)).getByTestId('study-item').filter({ hasText: '研究A' })).toContainText('19 手');
   });
 
   test('ここで終わりにする・この研究手順を消す・名前とメモを直す（⋯ と ★ の行から）', async ({ page }) => {
     await openHome(page);
     await importStudies(page, [A, B]);
-    await page.getByTestId('study-item').filter({ hasText: '研究A' }).click();
+    await (await openStudyList(page)).getByTestId('study-item').filter({ hasText: '研究A' }).click();
     // ★ の行を押すと名前・メモ（自分の側は出さない）
     await page.getByTestId('book-head').click();
     await expect(page.getByTestId('study-side-black')).toHaveCount(0);
@@ -331,7 +333,7 @@ test.describe('定跡帳の出発点がずれる不具合の直し', () => {
     // 一覧から開き直しても、16 手目に戻れる
     await page.getByRole('button', { name: '‹ 一覧' }).click();
     await page.getByTestId('tab-studies').click();
-    await page.getByTestId('study-item').filter({ hasText: '▲３六飛' }).click();
+    await (await openStudyList(page)).getByTestId('study-item').filter({ hasText: '▲３六飛' }).click();
     await expect(page.getByTestId('study-position')).toContainText('17手目');
     await page.getByTestId('study-prev').click();
     await expect(page.getByTestId('study-position')).toContainText('16手目');
@@ -362,9 +364,10 @@ test('前の版でずれた研究手順（後手番に先手番の戦型・戦�
     study('s-old', '横歩取り △3三角型（▲3六飛まで）', [...KAKU33], { mySide: 'white', templateId: 'yokofu-33kaku', updatedAt: 2 }),
     study('s-mine', '自分の名前', [...KAKU33, '8f8d'], { mySide: 'white', templateId: 'yokofu-33kaku', updatedAt: 1 }),
   ]);
-  await expect(page.getByTestId('study-item').filter({ hasText: '▲３六飛' })).toHaveCount(1);
-  await expect(page.getByTestId('study-item').filter({ hasText: '自分の名前' })).toHaveCount(1);
-  await page.getByTestId('study-item').filter({ hasText: '▲３六飛' }).click();
+  const list = await openStudyList(page);
+  await expect(list.getByTestId('study-item').filter({ hasText: '▲３六飛' })).toHaveCount(1);
+  await expect(list.getByTestId('study-item').filter({ hasText: '自分の名前' })).toHaveCount(1);
+  await list.getByTestId('study-item').filter({ hasText: '▲３六飛' }).click();
   await expect(page.getByTestId('book-title')).toHaveText('定跡帳横歩取り（後手番）');
   await expect(page.getByTestId('study-first')).toHaveAttribute('aria-label', /△3三角（後手番）/);
   await page.getByTestId('study-prev').click();

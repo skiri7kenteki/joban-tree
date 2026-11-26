@@ -43,7 +43,7 @@ async function setup(page: Page) {
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies: [A] })),
   });
-  await expect(page.getByTestId('study-item')).toHaveCount(1);
+  await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${1} 本`);
   await page.goto('./#/trees');
   await page.getByTestId('import-file').setInputFiles({ name: 't.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(tree())) });
   await expect(page.getByTestId('tree-item')).toHaveCount(1);
@@ -108,7 +108,7 @@ for (const [w, h] of [
       mimeType: 'application/json',
       buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies: [bishop] })),
     });
-    await expect(page.getByTestId('study-item')).toHaveCount(1);
+    await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${1} 本`);
     await openStudyReview(page);
     await expect(page.getByTestId('review-prompt')).toHaveAttribute('data-phase', 'ask');
     await page.locator('[data-testid="board"] [data-square="77"]').click();

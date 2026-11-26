@@ -33,7 +33,7 @@ async function setup(page: Page, studies: Study[]) {
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies })),
   });
-  await expect(page.getByTestId('study-item')).toHaveCount(studies.length);
+  await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${studies.length} 本`);
 }
 
 /** 候補の表を端末の保存場所に直接入れる（エンジンを使わずに確かめる） */
@@ -214,23 +214,23 @@ test.describe('エンジンを使う', () => {
   });
 });
 
-test('手順前後の研究の手が 1 つだけの局面でも、研究の手として扱う（「手順前後」の行。表にあっても「研究手順なし」にしない）', async ({ page }) => {
+test('手順前後の研究の手が 1 つだけの局面でも、研究の手として扱う（「手順前後」の印の行。表にあっても「研究手順なし」にしない）', async ({ page }) => {
   // ▲7六歩 △3四歩 ▲2六歩（X はここで終わる）と、▲2六歩 △3四歩 ▲7六歩 △3二金（Y）は同じ局面
   const x: Study = { id: 's-x', name: '研究X', note: '', moves: ['7g7f', '3c3d', '2g2f'], mySide: 'white', createdAt: 2, updatedAt: 2 };
   const y: Study = { id: 's-y', name: '研究Y', note: '', moves: ['2g2f', '3c3d', '7g7f', '4a3b'], mySide: 'white', createdAt: 1, updatedAt: 1 };
   await setup(page, [x, y]);
   await page.goto(`./#/book/${encodeURIComponent('study:hirate|white')}/s-x/3`);
   await expect(page.getByTestId('study-position')).toContainText('3手目');
-  await expect(page.getByTestId('book-transposed')).toHaveCount(1);
+  await expect(page.getByTestId('book-transposed-tag')).toHaveCount(1);
   await expect(page.getByTestId('book-conflict-tag')).toHaveCount(0);
 
-  await page.getByTestId('book-transposed-menu').click();
+  await page.getByTestId('book-branch-menu').click();
   await page.getByTestId('mark-main').click();
-  await expect(page.getByTestId('book-transposed').getByTestId('book-mark-tag')).toHaveText('本命');
+  await expect(page.getByTestId('study-book-branch').getByTestId('book-mark-tag')).toHaveText('本命');
   await expect(page.getByTestId('book-cand-row')).toHaveCount(0);
 
   // 研究手順が通る手なので、悪手にするときは確認が出る
-  await page.getByTestId('book-transposed-menu').click();
+  await page.getByTestId('book-branch-menu').click();
   await page.getByTestId('mark-bad').click();
   await expect(page.getByTestId('book-bad-text')).toContainText('研究Y');
 });

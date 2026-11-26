@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs';
 import { Position, Record as KifRecord, exportKIF } from 'tsshogi';
 import { STARTPOS_SFEN, applyUsiMove, sfenKey } from '../src/shogi/position';
 import { TREE_APP, TREE_FORMAT_VERSION, type Study, type TreeData, type TreeEdge, type TreeNode, type TreeStudy } from '../src/tree/types';
+import { openStudyList } from './study-list';
 
 /**
  * 開いている窓を × で閉じる（窓が本当に開くまで待ってから押し、閉じたのを確かめる）。
@@ -136,12 +137,12 @@ test.describe('8-1 登録（エンジンを使わない）', () => {
     await page.getByRole('button', { name: '‹ 一覧' }).click();
     await page.getByTestId('tab-studies').click();
     await expect(page.getByTestId('study-count')).toHaveText('研究手順 1 本');
-    const item = page.getByTestId('study-item');
+    await expect(page.getByTestId('book-group')).toHaveText([/その他（先手番）\s*研究 1本/]);
+    const item = (await openStudyList(page)).getByTestId('study-item');
     await expect(item).toHaveCount(1);
     await expect(item).toContainText('▲７六歩 △３四歩 ▲２六歩');
     await expect(item).toContainText('3 手');
     await expect(item.getByTestId('study-item-note')).toHaveText('狙い：早めの▲2六歩');
-    await expect(page.getByTestId('tree-group-head')).toHaveText([/その他（先手番）\s*1/]);
 
     // 開く（定跡帳の、その研究手順の終わりの局面）
     await item.click();
@@ -202,7 +203,7 @@ test.describe('8-1 登録（エンジンを使わない）', () => {
     await page.getByTestId('kif-paste-read').click();
     await expect(page.getByTestId('kif-paste-message')).toContainText('平手の初期局面から始まる手順だけ');
     await closeDialog(page);
-    await expect(page.getByTestId('study-item')).toHaveCount(1);
+    await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${1} 本`);
   });
 });
 
@@ -270,8 +271,9 @@ test.describe('8-1 ツリーとのつながり・復習', () => {
       study('s-1', '研究1', ['7g7f', '3c3d', '2g2f', '8c8d'], { note: 'メモの 1 行目\n2 行目', updatedAt: 3 }),
       study('s-2', '研究2', ['2g2f', '8c8d'], { updatedAt: 2 }),
     ]);
-    await expect(page.getByTestId('study-item')).toHaveText([/研究1/, /研究2/]);
-    await page.getByTestId('study-menu').first().click();
+    const list = await openStudyList(page);
+    await expect(list.getByTestId('study-item')).toHaveText([/研究1/, /研究2/]);
+    await list.getByTestId('study-menu').first().click();
     await page.getByTestId('study-menu-review').click();
     await expect(page).toHaveURL(/#\/practice\/play\/s-1$/);
     // 相手の ▲7六歩 はアプリが指す → △3四歩（正解）→ ▲2六歩 → △1四歩（まちがい）→ 正解の △8四歩 を指して続く
@@ -290,8 +292,9 @@ test.describe('8-1 ツリーとのつながり・復習', () => {
     // グループ（その他）の研究手順を稽古
     await page.goto('./#/trees');
     await page.getByTestId('tab-studies').click();
-    await page.getByTestId('study-group-menu-open').click();
-    await page.getByTestId('study-group-review').click();
+    await page.getByTestId('book-group-open').click();
+    await page.getByTestId('book-menu').click();
+    await page.getByTestId('book-review').click();
     await expect(page).toHaveURL(/#\/practice\/group\//);
     await expect(page.getByTestId('practice-title')).toContainText('稽古 1／2本');
 
@@ -325,7 +328,7 @@ test.describe('8-1 書き出し・取り込み', () => {
   test('選んで JSON・KIF に書き出す。JSON の取り込みで同じ手順があれば、置き換える・両方残す・取り込まないを選ぶ', async ({ page }) => {
     await openHome(page);
     await importStudies(page, [study('s-1', '研究1', ['7g7f', '3c3d'], { note: 'メモ1' }), study('s-2', '研究2', ['2g2f', '8c8d'])]);
-    await expect(page.getByTestId('study-item')).toHaveCount(2);
+    await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${2} 本`);
 
     // 段階20-3：書き出しは定跡帳のタブの右上から、設定の「データ」へ移した
     await expect(page.getByTestId('study-export-open')).toHaveCount(0);
@@ -355,18 +358,19 @@ test.describe('8-1 書き出し・取り込み', () => {
     await expect(page.getByTestId('study-import-conflict')).toContainText('「研究1（仲間）」（今は「研究1」）');
     await page.getByTestId('study-import-both').click();
     await expect(page.getByTestId('home-message')).toContainText('研究手順 1 本を取り込みました');
-    await expect(page.getByTestId('study-item')).toHaveCount(3);
+    await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${3} 本`);
     // 置き換える
     await importStudies(page, [study('x-2', '研究2（直した）', ['2g2f', '8c8d'])]);
     await page.getByTestId('study-import-replace').click();
-    await expect(page.getByTestId('study-item')).toHaveCount(3);
-    await expect(page.getByTestId('study-item').filter({ hasText: '研究2（直した）' })).toHaveCount(1);
+    await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${3} 本`);
+    await expect((await openStudyList(page)).getByTestId('study-item').filter({ hasText: '研究2（直した）' })).toHaveCount(1);
+    await page.goto('./#/');
     // 取り込まない・まったく同じものは黙って飛ばす
     await importStudies(page, [study('x-3', '研究2（また別）', ['2g2f', '8c8d']), study('s-1', '研究1', ['7g7f', '3c3d'], { note: 'メモ1' })]);
     await page.getByTestId('study-import-skip').click();
     await expect(page.getByTestId('home-message')).toContainText('まったく同じもの 1 本は飛ばしました');
     await expect(page.getByTestId('home-message')).toContainText('同じ手順の 1 本は取り込みませんでした');
-    await expect(page.getByTestId('study-item')).toHaveCount(3);
+    await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${3} 本`);
   });
 });
 
@@ -423,16 +427,18 @@ test.describe('8-1 移し替え（段階7の研究手順 → 独立した研究�
     await expect(page.getByTestId('home-message')).toContainText('途中の局面から始まるツリーの研究手順 1 本は移せませんでした');
     await page.getByTestId('tab-studies').click();
     await expect(page.getByTestId('study-count')).toHaveText('研究手順 2 本');
-    await expect(page.getByTestId('study-item')).toHaveText([/新しい名前/, /研究2/]);
-    await expect(page.getByTestId('study-item').first().getByTestId('study-item-note')).toHaveText('新しいメモ');
+    const moved = await openStudyList(page);
+    await expect(moved.getByTestId('study-item')).toHaveText([/新しい名前/, /研究2/]);
+    await expect(moved.getByTestId('study-item').first().getByTestId('study-item-note')).toHaveText('新しいメモ');
+    await page.goto('./#/');
 
     // もう一度開いても増えない・知らせも出ない
     await page.reload();
-    await expect(page.getByTestId('study-item')).toHaveCount(2);
+    await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${2} 本`);
     await expect(page.getByTestId('home-message')).toHaveCount(0);
 
     // メモは両方残る。記録も写っている（▲7六歩の後の △3四歩 は「覚えた」）
-    await page.getByTestId('study-item').first().click();
+    await (await openStudyList(page)).getByTestId('study-item').first().click();
     // 段階14：メモの全文は ★ の行を押して開く窓で
     await page.getByTestId('book-head').click();
     await expect(page.getByTestId('study-note')).toHaveValue('新しいメモ\n――\n古いメモ');
@@ -462,7 +468,7 @@ test.describe('8-1 移し替え（段階7の研究手順 → 独立した研究�
     await page.getByTestId('import-file').setInputFiles({ name: 't.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(tree)) });
     await expect(page.getByTestId('home-message')).toContainText('「仲間のツリー」を取り込みました。研究手順 1 本も取り込みました（1 本はすでにありました）');
     await page.getByTestId('tab-studies').click();
-    await expect(page.getByTestId('study-item')).toHaveText([/自分の研究/, /仲間の研究/]);
+    await expect((await openStudyList(page)).getByTestId('study-item')).toHaveText([/自分の研究/, /仲間の研究/]);
   });
 });
 
@@ -549,10 +555,12 @@ test.describe('8-2 変化付き KIF からまとめて取り込む', () => {
     await expect(page.getByTestId('home-message')).toHaveText('研究手順 2 本を KIF から取り込みました（1 本は取り込みませんでした）');
     await expect(page.getByTestId('tab-studies')).toHaveAttribute('aria-current', 'page');
     // 「その他」は自分の側で分かれる（後手番 → 先手番。段階10-1）
-    await expect(page.getByTestId('study-item')).toHaveText([/前から登録した本譜/, /3手目 ▲６六歩/, /4手目 △６二銀/]);
+    await expect(page.getByTestId('book-group')).toHaveText([/その他（後手番）\s*研究 1本/, /その他（先手番）\s*研究 2本/]);
+    await expect((await openStudyList(page, '後手番')).getByTestId('study-item')).toHaveText([/前から登録した本譜/]);
+    await expect((await openStudyList(page, '先手番')).getByTestId('study-item')).toHaveText([/3手目 ▲６六歩/, /4手目 △６二銀/]);
 
     // メモ：その変化の終わりまでの手のコメントを手数付きで。「#」の行は入らない
-    await page.getByTestId('study-item').filter({ hasText: '3手目 ▲６六歩' }).click();
+    await (await openStudyList(page, '先手番')).getByTestId('study-item').filter({ hasText: '3手目 ▲６六歩' }).click();
     // 段階14：メモの全文は ★ の行を押して開く窓で
     await page.getByTestId('book-head').click();
     await expect(page.getByTestId('study-note')).toHaveValue('1手目 ▲７六歩：初手は角道\n4手目 △８四歩：△8四歩なら');

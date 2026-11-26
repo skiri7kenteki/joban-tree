@@ -41,7 +41,7 @@ test('基本の研究：4 本・確認済み →1 本外して 3 本入れる �
 
   // 定跡帳のタブに 3 本。もう一度開くと、入れたものは「入れてあります」
   await page.goto('./');
-  await expect(page.getByTestId('study-item')).toHaveCount(3);
+  await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${3} 本`);
   await openBasic(page);
   await expect(dialog.getByTestId('basic-row').filter({ hasText: '入れてあります' })).toHaveCount(3);
   await expect(dialog.getByTestId('basic-check').nth(0)).toBeDisabled();
@@ -50,7 +50,7 @@ test('基本の研究：4 本・確認済み →1 本外して 3 本入れる �
   await dialog.getByTestId('basic-add').click();
   await expect(page.getByTestId('study-book-head')).toHaveText('研究 4本');
   await page.goto('./');
-  await expect(page.getByTestId('study-item')).toHaveCount(4);
+  await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${4} 本`);
   await openBasic(page);
   await expect(dialog.getByTestId('basic-add')).toHaveText('入れるものがありません');
   await expect(dialog.getByTestId('basic-add')).toBeDisabled();

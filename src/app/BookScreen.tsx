@@ -17,6 +17,8 @@
 // - 段階21-1：自分の手番の局面に候補の表（本命・次善・悪手。src/tree/candidates.ts、窓は src/app/CandidateDialogs.tsx）。行に印、研究手順の無い手は薄い行、
 //   見出しの行は表の要約（局面メモは候補の窓の下へ）。行の ⋯ で印を付け替える。食い違いは「どちらを本命にするか」。表の変更も「取り消す」で戻る
 // - 段階21-2：研究手順の無い悪手の行を押すと、盤の上で咎め方を ‹ › でたどる（「咎め方を見ています［戻る］」）。研究手順には入れない
+// - 段階22-4：同じ局面（手数を除いた SFEN）を通る研究手順をつなぐ。手順前後で来た手の行に「手順前後」、押して手順が切り替わったら画面の下に知らせる。
+//   ⋯「研究手順の一覧（n本）」（StudyList.tsx）。定跡帳のタブの「その他」の行からは、盤は平手から（同じ側の全部）、一覧とまとめて稽古はその他の分だけ
 // 研究手順の画面（StudyScreen）と編集モードは段階10-2 で片付けた（古い URL は src/app/LegacyRedirect.tsx でここへ移す）。
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
@@ -37,8 +39,8 @@ import { fileNameOf } from '../tree/backup';
 import {
 
   coveredDepth,
-  cutBranch,
   cutMoveAt,
+  cutRow,
   endHere,
   inverseChange,
   playInBook,
@@ -48,11 +50,11 @@ import {
   type BookChange,
   type BookCtx,
   type BookView,
-  type CutPlan,
+  type RowCut,
 } from '../tree/bookEdit';
-import { bookLabel, bookPool, bookSide, fitsBook, isHirateBook } from '../tree/organize';
+import { bookKeyOfGroup, bookLabel, bookPool, bookSide, fitsBook, isHirateBook } from '../tree/organize';
 import { firstLine, moveTexts, newStudyId, startsWith, studyMovesText } from '../tree/studies';
-import { bookAt, bookOrder, bookStart, type BookBranch, type BookPosition } from '../tree/studyBook';
+import { bookAtPosition, bookOrder, bookStart, branchTarget, type BookBranch, type BookPosition } from '../tree/studyBook';
 import { studiesToKif } from '../tree/studyFile';
 import { listName, type OpeningTemplate } from '../tree/templates';
 import type { Study } from '../tree/types';
@@ -62,6 +64,7 @@ import { back, bookPath, go, groupPracticePath } from './router';
 import { bookFromGame } from './games';
 import { OUTCOME_TEXT, copyText, shareFile } from './share';
 import { StudyEditDialog } from './StudyDialogs';
+import { StudyListDialog } from './StudyList';
 import { applyStudyChange, ensureStudies, library, studiesNow } from './studies';
 import { KifuPanel, KifuSheet, useWideLayout, type KifuRow } from '../components/KifuList';
 import { MoveBar } from '../components/MoveBar';
@@ -94,7 +97,9 @@ const TABLE_FULL = '候補の表は 8 手までです。使わない手を表か
 const TOAST_MS = 5000;
 
 /** 定跡帳の画面。研究手順と戦型を読み終えてから中身を出す */
-export function BookScreen({ bookKey, id, ply, template, line }: { bookKey: string; id?: string; ply?: number; template?: string; line?: string[] }) {
+export function BookScreen({ bookKey: urlKey, id, ply, template, line }: { bookKey: string; id?: string; ply?: number; template?: string; line?: string[] }) {
+  // 盤の定跡帳（「その他」は平手から）。urlKey は、研究手順の一覧とまとめて稽古の範囲
+  const bookKey = bookKeyOfGroup(urlKey);
   const [error, setError] = useState('');
   const studies = library.value;
   void myTemplates.value;
@@ -135,7 +140,10 @@ export function BookScreen({ bookKey, id, ply, template, line }: { bookKey: stri
     );
   }
   opened.current = true;
-  return <BookViewScreen bookKey={bookKey} side={side} pool={pool} templates={templates} id={id} ply={ply} tpl={tpl} openLine={line} />;
+  const listPool = urlKey === bookKey ? pool : bookPool(urlKey, studies, templates);
+  return (
+    <BookViewScreen bookKey={bookKey} urlKey={urlKey} listPool={listPool} side={side} pool={pool} templates={templates} id={id} ply={ply} tpl={tpl} openLine={line} />
+  );
 }
 
 /** 定跡帳の出発点：平手からの定跡帳は初期局面。戦型のグループは、研究手順（と今の手順）が全部通る、自分の側が同じ、いちばん浅い戦型の出発点（段階10 の直し） */
@@ -167,6 +175,7 @@ function initialView(key: string, pool: readonly Study[], templates: readonly Op
 /** 窓 */
 type BookDialog =
   | { kind: 'menu' }
+  | { kind: 'list' }
   | { kind: 'fields' }
   /** 行の ⋯：自分の手番は印の付け替え。branch：この定跡帳の研究手順がある手（消す操作も出す） */
   | { kind: 'row'; move: string; branch: boolean }
@@ -188,6 +197,8 @@ interface UndoEntry {
 
 function BookViewScreen({
   bookKey,
+  urlKey,
+  listPool,
   side,
   pool,
   templates,
@@ -197,6 +208,10 @@ function BookViewScreen({
   openLine,
 }: {
   bookKey: string;
+  /** URL の key（「その他」から開いたときは bookKey と違う） */
+  urlKey: string;
+  /** 研究手順の一覧・まとめて稽古の研究手順 */
+  listPool: Study[];
   side: Side;
   pool: Study[];
   templates: OpeningTemplate[];
@@ -266,9 +281,9 @@ function BookViewScreen({
 
   // 今の研究手順と局面を URL に書いておく（戻るボタンで戻ってきたときに同じところを開く）。画面は移らない（hashchange は起きない）
   useEffect(() => {
-    const url = `#${current ? bookPath(bookKey, current.id, index) : bookPath(bookKey)}`;
+    const url = `#${current ? bookPath(urlKey, current.id, index) : bookPath(urlKey)}`;
     if (current && location.hash !== url) history.replaceState(history.state, '', url);
-  }, [bookKey, current?.id, index]);
+  }, [urlKey, current?.id, index]);
 
 
   // 段階20-1：局面メモと食い違い（自分の側が同じ研究手順すべてを局面で引く。手順前後も同じ局面）
@@ -349,10 +364,22 @@ function BookViewScreen({
     setView({ id: target.id, line: [...target.moves], index: at });
   }
 
-  /** 次の手を押した：今の研究手順の次の手なら 1 手進む。違う手なら、その手を通る研究手順のうちいちばん最近直したものへ */
+  /** 手順前後の研究手順へ切り替わったときの知らせ */
+  const tellSwitched = (target: Study) => showToast(`「${target.name}」の手順に切り替えました`, false);
+
+  /** 次の手を押した：今の研究手順の次の手なら 1 手進む。違う手なら、その手を通る研究手順へ（手順前後なら知らせる） */
   function pickBranch(branch: BookBranch<Study>) {
-    if (current && current.moves[index] === branch.move) moveTo(index + 1);
-    else switchTo(branch.studies[0], index + 1);
+    const to = branchTarget(branch, here, current?.id ?? null);
+    if (!to.switched && to.study.id === current?.id) return moveTo(index + 1);
+    switchTo(to.study, to.index);
+    if (to.switched) tellSwitched(to.study);
+  }
+
+  /** 「ここで終わる研究」を押した */
+  function pickEnding(s: Study) {
+    const same = startsWith(s.moves, here);
+    switchTo(s, same ? index : s.moves.length);
+    if (!same) tellSwitched(s);
   }
 
   // 左右スワイプ：右へ払うと 1 手戻る、左へ払うと 1 手進む
@@ -433,7 +460,8 @@ function BookViewScreen({
     const r = playInBook(pool, studiesNow(), here, move, current?.id ?? null, ctx());
     const played = moveText(sfen, move, prevMove);
     if (r.kind === 'advance') {
-      setView({ id: r.target.id, line: [...r.target.moves], index: index + 1 });
+      setView({ id: r.target.id, line: [...r.target.moves], index: r.index });
+      if (r.switched) tellSwitched(r.target);
       return;
     }
     // 段階21-1：悪手の印のある手は、研究手順に足さない
@@ -492,9 +520,10 @@ function BookViewScreen({
     }
     if (r.kind !== 'ok') return;
     const made = r.study;
-    const view = { id: made.id, line: [...made.moves], index: index + 1 };
+    const view = { id: made.id, line: [...made.moves], index: r.index };
     if (!r.change) {
       setView(view);
+      if (!startsWith(made.moves, [...here, moves[0]])) tellSwitched(made);
       return;
     }
     const added = moveTexts([...here, ...moves.slice(0, r.played)]).slice(index).join(' ');
@@ -584,12 +613,23 @@ function BookViewScreen({
     setPicking(true);
   }
 
+  // 段階22-4：同じ局面を通る研究手順をつなぐ
+  const poolIndex = useMemo(() => buildBookIndex(pool, side), [pool, side]);
+  const connections = bookAtPosition(poolIndex, here, sfen);
+
   // ---- 消す ----
 
   /** 消した後の盤：残した研究手順か今の研究手順が今の局面を通っていればそのまま、無ければ近くの研究手順へ */
-  const afterCut = (plan: CutPlan) => (list: Study[]) => settleView(list, line, index, plan.kept?.id ?? current?.id ?? null);
+  const afterCut = (keptId: string | undefined) => (list: Study[]) => settleView(list, line, index, keptId ?? current?.id ?? null);
 
-  const cutPlan = dialog?.kind === 'row' && dialog.branch ? cutBranch(pool, here, dialog.move, current?.id ?? null, ctx()) : null;
+  /** 行の「この手から先を消す」：同じ局面でこの手を指す研究手順すべて（手順前後も） */
+  const rowCut = (move: string) => {
+    const branch = connections.branches.find((b) => b.move === move);
+    return branch ? cutRow(pool, here, branch, current?.id ?? null, ctx()) : null;
+  };
+  const cutPlan = dialog?.kind === 'row' && dialog.branch ? rowCut(dialog.move) : null;
+  /** 残す研究手順のうち、盤でたどる方（今のものを先に） */
+  const keptOf = (plan: RowCut) => (plan.put.find((s) => s.id === current?.id) ?? plan.put[0])?.id;
   // ここで終わりにする：出発点（と初期局面）では使えない
   const endPlan = useMemo(
     () => (index > start && index > 0 ? endHere(pool, here, current?.id ?? null, { templates, start, side, now: 0 }) : null),
@@ -597,15 +637,15 @@ function BookViewScreen({
   );
 
   async function doCut(move: string) {
-    const plan = cutBranch(pool, here, move, current?.id ?? null, ctx());
+    const plan = rowCut(move);
     setDialog(null);
-    if (plan) await commit(plan, afterCut(plan), `${moveText(sfen, move, prevMove)} から先を消しました（${plan.remove.length + (plan.kept ? 1 : 0)} 本）`);
+    if (plan) await commit(plan, afterCut(keptOf(plan)), `${moveText(sfen, move, prevMove)} から先を消しました（${plan.count} 本）`);
   }
 
   async function doEnd() {
     const plan = endHere(pool, here, current?.id ?? null, ctx());
     setDialog(null);
-    if (plan) await commit(plan, afterCut(plan), 'ここで終わりにしました');
+    if (plan) await commit(plan, afterCut(plan.kept?.id), 'ここで終わりにしました');
   }
 
   async function doDelete() {
@@ -648,7 +688,6 @@ function BookViewScreen({
     }
   }
 
-  const connections = bookAt(pool, here);
   /** 手順前後で同じ局面に来る、ほかの研究手順の自分の手（この定跡帳の一覧に無い手） */
   const transposed = studyMoves
     .filter((m) => !connections.branches.some((b) => b.move === m.move))
@@ -691,7 +730,7 @@ function BookViewScreen({
     }
   }
 
-  const outside = index > covered || pool.length === 0;
+  const outside = (index > covered && connections.count === 0) || pool.length === 0;
 
   return (
     <div class="board-screen">
@@ -790,7 +829,7 @@ function BookViewScreen({
             sfen={sfen}
             prev={prevMove}
             onBranch={pickBranch}
-            onEnding={(s) => switchTo(s, index)}
+            onEnding={pickEnding}
             onMenu={openRow}
             conflict={conflict}
             transposed={transposed}
@@ -874,15 +913,18 @@ function BookViewScreen({
           </div>
           <p class="menu-section-title">定跡帳</p>
           <div class="dialog-actions dialog-actions-column">
+            <button type="button" class="btn" data-testid="book-study-list" onClick={() => setDialog({ kind: 'list' })}>
+              研究手順の一覧（{listPool.length}本）
+            </button>
             {/* 段階14：盤の下から ⋯ へ移した */}
             <button
               type="button"
               class="btn"
               data-testid="book-review"
-              disabled={pool.length === 0}
-              onClick={() => go(groupPracticePath(bookKey))}
+              disabled={listPool.length === 0}
+              onClick={() => go(groupPracticePath(urlKey))}
             >
-              まとめて稽古（{pool.length} 本）
+              まとめて稽古（{listPool.length} 本）
             </button>
             <button
               type="button"
@@ -921,6 +963,23 @@ function BookViewScreen({
         </Dialog>
       )}
 
+      {dialog?.kind === 'list' && (
+        <StudyListDialog
+          studies={listPool}
+          onOpen={(s) => {
+            setDialog(null);
+            switchTo(s, s.moves.length);
+          }}
+          // 一覧で直した・消した研究手順を、前の書き込みの取り消しで古い形に書き戻さないように、取り消しの記録は捨てる
+          onChanged={() => {
+            undoStack.current = [];
+            setUndoCount(0);
+            setToast(null);
+          }}
+          onClose={() => setDialog(null)}
+        />
+      )}
+
       {dialog?.kind === 'fields' && current && (
         <StudyEditDialog
           study={current}
@@ -953,7 +1012,11 @@ function BookViewScreen({
           {cutPlan && (
             <>
               {mine && <p class="menu-section-title">研究手順</p>}
-              <CutText plan={cutPlan} />
+              <CutText count={cutPlan.count} kept={cutPlan.put} />
+              {/* 手順前後で来る研究手順も消えるときは、消える名前を出す（盤でたどっていない研究手順なので） */}
+              {cutPlan.remove.some((s) => !startsWith(s.moves, here)) && (
+                <p data-testid="book-cut-names">消える研究手順（メモも）：{cutPlan.remove.map((s) => `「${s.name}」`).join('')}</p>
+              )}
               <div class="dialog-actions">
                 <button type="button" class="btn btn-danger" data-testid="book-cut-ok" disabled={busy} onClick={() => void doCut(dialog.move)}>
                   この手から先を消す
@@ -984,8 +1047,9 @@ function BookViewScreen({
 
       {dialog?.kind === 'end' && endPlan && (
         <Dialog title="ここで終わりにしますか？" onClose={() => setDialog(null)} testId="book-end-dialog">
-          <p>この局面より先の手を、すべて消します。</p>
-          <CutText plan={endPlan} />
+          <p>この局面より先の手を、すべて消します。{[...connections.branches.flatMap((x) => x.studies), ...connections.ending].some((s) => !startsWith(s.moves, here)) &&
+              '手順前後で来る研究手順は残ります。'}</p>
+          <CutText count={endPlan.remove.length + (endPlan.kept ? 1 : 0)} kept={endPlan.kept ? [endPlan.kept] : []} />
           <div class="dialog-actions">
             <button type="button" class="btn btn-danger" data-testid="book-end-ok" disabled={busy} onClick={() => void doEnd()}>
               終わりにする
@@ -1132,13 +1196,12 @@ function RefuteCard({
 }
 
 /** 消すときの説明（何本消すか・どれを残すか） */
-function CutText({ plan }: { plan: CutPlan }) {
-  const removed = plan.remove.length + (plan.kept ? 1 : 0);
+function CutText({ count, kept }: { count: number; kept: readonly Study[] }) {
   return (
     <>
       <p data-testid="book-cut-text">
-        研究手順 {removed} 本を消します
-        {plan.kept ? `。「${plan.kept.name}」は、この局面で終わる研究手順として残します（メモもそのまま）` : ''}。
+        研究手順 {count} 本を消します
+        {kept.length > 0 ? `。${kept.map((s) => `「${s.name}」`).join('')}は、この局面で終わる研究手順として残します（メモもそのまま）` : ''}。
       </p>
       <p class="muted">取り消せます。</p>
     </>
@@ -1256,7 +1319,7 @@ function BookBranches({
       </div>
       <ul class="candidate-list">
         {branches.map((b) => {
-          const isCurrent = b.studies.some((s) => s.id === current?.id);
+          const isCurrent = b.studies.some((s) => s.id === current?.id) && !b.transposed;
           return (
             <li key={b.move} class="candidate-item">
               <button
@@ -1271,6 +1334,11 @@ function BookBranches({
                     {isCurrent ? '▶ ' : ''}
                     {moveText(sfen, b.move, prev)}
                     {tagOf(b.move)}
+                    {b.transposed && (
+                      <span class="transposed-tag" data-testid="book-transposed-tag">
+                        手順前後
+                      </span>
+                    )}
                   </span>
                   <span class="book-names">{names(b.studies)}</span>
                   {/* その手を通る研究手順の割合の棒（段階12-3。本数はこの局面を通る研究手順の数に対して） */}

@@ -3485,3 +3485,12 @@ button.move-bar-center.move-bar-action {
   padding: var(--space-3);
   background: color-mix(in srgb, var(--color-bg) 85%, transparent);
 }
+
+/* 段階22-4：定跡帳の行の「手順前後」の小さな印 */
+.transposed-tag {
+  margin-left: var(--space-1);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--color-mark);
+  white-space: nowrap;
+}

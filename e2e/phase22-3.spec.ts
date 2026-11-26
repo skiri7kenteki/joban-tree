@@ -3,6 +3,7 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import type { Study } from '../src/tree/types';
+import { openStudyList } from './study-list';
 
 test.use({ viewport: { width: 390, height: 844 }, hasTouch: true });
 
@@ -103,7 +104,7 @@ async function openApp(page: Page, studies: Study[] = []) {
       mimeType: 'application/json',
       buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies })),
     });
-    await expect(page.getByTestId('study-item')).toHaveCount(studies.length);
+    await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${studies.length} 本`);
   }
 }
 
@@ -131,8 +132,21 @@ async function device(browser: Browser, google: FakeGoogle, studies: Study[]): P
 
 async function names(page: Page, expected: string[]) {
   await page.goto('./#/');
-  await expect(page.getByTestId('study-item')).toHaveCount(expected.length);
-  for (const name of expected) await expect(page.getByTestId('study-item').filter({ hasText: name })).toHaveCount(1);
+  await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${expected.length} 本`);
+  const list = await openStudyList(page);
+  await expect(list.getByTestId('study-item')).toHaveCount(expected.length);
+  for (const name of expected) await expect(list.getByTestId('study-item').filter({ hasText: name })).toHaveCount(1);
+  await page.goto('./#/');
+}
+
+/** 一覧の行の ⋯ で消す */
+async function deleteStudy(page: Page, name: string, left: number) {
+  const list = await openStudyList(page);
+  await list.getByTestId('study-item').filter({ hasText: name }).locator('..').getByTestId('study-menu').click();
+  await page.getByTestId('study-menu-delete').click();
+  await page.getByTestId('study-menu-delete-ok').click();
+  await expect(list.getByTestId('study-item')).toHaveCount(left);
+  await page.goto('./#/');
 }
 
 test('同期を押す → ログインして戻ると、続けて同期する。鍵は URL にもバックアップにもドライブの中にも残らない', async ({ page }) => {
@@ -196,10 +210,7 @@ test('2 台で順に同期するとそろう。消した研究も伝わる。同
   expect(google.files.size).toBe(2);
 
   // A で消す → B で同期すると消えて、名前が出る
-  await a.getByTestId('study-item').filter({ hasText: 'Android で足した研究' }).locator('..').getByTestId('study-menu').click();
-  await a.getByTestId('study-menu-delete').click();
-  await a.getByTestId('study-menu-delete-ok').click();
-  await expect(a.getByTestId('study-item')).toHaveCount(1);
+  await deleteStudy(a, 'Android で足した研究', 1);
   await sync(a, '同期しました');
   await sync(b, '消えた研究手順：Android で足した研究');
   await names(b, ['iPad で足した研究']);
@@ -306,6 +317,6 @@ test('前の同期から 1 日以上なら、定跡帳のタブと設定に一�
   await page.getByTestId('sync-nudge-close').click();
   await expect(page.getByTestId('sync-nudge')).toHaveCount(0);
   await page.reload();
-  await expect(page.getByTestId('study-item')).toHaveCount(1);
+  await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${1} 本`);
   await expect(page.getByTestId('sync-nudge')).toHaveCount(0);
 });

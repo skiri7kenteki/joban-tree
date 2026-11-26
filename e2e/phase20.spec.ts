@@ -22,7 +22,7 @@ async function setup(page: Page, studies: Study[]) {
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies })),
   });
-  await expect(page.getByTestId('study-item')).toHaveCount(studies.length);
+  await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${studies.length} 本`);
 }
 
 /** ⋯ から候補の窓（自分の手番）を開いて、いちばん下の局面メモに書く */
@@ -100,7 +100,7 @@ test('食い違い：行に印 → 定跡帳のタブに知らせ → 見るで�
   await expect(page.getByTestId('book-table')).toHaveText('候補 2・本命 △６二玉');
 
   await page.goto('./');
-  await expect(page.getByTestId('study-item')).toHaveCount(2);
+  await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${2} 本`);
   await expect(page.getByTestId('conflict-notice')).toHaveCount(0);
 });
 
@@ -110,14 +110,16 @@ test('手順前後：同じ局面に別の手順で来る研究手順の手は�
   await setup(page, [x, y]);
   await expect(page.getByTestId('conflict-notice')).toContainText('3手目');
   await page.getByTestId('conflict-open').click();
-  await expect(page.getByTestId('study-book-branch')).toHaveCount(1);
-  await expect(page.getByTestId('book-transposed')).toHaveCount(1);
-  await expect(page.getByTestId('book-transposed')).toContainText('手順前後：研究');
+  // 段階22-4：同じ定跡帳の手順前後は、ふつうの行にまとめて「手順前後」の印
+  await expect(page.getByTestId('study-book-branch')).toHaveCount(2);
+  await expect(page.getByTestId('book-transposed-tag')).toHaveCount(1);
   await expect(page.getByTestId('book-conflict-tag')).toHaveCount(2);
   const before = await page.getByTestId('study-title').textContent();
-  await page.getByTestId('book-transposed').click();
+  await page.getByTestId('study-book-branch').filter({ has: page.getByTestId('book-transposed-tag') }).click();
   await expect(page.getByTestId('study-title')).not.toHaveText(before ?? '');
-  await expect(page.getByTestId('study-position')).toContainText('3手目');
+  await expect(page.getByTestId('book-toast')).toContainText('の手順に切り替えました');
+  // 盤は次の局面へ進む
+  await expect(page.getByTestId('study-position')).toContainText('4手目');
 });
 
 test('稽古：ほかの研究手順の手はまちがいにしない。局面メモをカードの下に出す', async ({ page }) => {

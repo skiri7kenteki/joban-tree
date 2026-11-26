@@ -1,11 +1,14 @@
 // 研究手順どうしをつないで見る（段階9-2、自分の定跡帳）。エンジンは使わない。
 // 持ち主の判断（2026-11-18「おすすめの通りで」）：
-//   - つなぐのは、平手の初期局面からの手順がまったく同じ部分だけ（★と同じ考え方。手順前後で同じ局面に合流してもつながない）
+//   - 定跡帳の画面は、**同じ局面**（手数を除いた SFEN）を通る研究手順をつなぐ（段階22-4。`bookAtPosition`。前は手順がまったく同じ部分だけ）。
+//     KIF の書き出し（`bookAt`・`bookOrder`）は今まで通り、手順がまったく同じ部分だけ
 //   - つないだツリーは保存せず、開くたびに研究手順の一覧から組み立てる（データの形は変えない）
 //   - 次の手の並びは、その手を通る研究手順の多い順。同じなら、いちばん最近直した研究手順が新しい順。KIF の本譜・変化の並びも同じ
 //   - 違う手を押したら、その手を通る研究手順のうち、いちばん最近直したものに切り替える
 //   - 定跡帳の出発点は、そのグループの研究手順が全部通る、自分の側が同じ、いちばん浅い戦型の出発点（段階10 の直し。前はいちばん深いもの）（無ければ平手の初期局面）
 
+import type { BookIndex } from '../games/compare';
+import { sfenKey } from '../shogi/position';
 import { startsWith } from './studies';
 import type { OpeningTemplate } from './templates';
 import type { Study } from './types';
@@ -16,6 +19,10 @@ type BookStudy = Pick<Study, 'moves' | 'updatedAt'>;
 export interface BookBranch<S extends BookStudy> {
   move: string;
   studies: S[];
+  /** 研究手順ごとの、この局面が何手目か（局面でつなぐときだけ） */
+  plies?: ReadonlyMap<string, number>;
+  /** どの研究手順も、今の手順とは違う順でこの局面に来る（手順前後） */
+  transposed?: boolean;
 }
 
 /** ある局面（平手からの手順 movesHere）での、研究手順のつながり */
@@ -54,6 +61,51 @@ export function bookAt<S extends BookStudy>(studies: readonly S[], movesHere: re
   }
   const branches = [...byMove].map(([move, list]) => ({ move, studies: list.sort(byLatest) })).sort(compareBranches);
   return { count: through.length, branches, ending: ending.sort(byLatest) };
+}
+
+/**
+ * 局面でつなぐ（段階22-4）：局面 sfen を通る研究手順すべての次の手。index は定跡帳の研究手順の局面の索引（`buildBookIndex`）、
+ * here は今の局面までの手順。並びは bookAt と同じ
+ */
+export function bookAtPosition(index: BookIndex, here: readonly string[], sfen: string): BookPosition<Study> {
+  /** 研究手順ごとに、この局面が何手目か（2 回通るなら、今の手順と同じ所。無ければ最初） */
+  const plies = new Map<Study, number>();
+  for (const { study, ply } of index.get(sfenKey(sfen))?.through ?? []) {
+    if (!plies.has(study) || (ply === here.length && startsWith(study.moves, here))) plies.set(study, ply);
+  }
+  const ending: Study[] = [];
+  const byMove = new Map<string, Study[]>();
+  for (const [study, ply] of plies) {
+    if (ply >= study.moves.length) {
+      ending.push(study);
+      continue;
+    }
+    const move = study.moves[ply];
+    const list = byMove.get(move);
+    if (list) list.push(study);
+    else byMove.set(move, [study]);
+  }
+  const branches = [...byMove]
+    .map(([move, list]) => ({
+      move,
+      studies: list.sort(byLatest),
+      plies: new Map(list.map((s) => [s.id, plies.get(s)!])),
+      transposed: !list.some((s) => startsWith(s.moves, [...here, move])),
+    }))
+    .sort(compareBranches);
+  return { count: plies.size, branches, ending: ending.sort(byLatest) };
+}
+
+/**
+ * 局面でつないだ行を押したときの行き先。今の手順どおりに進める研究手順があれば、その中で今たどっているもの、無ければいちばん最近直したもの。
+ * 無ければ手順前後の研究手順の、同じ局面の次へ（switched：たどる手順が切り替わる）。index は行き先が何手目か
+ */
+export function branchTarget(branch: BookBranch<Study>, here: readonly string[], currentId: string | null): { study: Study; index: number; switched: boolean } {
+  const next = [...here, branch.move];
+  const same = branch.studies.filter((s) => startsWith(s.moves, next));
+  const list = same.length > 0 ? same : branch.studies;
+  const study = list.find((s) => s.id === currentId) ?? list[0];
+  return same.length > 0 ? { study, index: next.length, switched: false } : { study, index: (branch.plies?.get(study.id) ?? here.length) + 1, switched: true };
 }
 
 /** 次の手を押したときに切り替える研究手順：その手を通るもののうち、いちばん最近直したもの */

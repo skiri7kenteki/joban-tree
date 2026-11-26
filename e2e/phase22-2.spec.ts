@@ -5,6 +5,7 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import type { Study } from '../src/tree/types';
+import { openStudyList } from './study-list';
 
 const BASE = '7g7f 3c3d 2g2f 8c8d 2f2e 8d8e 6i7h 4a3b 2e2d 2c2d 2h2d';
 const study = (id: string, name: string, tail: string, createdAt: number): Study => ({
@@ -31,7 +32,7 @@ async function device(browser: Browser, studies: Study[], size = { width: 390, h
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies })),
   });
-  await expect(page.getByTestId('study-item')).toHaveCount(studies.length);
+  await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${studies.length} 本`);
   return page;
 }
 
@@ -58,8 +59,21 @@ async function confirmMerge(page: Page) {
 
 async function names(page: Page, expected: string[]) {
   await page.goto('./#/');
-  await expect(page.getByTestId('study-item')).toHaveCount(expected.length);
-  for (const name of expected) await expect(page.getByTestId('study-item').filter({ hasText: name })).toHaveCount(1);
+  await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${expected.length} 本`);
+  const list = await openStudyList(page);
+  await expect(list.getByTestId('study-item')).toHaveCount(expected.length);
+  for (const name of expected) await expect(list.getByTestId('study-item').filter({ hasText: name })).toHaveCount(1);
+  await page.goto('./#/');
+}
+
+/** 一覧の行の ⋯ で消す */
+async function deleteStudy(page: Page, name: string, left: number) {
+  const list = await openStudyList(page);
+  await list.getByTestId('study-item').filter({ hasText: name }).locator('..').getByTestId('study-menu').click();
+  await page.getByTestId('study-menu-delete').click();
+  await page.getByTestId('study-menu-delete-ok').click();
+  await expect(list.getByTestId('study-item')).toHaveCount(left);
+  await page.goto('./#/');
 }
 
 test('A で保存して B で合わせると両方の研究が残る。戻す前のデータに戻せる', async ({ browser }) => {
@@ -99,10 +113,7 @@ test('消した研究手順は合わせた端末でも消える。戻したも�
   const b = await device(browser, [SHARED_A, ONLY_A]);
 
   // A で消す
-  await a.getByTestId('study-item').filter({ hasText: 'iPad で足した研究' }).locator('..').getByTestId('study-menu').click();
-  await a.getByTestId('study-menu-delete').click();
-  await a.getByTestId('study-menu-delete-ok').click();
-  await expect(a.getByTestId('study-item')).toHaveCount(1);
+  await deleteStudy(a, 'iPad で足した研究', 1);
   const fromA = await saveBackup(a);
 
   await pickMerge(b, fromA);
@@ -142,10 +153,7 @@ test('同じ手順の 2 本の片方を消しても、残した方は次に合�
   const a = await device(browser, [one, two]);
   const before = await saveBackup(a);
   await a.goto('./#/');
-  await a.getByTestId('study-item').filter({ hasText: '消す方' }).locator('..').getByTestId('study-menu').click();
-  await a.getByTestId('study-menu-delete').click();
-  await a.getByTestId('study-menu-delete-ok').click();
-  await expect(a.getByTestId('study-item')).toHaveCount(1);
+  await deleteStudy(a, '消す方', 1);
   await pickMerge(a, before);
   await expect(a.getByTestId('merge-removed')).toHaveCount(0);
   await confirmMerge(a);

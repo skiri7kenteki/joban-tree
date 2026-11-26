@@ -19,7 +19,7 @@ async function importStudies(page: Page, studies: Study[]) {
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies })),
   });
-  await expect(page.getByTestId('study-item')).toHaveCount(studies.length);
+  await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${studies.length} 本`);
 }
 
 async function play(page: Page, from: string, to: string) {
@@ -49,8 +49,7 @@ test.describe('9-2 研究手順どうしをつないで見る', () => {
   test('定跡帳として見る：出発点からたどる・研究手順の数・ここで終わる研究・まとめて復習・定跡帳で指して延ばす', async ({ page }) => {
     await openHome(page);
     await importStudies(page, BOOK);
-    await page.getByTestId('study-group-menu-open').first().click();
-    await page.getByTestId('study-group-book').click();
+    await page.getByTestId('book-group-open').first().click();
     await expect(page.getByTestId('book-title')).toHaveText('定跡帳横歩取り（先手番）');
     // 出発点は 3 本が全部通る、先手番の戦型のうちいちばん浅いもの（基本図。段階10 の直し）。それより前には戻れない。いちばん最近直した研究A を見ている
     await expect(page.getByTestId('study-position')).toContainText('15手目');

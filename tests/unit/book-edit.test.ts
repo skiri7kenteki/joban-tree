@@ -85,11 +85,11 @@ describe('定跡帳で指す：延ばす・同じ手で進む・新しい枝', (
 
   it('途中の局面で、すでにある次の手と同じ手 → 1 手進むだけ（今の研究手順が通ればそれ、無ければいちばん最近直したもの）', () => {
     const here = [...K, '3d3f', '8f8d', '3f2f'];
-    expect(playInBook([A, B], [A, B], here.slice(0, -1), '3f2f', 'A', ctx())).toEqual({ kind: 'advance', target: A });
+    expect(playInBook([A, B], [A, B], here.slice(0, -1), '3f2f', 'A', ctx())).toMatchObject({ kind: 'advance', target: A, switched: false });
     // 今の研究手順（A）が通らない手：その手を通る B へ
-    expect(playInBook([A, B], [A, B], here, '5a4b', 'A', ctx())).toEqual({ kind: 'advance', target: B });
+    expect(playInBook([A, B], [A, B], here, '5a4b', 'A', ctx())).toMatchObject({ kind: 'advance', target: B, switched: false });
     // どちらも通る手で、今の研究手順が無い（木の外から来た）ときは、いちばん最近直した B
-    expect(playInBook([A, B], [A, B], K, '3d3f', null, ctx())).toEqual({ kind: 'advance', target: B });
+    expect(playInBook([A, B], [A, B], K, '3d3f', null, ctx())).toMatchObject({ kind: 'advance', target: B, switched: false });
   });
 
   it('途中の局面で新しい手 → 「その局面までの手順＋指した手」の新しい研究手順（名前は分かれ目がわかる形・側は定跡帳の側）', () => {

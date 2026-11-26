@@ -5,6 +5,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { STARTPOS_SFEN, applyUsiMove, sfenKey } from '../src/shogi/position';
 import { TREE_APP, TREE_FORMAT_VERSION, type Study, type TreeData, type TreeNode } from '../src/tree/types';
+import { openStudyList } from './study-list';
 
 test.use({ hasTouch: true });
 
@@ -68,7 +69,7 @@ async function setup(page: Page) {
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies: STUDIES })),
   });
-  await expect(page.getByTestId('study-item')).toHaveCount(STUDIES.length);
+  await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${STUDIES.length} 本`);
   await page.goto('./#/trees');
   await page.getByTestId('import-file').setInputFiles({ name: 't.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(tree())) });
   await expect(page.getByTestId('tree-item')).toHaveCount(1);
@@ -104,7 +105,7 @@ for (const [w, h] of [
 
     // 定跡帳の盤：研究候補は枠の中。盤の下に［取り消す］［まとめて復習］・メモは出さない（⋯ と ★ の行から）
     await page.goto('./');
-    await page.getByTestId('study-item').first().click();
+    await (await openStudyList(page)).getByTestId('study-item').first().click();
     await page.getByTestId('study-prev').click();
     await page.getByTestId('study-prev').click();
     await expect(page.getByTestId('study-book-branch')).toHaveCount(4);

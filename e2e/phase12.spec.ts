@@ -4,6 +4,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { STARTPOS_SFEN, applyUsiMove, sfenKey } from '../src/shogi/position';
 import { TREE_APP, TREE_FORMAT_VERSION, type Study, type TreeData, type TreeNode } from '../src/tree/types';
 import { openStudyReview } from './studyTree';
+import { openStudyList } from './study-list';
 
 test.use({ viewport: { width: 360, height: 740 }, hasTouch: true });
 
@@ -162,7 +163,7 @@ test.describe('12-1 色・文字・部品の土台（段階16 で明るい対局
       mimeType: 'application/json',
       buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies: STUDIES })),
     });
-    await expect(page.getByTestId('study-item')).toHaveCount(2);
+    await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${2} 本`);
     const style = (sel: string, prop: string) => page.locator(sel).first().evaluate((e, p) => getComputedStyle(e).getPropertyValue(p), prop);
     // 一覧の画面：地は #F7F5F1、見出しは帯なし（地と同じ）で墨の明朝（「書き出し」は段階20-3 で設定へ移した）
     expect(await style('.app', 'background-color')).toBe('rgb(247, 245, 241)');
@@ -173,8 +174,6 @@ test.describe('12-1 色・文字・部品の土台（段階16 で明るい対局
     expect(await style('.tree-group', 'background-color')).toBe('rgba(0, 0, 0, 0)');
     expect(await style('.tree-group .tree-list', 'background-color')).toBe('rgb(255, 255, 255)');
     expect(await style('.tree-group .tree-row', 'box-shadow')).toBe('none');
-    // 行の輪の下に小さく「覚えた」、輪と ⋯ の間の縦線はなし
-    expect(await style('[data-testid="study-menu"]', 'border-left-width')).toBe('0px');
     // 主なボタンは墨の塗りに白い文字と少しの影（グラデーションなし）
     expect(await style('[data-testid="study-register"]', 'background-color')).toBe('rgb(45, 45, 45)');
     expect(await style('[data-testid="study-register"]', 'color')).toBe('rgb(255, 255, 255)');
@@ -192,7 +191,7 @@ test.describe('12-1 色・文字・部品の土台（段階16 で明るい対局
     // 明朝体はアプリに入っている（端末に無くても出る）
     expect(await page.evaluate(() => document.fonts.check('600 21px "Joban Mincho"', '定跡帳'))).toBe(true);
 
-    await page.getByTestId('study-item').first().click();
+    await (await openStudyList(page)).getByTestId('study-item').first().click();
     await expect(page.getByTestId('study-position')).toBeVisible();
     // 盤の画面：地は一覧と同じ #F7F5F1（盤のまわりに色の地を敷かない）。盤と駒台は影で浮かせる
     expect(await style('.app', 'background-color')).toBe('rgb(247, 245, 241)');
@@ -230,17 +229,20 @@ test.describe('12-1 色・文字・部品の土台（段階16 で明るい対局
       mimeType: 'application/json',
       buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies: STUDIES })),
     });
-    await expect(page.getByTestId('study-item')).toHaveCount(2);
+    await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${2} 本`);
     await check('定跡帳のタブ');
-    await page.getByTestId('study-menu').first().click();
+    await (await openStudyList(page)).getByTestId('study-menu').first().click();
     await check('研究手順の行の ⋯');
+    await page.locator('dialog[open]').last().getByRole('button', { name: '閉じる' }).click();
+    await check('研究手順の一覧');
     await closeDialog(page);
+    await page.goto('./#/');
     await page.getByTestId('study-register').click();
     await check('研究手順を登録');
     await closeDialog(page);
 
     // 定跡帳（盤）と ⋯
-    await page.getByTestId('study-item').first().click();
+    await (await openStudyList(page)).getByTestId('study-item').first().click();
     await expect(page.getByTestId('study-position')).toBeVisible();
     for (let i = 0; i < 3; i++) await page.getByTestId('study-prev').click();
     await check('定跡帳');
@@ -369,16 +371,19 @@ test.describe('12-3 定跡帳', () => {
       mimeType: 'application/json',
       buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies: STUDIES })),
     });
-    await expect(page.getByTestId('study-item')).toHaveCount(2);
+    await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${2} 本`);
     await seedPractice(page);
     await page.reload();
     await expect(page.getByTestId('book-summary-today')).toHaveText('1 本');
     await expect(page.getByTestId('book-summary-learned')).toHaveText('1 / 2本');
     await expect(page.getByTestId('book-summary-wrong')).toHaveText('1 本');
-    const due = page.getByTestId('study-due');
-    await expect(due).toHaveCount(2);
-    await expect(page.getByTestId('study-item').filter({ hasText: '銀' }).getByTestId('study-due')).toHaveText('稽古 今日');
-    await expect(page.getByTestId('study-item').filter({ hasNotText: '銀' }).getByTestId('study-due')).toHaveText('稽古 あと 7日');
+    // 段階22-4：定跡帳ごとに 1 行（今日の分があれば「今日」・覚えた割合の輪）
+    await expect(page.getByTestId('book-group')).toHaveCount(1);
+    await expect(page.getByTestId('book-group').getByTestId('study-due')).toHaveText('稽古 今日');
+    await expect(page.getByTestId('book-group-ring')).toContainText('50%');
+    const list = await openStudyList(page);
+    await expect(list.getByTestId('study-item').filter({ hasText: '銀' }).getByTestId('study-due')).toHaveText('稽古 今日');
+    await expect(list.getByTestId('study-item').filter({ hasNotText: '銀' }).getByTestId('study-due')).toHaveText('稽古 あと 7日');
     await expect(page.locator('.sprout-mark')).toHaveCount(0);
     // 研究手順の行は 1 枚のカード（行と ⋯ が同じ箱）
     const row = await page.locator('.tree-row').first().boundingBox();
@@ -386,6 +391,7 @@ test.describe('12-3 定跡帳', () => {
     expect(menu!.x + menu!.width).toBeLessThanOrEqual(row!.x + row!.width + 0.5);
     expect(Math.round(menu!.height)).toBeGreaterThanOrEqual(44);
     // 集計を押すと稽古のタブ
+    await page.goto('./#/');
     await page.getByTestId('book-summary').click();
     await expect(page).toHaveURL(/#\/practice$/);
   });
@@ -397,7 +403,7 @@ test.describe('12-3 定跡帳', () => {
       mimeType: 'application/json',
       buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies: STUDIES })),
     });
-    await page.getByTestId('study-item').first().click();
+    await (await openStudyList(page)).getByTestId('study-item').first().click();
     await expect(page.getByTestId('study-position')).toBeVisible();
     // 8 手目（△3二金の後）：次の手は ▲2四歩・▲3八銀 の 2 つ、それぞれ 2 本のうち 1 本
     for (let i = 0; i < 3; i++) await page.getByTestId('study-prev').click();
@@ -444,7 +450,7 @@ test.describe('12-4 残りの画面', () => {
       buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies: [STUDIES[0]] })),
     });
     // 取り込みの保存が終わってから復習を開く（終わる前に開くと問題が 0 になることがあった）
-    await expect(page.getByTestId('study-item')).toHaveCount(1);
+    await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${1} 本`);
     await openStudyReview(page);
     const progress = page.getByTestId('review-progress');
     await expect(progress).toHaveText('今日 1／5問');
@@ -487,7 +493,7 @@ test.describe('12-4 残りの画面', () => {
       mimeType: 'application/json',
       buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies: [STUDIES[0]] })),
     });
-    await expect(page.getByTestId('study-item')).toHaveCount(1);
+    await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${1} 本`);
     await openStudyReview(page);
     await expect(page.getByTestId('review-progress')).toBeVisible();
     await page.locator('[data-square="77"]').click();
@@ -516,7 +522,7 @@ test.describe('段階12 の追加：駒と駒台（v0.34.0）', () => {
       mimeType: 'application/json',
       buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies: [MID] })),
     });
-    await page.getByTestId('study-item').first().click();
+    await (await openStudyList(page)).getByTestId('study-item').first().click();
     const board = page.getByTestId('board');
     await expect(board).toBeVisible();
     // 駒の字体がアプリの中から読み込まれる（オフラインでも出る）
@@ -598,7 +604,7 @@ test.describe('段階12 の追加：駒と駒台（v0.34.0）', () => {
       mimeType: 'application/json',
       buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies: [MID] })),
     });
-    await expect(page.getByTestId('study-item')).toHaveCount(1);
+    await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${1} 本`);
     await page.goto('./#/settings');
     await page.getByTestId('review-batch-5').click();
     await openStudyReview(page);

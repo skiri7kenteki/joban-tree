@@ -3,6 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { STARTPOS_SFEN, applyUsiMove, sfenKey } from '../src/shogi/position';
 import { TREE_APP, TREE_FORMAT_VERSION, type Study, type TreeData, type TreeNode } from '../src/tree/types';
 import { openStudyReview } from './studyTree';
+import { openStudyList } from './study-list';
 
 /**
  * 開いている窓を × で閉じる（窓が本当に開くまで待ってから押し、閉じたのを確かめる）。
@@ -70,7 +71,7 @@ test.describe('11-4 復習を小分けにする', () => {
       buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies: [LINE] })),
     });
     // 段階19：研究手順の 1 局面ずつの復習は稽古に置きかえたので、ツリーの復習の「研究手順だけ」で確かめる
-    await expect(page.getByTestId('study-item')).toHaveCount(1);
+    await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${1} 本`);
     await openStudyReview(page);
 
     const progress = page.getByTestId('review-progress');
@@ -194,14 +195,14 @@ async function importStudy(page: Page, study: Study) {
     mimeType: 'application/json',
     buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies: [study] })),
   });
-  await expect(page.getByTestId('study-item')).toHaveCount(1);
+  await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${1} 本`);
 }
 
 test.describe('11-5 手順の一覧（棋譜欄）', () => {
   test('スマホ縦：定跡帳の手数を押すと画面下から開く。今の行が目立ち、押すとその局面へ移って閉じる', async ({ page }) => {
     await openHome(page);
     await importStudy(page, LINE);
-    await page.getByTestId('study-item').click();
+    await (await openStudyList(page)).getByTestId('study-item').click();
     const pos = page.getByTestId('study-position');
     await expect(pos).toHaveText('11手目 ▲同　飛');
     // スマホ縦では盤の横に出さない（盤の大きさは変わらない）
@@ -276,7 +277,7 @@ test.describe('11-5 手順の一覧（iPad 横）', () => {
   test('盤の横に常に出す。今の行が目立ち、押すとその局面へ（定跡帳・ツリー）', async ({ page }) => {
     await openHome(page);
     await importStudy(page, LINE);
-    await page.getByTestId('study-item').click();
+    await (await openStudyList(page)).getByTestId('study-item').click();
     const panel = page.getByTestId('kifu-panel');
     await expect(panel).toBeVisible();
     await expect(panel.locator('[aria-current="step"]')).toHaveAttribute('data-ply', '11');
@@ -321,7 +322,7 @@ test.describe('11-2 盤の下の固定バー', () => {
   test('定跡帳：‹ › の行と手順の行の代わりに、盤のすぐ下のバー（段階14）。真ん中を押すと手順の一覧。ページはスクロールしない', async ({ page }) => {
     await openHome(page);
     await importStudy(page, LINE);
-    await page.getByTestId('study-item').click();
+    await (await openStudyList(page)).getByTestId('study-item').click();
     await expect(page.getByTestId('study-position')).toHaveText('11手目 ▲同　飛');
     await expectBarUnderBoard(page, 'study-nav', '[data-testid="study-board"]', 740);
     for (const id of ['study-first', 'study-prev', 'study-next', 'study-last']) {
@@ -450,13 +451,18 @@ test.describe('11-3 ⋯ のメニューと説明文', () => {
     await openHome(page);
     await importStudy(page, LINE);
     // 一覧の行の ⋯ も画面の下から。文字は短く
-    await page.getByTestId('study-menu').click();
+    await (await openStudyList(page)).getByTestId('study-menu').click();
     await expectSheet(page, 'study-menu-dialog', 740);
     await expect(page.getByTestId('study-menu-edit')).toHaveText('名前・メモ');
     await expect(page.getByTestId('study-menu-json')).toHaveCount(0);
+    await page.locator('dialog[open]').last().getByRole('button', { name: '閉じる' }).click();
     await closeDialog(page);
+    // 初めての説明は、一覧を見るために定跡帳を開いた時点で出ているので、見ていないことにする
+    await page.goto('./#/');
+    await page.evaluate(() => localStorage.removeItem('joban-tree.hints-seen'));
+    await page.reload();
 
-    await page.getByTestId('study-item').click();
+    await (await openStudyList(page)).getByTestId('study-item').click();
     await expect(page.getByTestId('study-title')).toHaveText('横歩の手前');
     // 初めての 1 回だけ：盤で指すと足される
     await expect(page.getByTestId('hint-book-write')).toBeVisible();

@@ -2,7 +2,8 @@
 // ここは画面から切り離した計算だけ（Vitest で確かめる）。データ（1 本ずつの研究手順）の形は変えない。木の葉の 1 本 1 本が研究手順。
 //
 // 盤で指したとき（今の局面＝平手から here の手順）。上から順に：
-//   1. すでにある次の手と同じ手 → 1 手進むだけ（データは変えない。今の研究手順がその手を通ればそのまま、無ければいちばん最近直したものへ）
+//   1. すでにある次の手と同じ手 → 1 手進むだけ（データは変えない。今の研究手順がその手を通ればそのまま、無ければいちばん最近直したものへ）。
+//      段階22-4：手順前後の研究手順に、同じ局面・同じ次の手があるときも、足さずにそちらへ進む
 //   2. here で終わる研究手順がある → その研究手順を 1 手延ばす
 //   3. それ以外 → 「here＋指した手」の新しい研究手順を作る（研究の木の外にいるときも、これ）
 //   - 足した結果がほかの研究手順とまったく同じ手順になる（別の側・別のグループにある）なら足さない
@@ -22,6 +23,8 @@ import { closestTemplate, type OpeningTemplate } from './templates';
 import type { Study } from './types';
 import { sfenKey, type Side } from '../shogi/position';
 import { studyPositions } from '../review/studyReview';
+import { buildBookIndex } from '../games/compare';
+import { bookAtPosition, branchTarget, type BookBranch } from './studyBook';
 
 /**
  * 手順から付け直す戦型：**自分の側が同じ戦型**のうち、いちばん長く一致するもの。無ければ付けない
@@ -171,8 +174,8 @@ export function createdStudy(moves: readonly string[], pool: readonly Study[], c
 }
 
 export type PlayResult =
-  /** 1 手進むだけ（target の研究手順へ。データは変えない） */
-  | { kind: 'advance'; target: Study }
+  /** 1 手進むだけ（target の研究手順の index 手目へ。データは変えない）。switched：手順前後の研究手順へ切り替わる */
+  | { kind: 'advance'; target: Study; index: number; switched: boolean }
   /** 延ばした（extend）・新しく作った（create）。study が書き込んだ後の研究手順 */
   | { kind: 'extend' | 'create'; change: BookChange; study: Study }
   /** ほかの研究手順とまったく同じ手順になる（この定跡帳の外にある） */
@@ -189,7 +192,13 @@ export type PlayResult =
 export function playInBook(pool: readonly Study[], all: readonly Study[], here: readonly string[], move: string, currentId: string | null, ctx: BookCtx): PlayResult {
   const next = [...here, move];
   const through = pool.filter((s) => startsWith(s.moves, next));
-  if (through.length > 0) return { kind: 'advance', target: through.find((s) => s.id === currentId) ?? [...through].sort(byLatest)[0] };
+  if (through.length > 0) return { kind: 'advance', target: through.find((s) => s.id === currentId) ?? [...through].sort(byLatest)[0], index: next.length, switched: false };
+  const sfen = studyPositions(here)[here.length];
+  const branch = sfen === undefined ? undefined : bookAtPosition(buildBookIndex(pool, ctx.side), here, sfen).branches.find((b) => b.move === move);
+  if (branch) {
+    const to = branchTarget(branch, here, currentId);
+    return { kind: 'advance', target: to.study, index: to.index, switched: to.switched };
+  }
   if (next.length <= ctx.start) return { kind: 'too-short' };
   const ending = here.length > 0 ? findSameStudy(pool, here) : null;
   const study = ending ? reshaped(ending, next, pool, ctx) : createdStudy(next, pool, ctx);
@@ -204,8 +213,8 @@ export function playInBook(pool: readonly Study[], all: readonly Study[], here: 
 
 /** 手順を続けて足した結果（段階20-2「エンジンに聞く」の［足す］：相手の手と自分の対応の 2 手など） */
 export type LineResult =
-  /** 足した（または全部すでにあって進むだけ）。change は全部まとめた 1 つの変更（取り消しは 1 回で戻る）。study は最後にたどる研究手順 */
-  | { kind: 'ok'; change: BookChange | null; study: Study; played: number }
+  /** 足した（または全部すでにあって進むだけ）。change は全部まとめた 1 つの変更（取り消しは 1 回で戻る）。study は最後にたどる研究手順、index は 1 手目を指した局面がその何手目か */
+  | { kind: 'ok'; change: BookChange | null; study: Study; played: number; index: number }
   /** 1 手目から足せない（playInBook と同じ理由） */
   | Extract<PlayResult, { kind: 'same' | 'outside' | 'too-short' }>;
 
@@ -220,10 +229,15 @@ export function playLineInBook(pool: readonly Study[], all: readonly Study[], he
   let curId = currentId;
   let study: Study | null = null;
   let played = 0;
+  /** 1 手目を指した局面（そこまでの手順） */
+  let first: string[] = [];
   for (const move of moves) {
     const r = playInBook(curPool, curAll, curHere, move, curId, ctx);
+    let reached = [...curHere, move];
     if (r.kind === 'advance') {
       study = r.target;
+      // 手順前後の研究手順へ切り替わったら、続きはその手順の上で
+      reached = r.target.moves.slice(0, r.index);
     } else if ('change' in r) {
       curPool = applyChange(curPool, r.change);
       curAll = applyChange(curAll, r.change);
@@ -233,10 +247,19 @@ export function playLineInBook(pool: readonly Study[], all: readonly Study[], he
       break;
     }
     curId = study.id;
-    curHere = [...curHere, move];
+    curHere = reached;
+    if (played === 0) first = reached;
     played++;
   }
-  return { kind: 'ok', change: diffChange(all, curAll), study: study!, played };
+  return { kind: 'ok', change: diffChange(all, curAll), study: study!, played, index: plyOfPosition(study!, first) };
+}
+
+/** study の中で、手順 path を指した局面が何手目か（同じ順ならその手数。手順前後なら局面で探す） */
+function plyOfPosition(study: Study, path: readonly string[]): number {
+  if (startsWith(study.moves, path)) return path.length;
+  const target = studyPositions(path)[path.length];
+  const found = studyPositions(study.moves).findIndex((s) => target !== undefined && sfenKey(s) === sfenKey(target));
+  return found < 0 ? Math.min(path.length, study.moves.length) : found;
 }
 
 /** 前と後の一覧の違いを 1 つの変更にする（変わらなければ null） */
@@ -297,17 +320,50 @@ export function cutMoveAt(
 ): (BookChange & { count: number }) | null {
   const targets = studiesPlaying(studies, side, key, move);
   if (targets.length === 0) return null;
+  const change = cutAll(studies, side, targets.map((s) => prefixPlaying(s, key, move)!), move, currentId, ctx);
+  return change ? { ...change, count: targets.length } : null;
+}
+
+/** 手順 prefixes のそれぞれで「この手から先を消す」を順に行い、まとめて 1 つの変更にする */
+function cutAll(
+  studies: readonly Study[],
+  side: Side,
+  prefixes: readonly (readonly string[])[],
+  move: string,
+  currentId: string | null,
+  ctx: Pick<BookCtx, 'templates' | 'now' | 'start' | 'side'>,
+): BookChange | null {
   let same = studies.filter((s) => s.mySide === side);
   let all = [...studies];
-  for (const target of targets) {
-    const prefix = prefixPlaying(target, key, move)!;
+  for (const prefix of prefixes) {
     const plan = cutBranch(same, prefix, move, currentId, ctx);
     if (!plan) continue;
     same = applyChange(same, plan);
     all = applyChange(all, plan);
   }
-  const change = diffChange(studies, all);
-  return change ? { ...change, count: targets.length } : null;
+  return diffChange(studies, all);
+}
+
+/** 定跡帳の行の「この手から先を消す」の中身：消す変更と、その手を指していた研究手順の数・残す研究手順 */
+export interface RowCut extends BookChange {
+  count: number;
+}
+
+/**
+ * 定跡帳の行の「この手から先を消す」（段階22-4：行は同じ局面の研究手順をまとめて出すので、手順前後で来るものも一緒に消す）。
+ * **消すのは行に出ている研究手順だけ**で、切る位置は行を作ったときの局面（今の手順どおりのものは今の盤の位置。同じ局面を 2 回通っても前の所では切らない）。
+ * 手順ごとの決まりは cutBranch と同じ。消すものが無ければ null
+ */
+export function cutRow(
+  pool: readonly Study[],
+  here: readonly string[],
+  branch: BookBranch<Study>,
+  currentId: string | null,
+  ctx: Pick<BookCtx, 'templates' | 'now' | 'start' | 'side'>,
+): RowCut | null {
+  const prefixes = branch.studies.map((s) => (startsWith(s.moves, [...here, branch.move]) ? here : s.moves.slice(0, branch.plies?.get(s.id) ?? here.length)));
+  const change = cutAll(pool, ctx.side, prefixes, branch.move, currentId, ctx);
+  return change ? { ...change, count: branch.studies.length } : null;
 }
 
 /** ここで終わりにする（here より先へ進む研究手順をまとめて）。消すものが無ければ null */

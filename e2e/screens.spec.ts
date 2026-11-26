@@ -6,6 +6,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { STARTPOS_SFEN, applyUsiMove, sfenKey } from '../src/shogi/position';
 import type { Study } from '../src/tree/types';
+import { openStudyList } from './study-list';
 
 test.skip(!process.env.SHOTS, '画面の撮影は SHOTS=1 のときだけ');
 test.use({ hasTouch: true });
@@ -64,8 +65,12 @@ for (const size of SIZES) {
         mimeType: 'application/json',
         buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies: STUDIES })),
       });
-      await expect(page.getByTestId('study-item')).toHaveCount(STUDIES.length);
+      await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${STUDIES.length} 本`);
       await shot(page, size.name, 'studies');
+      // 段階22-4：定跡帳の ⋯ の研究手順の一覧
+      await openStudyList(page);
+      await shot(page, size.name, 'study-list');
+      await page.goto('./#/');
 
       // 定跡帳の盤（17 手目、分かれ目のある局面）
       await page.goto(`./#/book/${KEY}/s-a/17`);
@@ -196,6 +201,30 @@ for (const size of SIZES) {
       await page.reload();
       await expect(page.getByTestId('sync-nudge')).toBeVisible();
       await shot(page, size.name, 'sync-nudge');
+      // 段階22-4：手順前後で合流した定跡帳（平手から）
+      await page.getByTestId('study-import-file').setInputFiles({
+        name: 't.json',
+        mimeType: 'application/json',
+        buffer: Buffer.from(
+          JSON.stringify({
+            app: 'joban-tree',
+            kind: 'studies',
+            version: 1,
+            studies: [
+              { id: 's-t1', name: '角道から組む形', note: '', moves: ['7g7f', '3c3d', '2g2f', '8c8d'], mySide: 'black', createdAt: 5, updatedAt: 5 },
+              { id: 's-t2', name: '飛車先から組む形', note: '', moves: ['2g2f', '3c3d', '7g7f', '4c4d', '2f2e'], mySide: 'black', createdAt: 4, updatedAt: 4 },
+            ],
+          }),
+        ),
+      });
+      await expect(page.getByTestId('study-count')).toHaveText('研究手順 5 本');
+      await shot(page, size.name, 'studies-groups');
+      await page.goto(`./#/book/${encodeURIComponent('study:hirate|black')}/s-t1/3`);
+      await expect(page.getByTestId('book-transposed-tag')).toBeVisible();
+      await shot(page, size.name, 'book-transposed');
+      await page.getByTestId('study-book-branch').filter({ hasText: '飛車先から' }).click();
+      await expect(page.getByTestId('book-toast')).toBeVisible();
+      await shot(page, size.name, 'book-switched');
     });
   });
 }
