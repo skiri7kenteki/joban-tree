@@ -7,7 +7,7 @@ paths:
 # Google ドライブ（段階22-3）
 
 > この機能の仕様を変えたら、このファイルを直す。下のパスのファイルを読んだときだけ読み込まれる。
-> 依頼と了承した判断は `docs/claude/stage22.md`、持ち主の準備は `docs/google-drive-setup.md`。
+> 依頼と了承した判断は `docs/claude/history.md` の「段階22」、持ち主の準備は `docs/google-drive-setup.md`。
 
 - **同期（v0.51.0）**：設定の「データ」の［Google ドライブで同期］。押したときだけ。読む → `src/tree/merge.ts` の `mergeAll` で合わせる → 書き戻す。流れは `src/drive/sync.ts`（通信と保存は差し替えられる。何台もの流れは偽物でテストする）、通信は `api.ts`、本物のつなぎは `run.ts`、覚えは `state.ts`、実行と操作止めは `src/app/syncing.tsx`、欄と一言は `src/app/DriveSection.tsx`
   - ログインしていなければ Google のログインへ移り、戻ったら続けて同期する（`joban-tree.drive-sync-pending`。2 分まで。途中で読み込み直しても続ける）
