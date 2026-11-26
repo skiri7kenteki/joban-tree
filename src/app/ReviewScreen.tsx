@@ -128,10 +128,9 @@ function ReviewView({ tree, initialRecord }: { tree: TreeData; initialRecord: Re
   const fitMemo = useRef<{ question: string; width: number | null }>({ question: '', width: null });
   const question = `${steps.length}:${current.key}`;
   const boardFit = useBoardFit(boardRef, (board) => {
-    // 段階14：枠の中で問題のカードが見える盤の幅（成る・成らないの小窓は数えない）
+    // 段階14：枠の中で問題のカードが見える盤の幅
     const frame = frameRef.current;
-    const promote = board.querySelector<HTMLElement>('.promote-box')?.getBoundingClientRect().height ?? 0;
-    const width = frame && promptRef.current ? measureFitFrame(board, frame, bottomInFrame(frame, promptRef.current) - promote) : null;
+    const width = frame && promptRef.current ? measureFitFrame(board, frame, bottomInFrame(frame, promptRef.current)) : null;
     const memo = fitMemo.current;
     const kept = memo.question === question && memo.width !== null && width !== null ? Math.min(memo.width, width) : width;
     fitMemo.current = { question, width: kept };

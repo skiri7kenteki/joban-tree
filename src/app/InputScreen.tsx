@@ -201,8 +201,7 @@ export function InputScreen() {
   const boardFit = useBoardFit(boardRef, (board) => {
     const frame = frameRef.current;
     if (!frame || !sideRef.current) return null;
-    const promote = board.querySelector<HTMLElement>('.promote-box')?.getBoundingClientRect().height ?? 0;
-    return measureFitFrame(board, frame, bottomInFrame(frame, sideRef.current.querySelector(".side-choice") ?? sideRef.current) - promote);
+    return measureFitFrame(board, frame, bottomInFrame(frame, sideRef.current.querySelector(".side-choice") ?? sideRef.current));
   });
   /** 手順の操作（段階11-2）：スマホ縦は作るボタンのバーの中、広い画面は右の列の上 */
   const moveBar = (

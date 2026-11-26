@@ -110,6 +110,13 @@ for (const size of SIZES) {
       await page.getByTestId('study-next').click();
       await shot(page, size.name, 'refute');
       await page.getByTestId('refute-close').click();
+      // 段階22-1：稽古で「成りますか？」（画面の下に重ねて出す）
+      await page.goto('./#/practice/play/s-a');
+      await page.reload();
+      await expect(page.getByTestId('practice-card')).toHaveAttribute('data-phase', 'ask');
+      for (const square of ['33', '88']) await page.locator(`[data-testid="practice-board"] [data-square="${square}"]`).click();
+      await expect(page.locator('.promote-box')).toBeVisible();
+      await shot(page, size.name, 'practice-promote');
       // 稽古で次善・悪手
       for (const [name, to] of [
         ['practice-alt', ['51', '52']],

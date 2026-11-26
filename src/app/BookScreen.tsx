@@ -308,9 +308,7 @@ function BookViewScreen({
     if (!frame || !list) return null;
     if (refuteLine && listFit.current !== null) return listFit.current;
     const rows = list.querySelectorAll<HTMLElement>('.book-row:not(.book-empty)');
-    // 成る・成らないの小窓は数えない（盤の大きさが変わらないように）
-    const promote = frame.querySelector<HTMLElement>('.promote-box')?.getBoundingClientRect().height ?? 0;
-    const width = measureFitFrame(board, frame, threeRowsNeed(frame, rows, list.querySelector<HTMLElement>('.candidates-head'), ROW_GUESS) - promote);
+    const width = measureFitFrame(board, frame, threeRowsNeed(frame, rows, list.querySelector<HTMLElement>('.candidates-head'), ROW_GUESS));
     if (!refuteLine) listFit.current = width;
     return width;
   });

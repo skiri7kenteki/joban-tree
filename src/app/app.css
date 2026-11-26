@@ -154,12 +154,23 @@
   margin-bottom: var(--space-2);
 }
 
+/* 「成りますか？」は画面の下に重ねて出し、場所を取らない（段階22-1）。場所を取ると、盤が縮んで戻らなくなったり、
+   1 画面の盤の画面がスクロールしたりする。盤の大きさの計算には入れない */
 .promote-box {
+  position: fixed;
+  left: var(--space-3);
+  right: var(--space-3);
+  bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+  /* 画面の下の知らせ（.toast）より上 */
+  z-index: 60;
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: center;
   gap: var(--space-2);
-  margin-top: var(--space-2);
+  max-width: 420px;
+  margin: 0 auto;
+  box-shadow: var(--shadow-raise);
 }
 
 /* 生成の進み具合 */
@@ -2217,11 +2228,11 @@ button.move-bar-center.move-bar-action {
   }
 }
 
-/* 広い画面（iPad 横）：盤の右の列から右と下を生成りに */
+/* 広い画面（iPad 横）：盤の右の列の余白。
+   clip-path は付けない（中から画面に重ねて出す「成りますか？」まで切り取られる。段階22-1） */
 @media (min-width: 768px) and (orientation: landscape) {
   .app:not(.has-tabs) .tree-side {
     padding: var(--space-2) 0 0 var(--space-3);
-    clip-path: inset(0 -100vmax -100vmax 0);
   }
 }
 
