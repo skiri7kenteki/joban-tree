@@ -167,6 +167,26 @@ for (const size of SIZES) {
       await page.goto('./#/settings');
       await expect(page.getByTestId('data-section')).toBeVisible();
       await shot(page, size.name, 'settings');
+      // 段階22-2：ほかの端末のバックアップを合わせる確認の窓（1 本足して 1 本消すファイル）
+      // backupFile.ts は読み込まない（Vite 専用の書き方の templates.ts につながり、Playwright が起動できなくなる）
+      const gone = STUDIES[1];
+      const incoming = {
+        app: 'joban-tree',
+        kind: 'backup',
+        version: 1,
+        createdAt: Date.now(),
+        appVersion: '0.50.0',
+        data: {
+          studies: [{ ...gone, id: 's-new', name: 'ほかの端末で足した研究', moves: [...G1, '5i5h', '3a2b'] }],
+          deleted: [{ kind: 'study', id: gone.id, at: Date.now() + 60_000, moves: gone.moves, side: gone.mySide }],
+        },
+      };
+      await page.getByTestId('backup-merge-file').setInputFiles({ name: 'b.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(incoming)) });
+      await expect(page.getByTestId('backup-merge-summary')).toBeVisible();
+      await shot(page, size.name, 'merge');
+      await page.getByTestId('backup-merge-dialog').getByRole('button', { name: 'やめる' }).click();
+      await page.getByTestId('backup-merge').scrollIntoViewIfNeeded();
+      await shot(page, size.name, 'settings-data');
     });
   });
 }

@@ -1,7 +1,8 @@
 // まとめてのバックアップのファイル（段階17、v0.41.0〜。持ち主の依頼書 stage17-prompt・判断 2026-11-23「おすすめの通りで」）。
 // 研究手順・ツリー・復習の記録・自分で登録した戦型・設定を 1 つの JSON にする。ここは形を作る・確かめるだけ（保存場所の読み書きは src/storage/backup.ts）。
 //
-// ファイルの形：{ app: 'joban-tree', kind: 'backup', version: 1, createdAt, appVersion, data: { studies, trees, reviews, templates, games, practice, positions, prefs } }
+// ファイルの形：{ app: 'joban-tree', kind: 'backup', version: 1, createdAt, appVersion, data: { studies, trees, reviews, templates, games, practice, positions, deleted, prefs } }
+//   （段階22-2 で deleted＝消した記録を足した。ほかの端末と合わせるときに「消した」ことを運ぶ）
 // - あとから種類を足せる：data に新しい種類を足すだけなら version は 1 のまま（段階18 で games＝実戦の棋譜、段階19 で practice＝稽古の記録、段階20-1 で positions＝局面メモを足した。無いファイルは空として読む）。
 //   この版のアプリが知らない種類は読まずに、画面で「戻すとそれは入りません」と知らせる（unknownKinds）
 // - version が新しい（形の違う）ファイルは、分かりやすく断る
@@ -16,6 +17,7 @@ import { practiceProblem, type PracticeRecord } from '../practice/practice';
 import { positionProblem, type PositionNote } from './positions';
 import { TREE_APP, type Study, type TreeData } from './types';
 import type { OpeningTemplate } from './templates';
+import { deletedProblem, type DeletedRecord } from './deleted';
 
 export const BACKUP_KIND = 'backup';
 export const BACKUP_VERSION = 1;
@@ -34,6 +36,7 @@ export const PREF_KEYS = [
 export interface BackupTemplate extends OpeningTemplate {
   createdAt: number;
   updatedAt: number;
+  restoredAt?: number;
 }
 
 /** バックアップの中身（この版のアプリが知っている種類） */
@@ -48,12 +51,14 @@ export interface BackupData {
   practice: PracticeRecord[];
   /** 局面メモと食い違いの「このままでよい」（段階20-1） */
   positions: PositionNote[];
+  /** 消した記録（段階22-2） */
+  deleted: DeletedRecord[];
   /** 端末の設定（localStorage の名前 → 値の文字列） */
   prefs: Record<string, string>;
 }
 
 /** この版のアプリが知っている種類（段階18 で games を足した） */
-export const KNOWN_KINDS = ['studies', 'trees', 'reviews', 'templates', 'games', 'practice', 'positions', 'prefs'] as const;
+export const KNOWN_KINDS = ['studies', 'trees', 'reviews', 'templates', 'games', 'practice', 'positions', 'deleted', 'prefs'] as const;
 
 /** 種類の名前（画面に出す） */
 export const KIND_LABELS: Record<string, string> = {
@@ -65,6 +70,7 @@ export const KIND_LABELS: Record<string, string> = {
   games: '実戦の棋譜',
   practice: '稽古の記録',
   positions: '局面メモ',
+  deleted: '消した記録',
 };
 
 export interface BackupFile {
@@ -107,6 +113,7 @@ export function reviewProblem(r: unknown): string | null {
   if (!isObject(r)) return '形';
   if (!isString(r.treeId) || r.treeId.length === 0 || r.treeId.length > 100) return 'どの記録か';
   if (r.version !== 1) return '形式';
+  if (r.restoredAt !== undefined && !isNumber(r.restoredAt)) return '日時';
   if (!isObject(r.nodes)) return '問題の一覧';
   for (const [key, n] of Object.entries(r.nodes)) {
     if (key.length > 400 || !isObject(n)) return '問題';
@@ -129,7 +136,7 @@ function duplicated<T>(list: readonly T[], id: (t: T) => string): string | null 
 }
 
 /** ファイルの文字列を読む。形を確かめ、おかしければ理由を返す */
-export function parseBackupJson(text: string): BackupParseResult {
+export function parseBackupJson(text: string, use: 'restore' | 'merge' = 'restore'): BackupParseResult {
   let raw: unknown;
   try {
     raw = JSON.parse(text);
@@ -140,13 +147,13 @@ export function parseBackupJson(text: string): BackupParseResult {
     return { ok: false, message: '将棋定跡帳のバックアップのファイルではありません。［バックアップを保存］で作ったファイルを選んでください。' };
   }
   if (!isNumber(raw.version) || raw.version > BACKUP_VERSION) {
-    return { ok: false, message: '新しい版のアプリで作ったバックアップです。アプリを最新にしてから戻してください。' };
+    return { ok: false, message: `新しい版のアプリで作ったバックアップです。アプリを最新にしてから${use === 'merge' ? '合わせて' : '戻して'}ください。` };
   }
   if (!isNumber(raw.createdAt) || !isString(raw.appVersion) || !isObject(raw.data)) {
     return { ok: false, message: 'ファイルの中身が壊れています（作った日時・中身）。' };
   }
   const d = raw.data;
-  const fail = (what: string) => ({ ok: false as const, message: `ファイルの中身がおかしいので、戻しませんでした（${what}）。` });
+  const fail = (what: string) => ({ ok: false as const, message: `ファイルの中身がおかしいので、${use === 'merge' ? '合わせ' : '戻し'}ませんでした（${what}）。` });
 
   const studies = d.studies ?? [];
   if (!Array.isArray(studies)) return fail('研究手順');
@@ -191,6 +198,15 @@ export function parseBackupJson(text: string): BackupParseResult {
     const p = positionProblem(positions[i]);
     if (p) return fail(`局面メモ ${i + 1} つ目の${p}`);
   }
+  const deleted = d.deleted ?? [];
+  if (!Array.isArray(deleted)) return fail('消した記録');
+  for (let i = 0; i < deleted.length; i++) {
+    const p = deletedProblem(deleted[i]);
+    if (p) return fail(`消した記録 ${i + 1} つ目の${p}`);
+  }
+  // 戻した日時（ツリー・戦型。研究手順と実戦は上の確かめに入っている）
+  const dated = [...(trees as unknown[]), ...(templates as unknown[])];
+  if (dated.some((x) => isObject(x) && [x.restoredAt, x.renamedAt].some((t) => t !== undefined && !isNumber(t)))) return fail('日時');
   const prefs = d.prefs ?? {};
   if (!isObject(prefs)) return fail('設定');
   for (const [k, v] of Object.entries(prefs)) {
@@ -219,6 +235,7 @@ export function parseBackupJson(text: string): BackupParseResult {
     games: games as Game[],
     practice: practice as PracticeRecord[],
     positions: positions as PositionNote[],
+    deleted: deleted as DeletedRecord[],
     prefs: knownPrefs,
   };
   const unknownKinds = Object.keys(d).filter((k) => !(KNOWN_KINDS as readonly string[]).includes(k));

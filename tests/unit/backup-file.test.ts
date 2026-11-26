@@ -78,6 +78,7 @@ function sample(): BackupData {
         updatedAt: 13,
       },
     ],
+    deleted: [{ kind: 'game', id: 'g-0', at: 14 }],
     prefs: { 'joban-tree.settings': '{"version":1}', 'joban-tree:book-write': 'off' },
   };
 }
@@ -96,7 +97,7 @@ describe('バックアップのファイル', () => {
   });
 
   it('空のデータも作って読める', () => {
-    const empty: BackupData = { studies: [], trees: [], reviews: [], templates: [], games: [], practice: [], positions: [], prefs: {} };
+    const empty: BackupData = { studies: [], trees: [], reviews: [], templates: [], games: [], practice: [], positions: [], deleted: [], prefs: {} };
     const parsed = parseBackupJson(backupToJson(makeBackup(empty, 1, '0.41.0')));
     expect(parsed.ok && parsed.file.data).toEqual(empty);
   });

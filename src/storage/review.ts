@@ -2,6 +2,7 @@
 
 import { emptyRecord, type ReviewRecord } from '../review/review';
 import { REVIEW, done, openDb } from './db';
+import { addDeleted } from './deleted';
 
 export async function loadReview(treeId: string): Promise<ReviewRecord> {
   const db = await openDb();
@@ -24,4 +25,5 @@ export async function loadAllReviews(): Promise<ReviewRecord[]> {
 export async function clearReview(treeId: string): Promise<void> {
   const db = await openDb();
   await done(db.transaction(REVIEW, 'readwrite').objectStore(REVIEW).delete(treeId));
+  addDeleted([{ kind: 'review', id: treeId, at: Date.now() }]);
 }

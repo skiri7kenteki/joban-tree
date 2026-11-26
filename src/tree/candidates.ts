@@ -29,6 +29,8 @@ export interface Candidate {
   hard?: boolean;
   /** 理由（打ちたいときだけ） */
   reason?: string;
+  /** この手の行を最後に変えた日時（段階22-2。端末どうしで合わせるときに使う） */
+  at?: number;
 }
 
 export const CANDIDATE_MAX = 8;
@@ -266,6 +268,7 @@ function candidateProblem(raw: unknown): string | null {
   const pv = raw.pv;
   if (pv !== undefined && (!Array.isArray(pv) || pv.length > PV_MAX || !pv.every((m) => typeof m === 'string' && isUsiMove(m)))) return '読み筋';
   if (raw.hard !== undefined && typeof raw.hard !== 'boolean') return '見えにくい手の印';
+  if (raw.at !== undefined && !isNumber(raw.at)) return '日時';
   if (raw.reason !== undefined && (typeof raw.reason !== 'string' || raw.reason.length > REASON_MAX)) return '理由';
   return null;
 }

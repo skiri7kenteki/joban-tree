@@ -2,10 +2,12 @@
 
 import type { OpeningTemplate } from '../tree/templates';
 import { TEMPLATES, done, finished, openDb } from './db';
+import { addDeleted, deletedAs, takeDeleted } from './deleted';
 
 export interface StoredTemplate extends OpeningTemplate {
   createdAt: number;
   updatedAt: number;
+  restoredAt?: number;
 }
 
 /** 登録した戦型（登録した順） */
@@ -20,7 +22,9 @@ export async function putMyTemplates(list: readonly StoredTemplate[]): Promise<v
   const db = await openDb();
   const tx = db.transaction(TEMPLATES, 'readwrite');
   const store = tx.objectStore(TEMPLATES);
-  for (const t of list) store.put(structuredClone(t));
+  // 段階22-2：消したものをもう一度保存するときは、戻した日時
+  const now = Date.now();
+  for (const t of list) store.put(structuredClone(takeDeleted(deletedAs('template', t.id)) ? { ...t, restoredAt: now } : t));
   await finished(tx);
 }
 
@@ -30,4 +34,5 @@ export async function deleteMyTemplate(id: string): Promise<void> {
   const tx = db.transaction(TEMPLATES, 'readwrite');
   tx.objectStore(TEMPLATES).delete(id);
   await finished(tx);
+  addDeleted([{ kind: 'template', id, at: Date.now() }]);
 }

@@ -27,6 +27,8 @@ export interface NodeRecord {
 
 /** ツリー 1 つぶんの復習の記録 */
 export interface ReviewRecord {
+  /** 戻すで復活させた日時（段階22-2。消した記録より勝つ） */
+  restoredAt?: number;
   treeId: string;
   version: 1;
   /** 局面のキー → 記録 */

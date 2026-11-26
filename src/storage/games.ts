@@ -2,6 +2,7 @@
 
 import type { Game } from '../games/game';
 import { GAMES, done, finished, openDb } from './db';
+import { addDeleted, deletedAs, takeDeleted } from './deleted';
 import { askPersistOnce } from './persist';
 
 /** 保存してある実戦（並びは決めない。画面で並べる） */
@@ -14,7 +15,12 @@ export async function listGames(): Promise<Game[]> {
 export async function putGame(game: Game): Promise<void> {
   const db = await openDb();
   const tx = db.transaction(GAMES, 'readwrite');
-  tx.objectStore(GAMES).put(structuredClone(game));
+  const store = tx.objectStore(GAMES);
+  const prev = await done(store.get(game.id));
+  const now = Date.now();
+  // 段階22-2：直した日時（自分の側を直した）。消したものをもう一度保存するときは、戻した日時
+  const revived = !prev && takeDeleted(deletedAs('game', game.id));
+  store.put(structuredClone({ ...game, ...(prev ? { updatedAt: now } : {}), ...(revived ? { restoredAt: now } : {}) }));
   await finished(tx);
   askPersistOnce();
 }
@@ -25,4 +31,5 @@ export async function deleteGame(id: string): Promise<void> {
   const tx = db.transaction(GAMES, 'readwrite');
   tx.objectStore(GAMES).delete(id);
   await finished(tx);
+  addDeleted([{ kind: 'game', id, at: Date.now() }]);
 }

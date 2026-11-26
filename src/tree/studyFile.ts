@@ -56,6 +56,8 @@ export function checkStudy(s: unknown): string | null {
   if (s.mySide !== 'black' && s.mySide !== 'white') return '自分の側';
   if (s.templateId !== undefined && (!isString(s.templateId) || s.templateId.length > 200)) return '戦型';
   if (!isNumber(s.createdAt) || !isNumber(s.updatedAt)) return '日付';
+  if ([s.movesAt, s.cutAt, s.noteAt, s.restoredAt].some((t) => t !== undefined && !isNumber(t))) return '日付';
+  if (s.cutFrom !== undefined && (!Array.isArray(s.cutFrom) || s.cutFrom.length > 2000 || !s.cutFrom.every(isString))) return '消した手順';
   if (!Array.isArray(s.moves) || s.moves.length === 0 || !s.moves.every(isString)) return '手順';
   const line = templateLine(s.moves as string[]);
   if (!line.ok) return `${line.index + 1} 手目が指せません`;

@@ -5,7 +5,9 @@ import { signal } from '@preact/signals';
 import type { Side } from '../shogi/position';
 import { deletePosition, listPositions, putPosition } from '../storage/positions';
 import type { Candidate } from '../tree/candidates';
-import { NOTE_MAX, isEmptyRecord, positionId, type PositionNote } from '../tree/positions';
+import { NOTE_MAX, positionId, type PositionNote } from '../tree/positions';
+import { stampPosition } from '../tree/deleted';
+import { addDeleted } from '../storage/deleted';
 import { sfenKey } from '../shogi/position';
 
 /** 局面の id → 局面の記録（読み込む前は null） */
@@ -64,13 +66,11 @@ async function writeNow(side: Side, sfen: string, change: Partial<Pick<PositionN
     ...change,
     updatedAt: Date.now(),
   };
-  if (!rec.okMoves?.length) delete rec.okMoves;
-  if (!rec.candidates?.length) delete rec.candidates;
-  if (isEmptyRecord(rec)) {
-    if (prev) await deletePosition(id);
-  } else {
-    await putPosition(rec);
-  }
+  // 段階22-2：変えた手とメモに日時を付け、消えたものは消した記録に（端末どうしで合わせるため）
+  const stamped = stampPosition(prev, rec, Date.now());
+  if (stamped.rec) await putPosition(stamped.rec);
+  else if (prev) await deletePosition(id);
+  addDeleted(stamped.removed);
   await refreshPositions();
 }
 

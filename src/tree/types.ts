@@ -113,6 +113,16 @@ export interface Study {
   templateId?: string;
   createdAt: number;
   updatedAt: number;
+  /** 手順を最後に変えた日時（段階22-2。端末どうしで合わせるときに使う。無ければ updatedAt。`src/tree/deleted.ts`） */
+  movesAt?: number;
+  /** 手を最後に消した（短くした）日時（段階22-2。合わせるとき短い方の手順が勝つのは、これが相手の手の変更より新しいときだけ） */
+  cutAt?: number;
+  /** 手を消したときに見ていた手順（消す前の手順。段階22-2。この中に入る手だけが消える） */
+  cutFrom?: string[];
+  /** メモを最後に変えた日時（段階22-2。無ければ、メモがあるとき updatedAt） */
+  noteAt?: number;
+  /** 取り消し・戻すで復活させた日時（段階22-2。消した記録より勝つ。並び順には使わない） */
+  restoredAt?: number;
 }
 
 /**
@@ -137,6 +147,10 @@ export interface TreeData {
   name: string;
   createdAt: number;
   updatedAt: number;
+  /** 戻すで復活させた日時（段階22-2。`src/tree/deleted.ts`） */
+  restoredAt?: number;
+  /** 名前を直した日時（段階22-2。合わせるとき、名前は中身とは別に、後で直した方） */
+  renamedAt?: number;
   /** 研究する側 */
   mySide: Side;
   /** 開始局面のキー */

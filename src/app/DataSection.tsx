@@ -5,12 +5,16 @@
 //   iPhone/iPad は「押した直後」でないと共有を断るので、ファイルの中身は画面を開いたときに作っておく（押したときに await を挟まない）
 // - ［バックアップから戻す］：ファイルを選ぶ → 中身の数を見せる → 「今のデータを全部置きかえる」を確かめてから戻す。戻す前のデータは端末の中に取っておく
 // - ［戻す前のデータに戻す］：戻したことがあるときだけ。戻したあとはアプリを読み込み直す
+// - ［ほかの端末のバックアップを合わせる］（段階22-2）：ファイルを選ぶ → この端末で変わる数と消える研究手順を見せる（MergeSummary）→ 合わせる。
+//   合わせる前のデータは「戻す」と同じく端末の中に取っておく
 // - ［研究手順を書き出す］（段階20-3 で定跡帳のタブの右上から移した）：選んで JSON・KIF（StudyExportDialog）。研究手順があるときだけ
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { Dialog } from '../components/Dialog';
 import { APP_VERSION } from '../components/Footer';
-import { currentBackup, hideNudgeUntil, lastBackupAt, loadSnapshot, markBackedUp, nudgeHiddenUntilStored, restoreFromBackup } from '../storage/backup';
+import { currentBackup, hideNudgeUntil, lastBackupAt, loadSnapshot, markBackedUp, mergeFromBackup, nudgeHiddenUntilStored, readAllData, restoreFromBackup } from '../storage/backup';
+import { mergeBackups, type MergeResult } from '../tree/merge';
+import { MergeSummary } from './MergeSummary';
 import { askPersist, persistState, type PersistState } from '../storage/persist';
 import {
   KIND_LABELS,
@@ -59,16 +63,32 @@ interface Pending {
   fromSnapshot: boolean;
 }
 
+/** 合わせたあと読み込み直すので、一言を覚えておく */
+const MERGED_NOTE_KEY = 'joban-tree.merged-note';
+
+function takeMergedNote(): string {
+  try {
+    const note = sessionStorage.getItem(MERGED_NOTE_KEY) ?? '';
+    sessionStorage.removeItem(MERGED_NOTE_KEY);
+    return note;
+  } catch {
+    return '';
+  }
+}
+
 export function DataSection() {
   const [persist, setPersist] = useState<PersistState | null>(null);
   const [prepared, setPrepared] = useState<{ text: string; bytes: number } | null>(null);
   const [last, setLast] = useState<number | null>(lastBackupAt());
   const [snapshotAt, setSnapshotAt] = useState<number | null>(null);
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState(takeMergedNote);
   const [error, setError] = useState('');
   const [pending, setPending] = useState<Pending | null>(null);
+  /** 合わせるかどうかを確かめているファイルと、合わせるとどうなるか */
+  const [merging, setMerging] = useState<{ file: BackupFile; unknownKinds: string[]; result: MergeResult } | null>(null);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const mergeFileRef = useRef<HTMLInputElement>(null);
   /** 研究手順の書き出しの窓 */
   const [exporting, setExporting] = useState(false);
   const studies = library.value ?? [];
@@ -126,6 +146,48 @@ export function DataSection() {
       return;
     }
     setPending({ file: parsed.file, unknownKinds: parsed.unknownKinds, fromSnapshot: false });
+  }
+
+  async function pickMerge(e: Event) {
+    const input = e.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    setMessage('');
+    setError('');
+    try {
+      const parsed = parseBackupJson(await file.text(), 'merge');
+      if (!parsed.ok) {
+        setError(parsed.message);
+        return;
+      }
+      setMerging({ file: parsed.file, unknownKinds: parsed.unknownKinds, result: mergeBackups(await readAllData(), parsed.file.data) });
+    } catch {
+      setError('データを読めませんでした。アプリを開き直してから、もう一度ためしてください。');
+    }
+  }
+
+  async function merge() {
+    if (!merging) return;
+    if (isGenerating()) {
+      setMerging(null);
+      setError('ツリーを生成しています。止めるか終わってから合わせてください。');
+      return;
+    }
+    setBusy(true);
+    try {
+      await mergeFromBackup(merging.file.data, APP_VERSION);
+      try {
+        sessionStorage.setItem(MERGED_NOTE_KEY, 'ほかの端末のバックアップを合わせました。');
+      } catch {
+        // 覚えられなくても、合わせることはできている
+      }
+      location.reload();
+    } catch {
+      setBusy(false);
+      setMerging(null);
+      setError('合わせられませんでした（データは変えていません）。アプリを開き直してから、もう一度ためしてください。');
+    }
   }
 
   async function openSnapshot() {
@@ -196,6 +258,10 @@ export function DataSection() {
         <button type="button" class="btn btn-primary btn-wide" data-testid="backup-save" disabled={!prepared} onClick={save}>
           {prepared ? `バックアップを保存（${sizeText(prepared.bytes)}）` : 'バックアップを準備中…'}
         </button>
+        <button type="button" class="btn btn-wide" data-testid="backup-merge" onClick={() => mergeFileRef.current?.click()}>
+          ほかの端末のバックアップを合わせる
+        </button>
+        <p class="muted data-hint">2 台をそろえるには、合わせた端末で保存して、もう 1 台でも合わせます。</p>
         <button type="button" class="btn btn-wide" data-testid="backup-restore" onClick={() => fileRef.current?.click()}>
           バックアップから戻す
         </button>
@@ -206,6 +272,20 @@ export function DataSection() {
         )}
       </div>
       <input ref={fileRef} type="file" accept="application/json,.json" hidden data-testid="backup-restore-file" onChange={(e) => void pick(e)} />
+      <input ref={mergeFileRef} type="file" accept="application/json,.json" hidden data-testid="backup-merge-file" onChange={(e) => void pickMerge(e)} />
+      {merging && (
+        <Dialog title="ほかの端末と合わせる" onClose={() => !busy && setMerging(null)} testId="backup-merge-dialog">
+          <MergeSummary file={merging.file} unknownKinds={merging.unknownKinds} result={merging.result} when={shortDateTime(merging.file.createdAt)} />
+          <div class="btn-row">
+            <button type="button" class="btn btn-primary" data-testid="backup-merge-confirm" disabled={busy} onClick={() => void merge()}>
+              {busy ? '合わせています…' : '合わせる'}
+            </button>
+            <button type="button" class="btn" disabled={busy} onClick={() => setMerging(null)}>
+              やめる
+            </button>
+          </div>
+        </Dialog>
+      )}
       {studies.length > 0 && (
         <div class="data-buttons">
           <button type="button" class="btn btn-wide" data-testid="study-export-open" onClick={() => setExporting(true)}>
@@ -270,6 +350,7 @@ function RestoreSummary({ pending }: { pending: Pending }) {
         今の研究手順・ツリー・復習と稽古の記録・戦型・実戦・設定は、全部このデータに置きかわります。
         {pending.fromSnapshot ? '今のデータは、また［戻す前のデータに戻す］で元に戻せます。' : '戻す前のデータは端末の中に取っておき、［戻す前のデータに戻す］で元に戻せます。'}
       </p>
+      <p class="muted">このあと、ほかの端末のバックアップを合わせると、相手にあるものはまた入ります。</p>
     </div>
   );
 }

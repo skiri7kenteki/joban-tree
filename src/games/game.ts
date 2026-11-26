@@ -41,6 +41,10 @@ export interface Game {
   ending?: string;
   /** 貼った日時（ミリ秒） */
   addedAt: number;
+  /** 直した日時（自分の側を直した。段階22-2。端末どうしで合わせるときに使う） */
+  updatedAt?: number;
+  /** 戻すで復活させた日時（段階22-2） */
+  restoredAt?: number;
 }
 
 /** 棋譜から読んだもの（自分の側はまだ決めていない） */
@@ -192,6 +196,7 @@ export function gameProblem(raw: unknown): string | null {
   if (g.mySide !== 'black' && g.mySide !== 'white') return '自分の側';
   if (!(g.winner === null || g.winner === 'black' || g.winner === 'white' || g.winner === 'draw')) return '勝ち負け';
   if (!num(g.addedAt) || (g.playedAt !== undefined && !num(g.playedAt))) return '日時';
+  if ((g.updatedAt !== undefined && !num(g.updatedAt)) || (g.restoredAt !== undefined && !num(g.restoredAt))) return '日時';
   if ((g.timeLimit !== undefined && !str(g.timeLimit)) || (g.ending !== undefined && !str(g.ending))) return '持ち時間・終わり方';
   return null;
 }

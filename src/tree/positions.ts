@@ -27,6 +27,8 @@ export interface PositionNote {
   okMoves?: string[];
   /** 自分の手の候補の表（段階21-1） */
   candidates?: Candidate[];
+  /** 局面メモを最後に変えた日時（段階22-2。端末どうしで合わせるときに使う） */
+  noteAt?: number;
   updatedAt: number;
 }
 
@@ -123,6 +125,7 @@ export function positionProblem(raw: unknown): string | null {
     if (p) return `候補の表の${p}`;
   }
   if (typeof r.updatedAt !== 'number' || !Number.isFinite(r.updatedAt)) return '日時';
+  if (r.noteAt !== undefined && (typeof r.noteAt !== 'number' || !Number.isFinite(r.noteAt))) return 'メモの日時';
   return null;
 }
 

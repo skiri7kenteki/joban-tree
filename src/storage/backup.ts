@@ -12,7 +12,10 @@ import type { StoredTemplate } from './templates';
 import type { Game } from '../games/game';
 import type { PracticeRecord } from '../practice/practice';
 import type { PositionNote } from '../tree/positions';
+import { reviveForRestore, unionDeleted } from '../tree/deleted';
+import { changesNothing, mergeBackups } from '../tree/merge';
 import { GAMES, POSITIONS, PRACTICE, REVIEW, STUDIES, TEMPLATES, TREES, done, finished, openDb } from './db';
+import { readDeleted, writeDeleted } from './deleted';
 
 const LAST_BACKUP_KEY = 'joban-tree.last-backup';
 const NUDGE_HIDDEN_KEY = 'joban-tree.backup-nudge-hidden-until';
@@ -35,7 +38,7 @@ export async function readAllData(): Promise<BackupData> {
     const v = readLocal(k);
     if (v !== null) prefs[k] = v;
   }
-  return { studies, trees, reviews, templates, games, practice, positions, prefs };
+  return { studies, trees, reviews, templates, games, practice, positions, deleted: readDeleted(), prefs };
 }
 
 /** 今のデータのバックアップ（ファイルの中身） */
@@ -61,16 +64,33 @@ export async function writeAllData(data: BackupData): Promise<void> {
   put(PRACTICE, data.practice ?? []);
   put(POSITIONS, data.positions ?? []);
   await finished(tx);
+  writeDeleted(data.deleted ?? []);
   for (const k of PREF_KEYS) {
     if (k in data.prefs) writeLocal(k, data.prefs[k]);
     else removeLocal(k);
   }
 }
 
-/** バックアップから戻す：今のデータを端末の中に取っておいてから、全部置きかえる */
+/**
+ * バックアップから戻す：今のデータを端末の中に取っておいてから、全部置きかえる。
+ * 消した記録のあるものを戻すときは、戻した日時を付ける（次に合わせたときに、また消されないように。段階22-2）
+ */
 export async function restoreFromBackup(data: BackupData, appVersion: string): Promise<void> {
-  await saveSnapshot(await currentBackup(appVersion));
-  await writeAllData(data);
+  const current = await currentBackup(appVersion);
+  await saveSnapshot(current);
+  await writeAllData(reviveForRestore(data, unionDeleted(current.data.deleted, data.deleted ?? []), Date.now()));
+}
+
+/**
+ * ほかの端末のバックアップを合わせる（段階22-2）：今のデータを端末の中に取っておいてから、合わせた結果を書く。
+ * 確認の窓を出している間に変わったかもしれないので、ここでもう一度合わせる
+ */
+export async function mergeFromBackup(incoming: BackupData, appVersion: string): Promise<void> {
+  const current = await currentBackup(appVersion);
+  const result = mergeBackups(current.data, incoming);
+  // 中身が変わらないときは、取っておいた「戻す前のデータ」を上書きしない（同じファイルをもう一度合わせても、前に戻せるように）
+  if (!changesNothing(result)) await saveSnapshot(current);
+  await writeAllData(result.data);
 }
 
 // ---- 戻す前のデータ（端末の中に最新の 1 回分） ----

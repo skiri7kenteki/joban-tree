@@ -4,6 +4,7 @@ import { prefixSummary } from '../tree/browse';
 import { startsWith, treeBaseMoves } from '../tree/studies';
 import type { TreeData } from '../tree/types';
 import { REVIEW, TREES, done, finished, openDb } from './db';
+import { addDeleted, deletedAs, takeDeleted } from './deleted';
 
 /** 一覧に出す情報 */
 export interface TreeSummary {
@@ -25,6 +26,8 @@ export interface TreeSummary {
 /** ツリーを保存する（同じ id なら上書き） */
 export async function saveTree(tree: TreeData): Promise<void> {
   const db = await openDb();
+  // 段階22-2：消したものをもう一度保存するとき（同じファイルを取り込み直したなど）は、戻した日時
+  if (takeDeleted(deletedAs('tree', tree.id))) tree.restoredAt = Date.now();
   // 生成中も書き換わるので、その時点の内容を複製して保存する
   await done(db.transaction(TREES, 'readwrite').objectStore(TREES).put(structuredClone(tree)));
 }
@@ -81,4 +84,9 @@ export async function deleteTree(id: string): Promise<void> {
   tx.objectStore(TREES).delete(id);
   tx.objectStore(REVIEW).delete(id);
   await finished(tx);
+  const at = Date.now();
+  addDeleted([
+    { kind: 'tree', id, at },
+    { kind: 'review', id, at },
+  ]);
 }

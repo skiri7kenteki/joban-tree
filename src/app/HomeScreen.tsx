@@ -184,6 +184,10 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
       } else if (tree.studies && tree.studies.length > 0) {
         studyText = `。途中の局面から始まるツリーなので、研究手順 ${tree.studies.length} 本は研究手順の一覧に移せませんでした（ツリーの中に残してあります）`;
       }
+      // 段階22-2：前より古いファイルで置き換えたら、戻した日時を付ける（ほかの端末と合わせて、元に戻らないように）
+      const existing = await loadTree(tree.id);
+      if (existing && tree.updatedAt <= Math.max(existing.updatedAt, existing.restoredAt ?? 0)) tree.restoredAt = Date.now();
+      if (existing?.renamedAt !== undefined) tree.renamedAt = Date.now();
       await saveTree(tree);
       if (openTree.value?.id === tree.id) openTree.value = tree;
       setMessage(`「${tree.name}」を取り込みました${studyText}`);
@@ -764,6 +768,8 @@ function TreeMenu({
     // 開いている（生成中かもしれない）ツリーなら、そのものを書き換える（自動保存で元に戻らないように）
     const target = openTree.value?.id === tree.id ? openTree.value : tree;
     target.name = trimmed;
+    // 段階22-2：並び順（updatedAt）は変えずに、名前を直した日時を覚える（ほかの端末と合わせて、前の名前に戻らないように）
+    target.renamedAt = Date.now();
     await saveTree(target);
     if (openTree.value?.id === tree.id) openTree.value = target;
     treeVersion.value++;
