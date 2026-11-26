@@ -55,7 +55,8 @@ import { fixStoredStudies } from './studyFix';
 /** 次にトップ画面を開いたとき「研究手順を登録」の窓を開く（古い登録の画面の URL #/new/study から来たとき。段階10-2） */
 export const registerRequest = signal(false);
 import { BasicStudiesDialog } from './BasicStudiesDialog';
-import { ensureStudies, homeNotice, importLiftedStudies, library, saveStudies } from './studies';
+import { ensureStudies, homeNotice, importLiftedStudies, importUndo, library, saveStudies } from './studies';
+import { ImportUndoButton } from './ImportUndo';
 import { Words } from '../components/Words';
 import { BackupNudge } from './DataSection';
 import { SyncNudge } from './DriveSection';
@@ -69,6 +70,12 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
     const notice = homeNotice.value;
     homeNotice.value = null;
     return notice ?? '';
+  });
+  // 段階25-2：KIF の取り込みの［取り消す］。この画面を離れるまで（持ち主の判断 2026-11-26）。ほかの一言に変わったら出さない
+  const [undo, setUndo] = useState(() => {
+    const asked = importUndo.value;
+    importUndo.value = null;
+    return asked;
   });
   // 開いている間に届いた一言（アプリを開いたときの研究手順の直しなど。段階10 の直し）
   const lateNotice = homeNotice.value;
@@ -264,6 +271,15 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
         <p class="muted" role="status" data-testid="home-message">
           {message}
         </p>
+      )}
+      {tab === 'studies' && undo && message === undo.message && (
+        <ImportUndoButton
+          undo={undo}
+          onDone={(text) => {
+            setUndo(null);
+            setMessage(text);
+          }}
+        />
       )}
       {trees === null && !error && <p class="muted">読み込み中…</p>}
 

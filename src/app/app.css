@@ -1341,6 +1341,25 @@
   cursor: default;
 }
 
+/* 段階25-2：研究手順の一覧の「選んで消す」。下のボタンは窓の下に固定 */
+.study-select-row {
+  gap: var(--space-2);
+}
+
+.study-select-row input {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  accent-color: var(--color-primary);
+}
+
+.study-delete-bar {
+  position: sticky;
+  bottom: 0;
+  padding: var(--space-2) 0;
+  background: var(--color-surface);
+}
+
 .mini-board.start-board {
   width: min(220px, 70vw);
   margin: 0 auto;

@@ -2,7 +2,7 @@
 // 段階22-2：保存するときに「手を変えた日時」「戻した日時」を付け、消すときは消した記録を残す（端末どうしで合わせるため。`src/tree/deleted.ts`）
 
 import type { Study } from '../tree/types';
-import { deletionHits, sameList, stampStudy, studyDeletion } from '../tree/deleted';
+import { deletionHits, removalRecords, stampStudy } from '../tree/deleted';
 import { STUDIES, done, finished, openDb } from './db';
 import { addDeleted, takeDeleted } from './deleted';
 import { askPersistOnce } from './persist';
@@ -23,8 +23,8 @@ export async function deleteStudy(id: string): Promise<void> {
   await writeStudies([], [id]);
 }
 
-/** まとめて保存して、まとめて消す（1 回の書き込みで。定跡帳で手を足す・消す・取り消すとき。段階10-1） */
-export async function writeStudies(put: readonly Study[], removeIds: readonly string[]): Promise<void> {
+/** まとめて保存して、まとめて消す（1 回の書き込みで。定跡帳で手を足す・消す・取り消すとき。段階10-1）。onlyId は removalRecords を見る */
+export async function writeStudies(put: readonly Study[], removeIds: readonly string[], opts: { onlyId?: boolean } = {}): Promise<void> {
   const db = await openDb();
   const tx = db.transaction(STUDIES, 'readwrite');
   const store = tx.objectStore(STUDIES);
@@ -36,16 +36,11 @@ export async function writeStudies(put: readonly Study[], removeIds: readonly st
     const revived = !prev && takeDeleted((d) => d.kind === 'study' && (d.id === s.id || deletionHits(d, s)));
     return stampStudy(prev, s, revived, now);
   });
-  // 消した後に残る研究手順。同じ手順の別のものが残るなら（重複の片方を消した）、消した記録は id が同じものだけに効かせる
+  // 消した後に残る研究手順（消した記録の効かせ方を決めるのに使う）
   const after = new Map(before);
   for (const id of removeIds) after.delete(id);
   for (const s of saved) after.set(s.id, s);
-  const gone = removeIds.flatMap((id) => {
-    const s = before.get(id);
-    if (!s || after.has(id)) return [];
-    const twin = [...after.values()].some((x) => x.mySide === s.mySide && sameList(x.moves, s.moves));
-    return [{ ...studyDeletion(s, now), ...(twin ? { onlyId: true } : {}) }];
-  });
+  const gone = removalRecords(before, after, removeIds, now, opts.onlyId);
   for (const id of removeIds) store.delete(id);
   for (const s of saved) store.put(structuredClone(s));
   await finished(tx);

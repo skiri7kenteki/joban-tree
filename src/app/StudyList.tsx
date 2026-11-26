@@ -1,5 +1,6 @@
 // 研究手順の一覧（段階22-4）。定跡帳の ⋯「研究手順の一覧（n本）」で出す（前は定跡帳のタブに 1 本ずつ並べていた）。
 // 1 行は ★名前・メモの最初の 1 行・手数・日付、右に次の稽古の日。押すとその研究手順の終わりの局面。行の ⋯：稽古・名前・メモ・消す（確認あり）。
+// 段階25-2：「選んで消す」で何本もまとめて消せる（確認あり。保存は 1 回）。
 // 定跡帳のタブの「定跡帳ごとに 1 行」で使う、次の稽古の日の言葉もここ
 
 import { useEffect, useState } from 'preact/hooks';
@@ -11,7 +12,7 @@ import type { Study } from '../tree/types';
 import { ensureGames, gameList } from './games';
 import { ensurePractice, planNow, practiceRecords } from './practice';
 import { go } from './router';
-import { library, removeStudy, updateStudyFields } from './studies';
+import { library, removeStudies, removeStudy, updateStudyFields } from './studies';
 import { StudyEditDialog } from './StudyDialogs';
 import { allTemplates } from './TemplateDialogs';
 
@@ -63,6 +64,35 @@ export function StudyListDialog({
   const [message, setMessage] = useState('');
   // 今日の稽古は、研究手順すべてから決まる（一覧の分だけで数えると、稽古のタブと食い違う）
   const { dueOf } = useStudyDue(library.value ?? studies);
+  // 段階25-2：選んで消す（null は選んでいないふだんの一覧）
+  const [selected, setSelected] = useState<ReadonlySet<string> | null>(null);
+  const [confirmBulk, setConfirmBulk] = useState(false);
+  const [busy, setBusy] = useState(false);
+  /** 選んだうち、今も一覧にあるもの */
+  const picked = studies.filter((s) => selected?.has(s.id));
+
+  function toggle(id: string) {
+    const next = new Set(selected);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelected(next);
+  }
+
+  async function removePicked() {
+    if (busy || picked.length === 0) return;
+    setBusy(true);
+    try {
+      await removeStudies(picked.map((s) => s.id));
+      setSelected(null);
+      setMessage(`研究手順 ${picked.length} 本を消しました`);
+      onChanged();
+    } catch (e) {
+      setMessage(`消せませんでした（${e instanceof Error ? e.message : String(e)}）`);
+    }
+    setConfirmBulk(false);
+    setBusy(false);
+  }
+
   return (
     <>
       <Dialog title={`研究手順の一覧（${studies.length}本）`} onClose={onClose} testId="study-list-dialog" sheet>
@@ -72,14 +102,72 @@ export function StudyListDialog({
           </p>
         )}
         {studies.length === 0 && <p class="muted">研究手順はまだありません。盤で指すと研究手順ができます。</p>}
+        {studies.length > 0 && !selected && (
+          <div class="btn-row">
+            <button
+              type="button"
+              class="btn"
+              data-testid="study-select"
+              onClick={() => {
+                setMessage('');
+                setSelected(new Set());
+              }}
+            >
+              選んで消す
+            </button>
+          </div>
+        )}
+        {selected && (
+          <div class="btn-row">
+            <button type="button" class="btn" data-testid="study-select-all" onClick={() => setSelected(new Set(studies.map((s) => s.id)))}>
+              全部選ぶ
+            </button>
+            <button type="button" class="btn" data-testid="study-select-none" onClick={() => setSelected(new Set())}>
+              全部外す
+            </button>
+            <button type="button" class="btn btn-ghost" data-testid="study-select-cancel" onClick={() => setSelected(null)}>
+              やめる
+            </button>
+          </div>
+        )}
         <div class="tree-group">
           <ul class="tree-list">
-            {studies.map((s) => (
-              <StudyRow key={s.id} study={s} due={dueOf(s)} onOpen={() => onOpen(s)} onMenu={() => setMenu(s)} />
-            ))}
+            {studies.map((s) =>
+              selected ? (
+                <li class="tree-row" key={s.id}>
+                  <label class="tree-item study-row-item study-select-row" data-testid="study-select-item">
+                    <input type="checkbox" checked={selected.has(s.id)} onChange={() => toggle(s.id)} />
+                    <StudyRowText study={s} />
+                    <DueText due={dueOf(s)} />
+                  </label>
+                </li>
+              ) : (
+                <StudyRow key={s.id} study={s} due={dueOf(s)} onOpen={() => onOpen(s)} onMenu={() => setMenu(s)} />
+              ),
+            )}
           </ul>
         </div>
+        {selected && studies.length > 0 && (
+          <div class="study-delete-bar">
+            <button type="button" class="btn btn-danger btn-wide" data-testid="study-select-delete" disabled={picked.length === 0} onClick={() => setConfirmBulk(true)}>
+              {picked.length} 本を消す
+            </button>
+          </div>
+        )}
       </Dialog>
+      {confirmBulk && (
+        <Dialog title={`研究手順 ${picked.length} 本を消しますか？`} onClose={() => setConfirmBulk(false)} testId="study-bulk-dialog">
+          <p>元に戻せません（ツリーの手や局面は消えません）。</p>
+          <div class="dialog-actions">
+            <button type="button" class="btn btn-danger" data-testid="study-bulk-ok" disabled={busy} onClick={() => void removePicked()}>
+              {picked.length} 本を消す
+            </button>
+            <button type="button" class="btn" onClick={() => setConfirmBulk(false)}>
+              やめる
+            </button>
+          </div>
+        </Dialog>
+      )}
       {menu && (
         <StudyMenu
           study={menu}
@@ -95,31 +183,38 @@ export function StudyListDialog({
   );
 }
 
-/** 研究手順の 1 行（★名前・メモの最初の 1 行・手数・日付、右に次の稽古の日） */
-function StudyRow({ study, due, onOpen, onMenu }: { study: Study; due: string | null; onOpen: () => void; onMenu: () => void }) {
+/** 研究手順の行の中身（★名前・メモの最初の 1 行・手数・日付） */
+function StudyRowText({ study }: { study: Study }) {
   const note = firstLine(study.note);
+  return (
+    <span class="study-row-text">
+      <span class="tree-item-title">
+        {/* ★ は名前の中に入れる（長い名前が折り返しても、★ だけの行にならないように） */}
+        <span class="tree-item-name">
+          <span class="study-star" aria-hidden="true">
+            ★
+          </span>
+          <Words text={study.name} />
+        </span>
+      </span>
+      {note && (
+        <span class="tree-item-meta study-item-note" data-testid="study-item-note">
+          {note}
+        </span>
+      )}
+      <span class="tree-item-meta num">
+        {study.moves.length} 手・{formatShortDate(study.updatedAt)}
+      </span>
+    </span>
+  );
+}
+
+/** 研究手順の 1 行（右に次の稽古の日と ⋯） */
+function StudyRow({ study, due, onOpen, onMenu }: { study: Study; due: string | null; onOpen: () => void; onMenu: () => void }) {
   return (
     <li class="tree-row">
       <button type="button" class="tree-item study-row-item" data-testid="study-item" onClick={onOpen}>
-        <span class="study-row-text">
-          <span class="tree-item-title">
-            {/* ★ は名前の中に入れる（長い名前が折り返しても、★ だけの行にならないように） */}
-            <span class="tree-item-name">
-              <span class="study-star" aria-hidden="true">
-                ★
-              </span>
-              <Words text={study.name} />
-            </span>
-          </span>
-          {note && (
-            <span class="tree-item-meta study-item-note" data-testid="study-item-note">
-              {note}
-            </span>
-          )}
-          <span class="tree-item-meta num">
-            {study.moves.length} 手・{formatShortDate(study.updatedAt)}
-          </span>
-        </span>
+        <StudyRowText study={study} />
         <DueText due={due} />
       </button>
       <button type="button" class="btn tree-menu-btn" aria-label={`「${study.name}」の操作`} data-testid="study-menu" onClick={onMenu}>

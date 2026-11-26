@@ -13,7 +13,7 @@ import { buildCandidates, candidateName, candidatesToStudies, decodeKifFile, kif
 import type { OpeningTemplate } from '../tree/templates';
 import { CreateTemplateDialog, NO_OWN_TEXT, PickTemplateDialog } from './ImportTemplate';
 import { back, go } from './router';
-import { ensureStudies, homeNotice, saveStudies, studiesNow } from './studies';
+import { ensureStudies, homeNotice, importUndo, saveStudies, studiesNow } from './studies';
 import { allTemplates, myTemplates, refreshMyTemplates, saveMine } from './TemplateDialogs';
 
 const SIDE_TEXT: Record<Side, string> = { black: '☗先手', white: '☖後手' };
@@ -121,7 +121,9 @@ export function StudyKifImportScreen() {
       }
       const skipped = candidates.length - picked.length;
       const added = usedNew ? `戦型「${used.name}」を登録しました。` : '';
-      homeNotice.value = `研究手順 ${picked.length} 本を KIF から取り込みました${skipped > 0 ? `（${skipped} 本は取り込みませんでした）` : ''}${added ? `。${added}` : ''}`;
+      const message = `研究手順 ${picked.length} 本を KIF から取り込みました${skipped > 0 ? `（${skipped} 本は取り込みませんでした）` : ''}${added ? `。${added}` : ''}`;
+      homeNotice.value = message;
+      importUndo.value = { message, studyIds: list.map((s) => s.id), ...(usedNew ? { templateId: used.id, templateName: used.name } : {}) };
       go('/');
     } catch (e) {
       setError(`保存できませんでした（${e instanceof Error ? e.message : String(e)}）`);

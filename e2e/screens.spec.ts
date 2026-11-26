@@ -261,7 +261,23 @@ for (const size of SIZES) {
       await page.getByTestId('kif-bulk-template').click();
       await page.getByTestId('import-pick-auto').click();
       await page.getByTestId('kif-bulk-import').click();
+      // 段階25-2：取り消すボタンと確認の窓
+      await expect(page.getByTestId('import-undo')).toBeVisible();
+      await shot(page, size.name, 'import-undo');
+      await page.getByTestId('import-undo').click();
+      await shot(page, size.name, 'import-undo-confirm');
+      await page.getByTestId('import-undo-dialog').getByRole('button', { name: 'やめる' }).click();
       await page.getByTestId('book-group-open').first().click();
+      // 段階25-2：研究手順の一覧の「選んで消す」
+      await page.getByTestId('book-menu').click();
+      await page.getByTestId('book-study-list').click();
+      await page.getByTestId('study-select').click();
+      await page.getByTestId('study-select-item').first().click();
+      await shot(page, size.name, 'study-list-select');
+      await page.getByTestId('study-select-delete').click();
+      await shot(page, size.name, 'study-list-delete-confirm');
+      await page.getByTestId('study-bulk-dialog').getByRole('button', { name: 'やめる' }).click();
+      await page.getByTestId('study-list-dialog').getByRole('button', { name: '閉じる' }).click();
       for (let i = 0; i < 12; i++) await page.getByRole('button', { name: '1手進む' }).click();
       await page.getByTestId('book-menu').click();
       await page.getByTestId('book-register-template').click();

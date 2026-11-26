@@ -2,11 +2,21 @@
 
 import { signal } from '@preact/signals';
 import { deleteStudy, listStudies, putStudies, writeStudies } from '../storage/studies';
+import type { ImportRecord } from '../tree/bulkDelete';
 import { findSameStudy, missingStudies } from '../tree/studies';
 import type { Study } from '../tree/types';
 
 /** トップ画面に一度だけ出す一言（KIF から取り込んだ後など） */
 export const homeNotice = signal<string | null>(null);
+
+/** KIF の取り込みの直後に、その取り込みを取り消せるようにする（一言と一緒に一度だけ渡す。段階25-2） */
+export const importUndo = signal<(ImportRecord & { message: string; templateName?: string }) | null>(null);
+
+/** まとめて消す（1 回の書き込みで。画面で確認を出してから呼ぶ）。onlyId は src/tree/deleted.ts の removalRecords */
+export async function removeStudies(ids: readonly string[], opts: { onlyId?: boolean } = {}): Promise<void> {
+  await writeStudies([], ids, opts);
+  await refreshStudies();
+}
 
 /** 研究手順の一覧（読み込む前は null） */
 export const library = signal<Study[] | null>(null);

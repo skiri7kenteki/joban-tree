@@ -25,12 +25,33 @@ export interface DeletedRecord {
   /** 研究手順：消したときの手順と自分の側（id が違っても同じ研究手順なら消すため） */
   moves?: string[];
   side?: Side;
-  /** 研究手順：同じ手順の別の研究手順がこの端末に残っている（重複の片方を消した）。id が同じものだけを消す */
+  /** 研究手順：id が同じものだけを消す（同じ手順の別の研究手順がこの端末に残っている＝重複の片方を消した。KIF の取り込みの取り消しも） */
   onlyId?: boolean;
 }
 
 export function studyDeletion(s: Pick<Study, 'id' | 'moves' | 'mySide'>, at: number): DeletedRecord {
   return { kind: 'study', id: s.id, at, moves: [...s.moves], side: s.mySide };
+}
+
+/**
+ * 研究手順を消したときの消した記録（1 本ずつ）。before・after：保存場所の消す前・書いた後。
+ * 同じ手順の別のもの（重複）が残るなら、id が同じものだけに効かせる。onlyId を渡すと全部そうする
+ * （取り込みの取り消し：ほかの端末に前からある同じ手順の研究手順は消さない。段階25-2、持ち主の判断 2026-11-26）
+ */
+export function removalRecords(
+  before: ReadonlyMap<string, Study>,
+  after: ReadonlyMap<string, Study>,
+  removeIds: readonly string[],
+  now: number,
+  onlyId = false,
+): DeletedRecord[] {
+  const rest = [...after.values()];
+  return removeIds.flatMap((id) => {
+    const s = before.get(id);
+    if (!s || after.has(id)) return [];
+    const only = onlyId || rest.some((x) => x.mySide === s.mySide && sameList(x.moves, s.moves));
+    return [{ ...studyDeletion(s, now), ...(only ? { onlyId: true } : {}) }];
+  });
 }
 
 export function candidateDeletionId(positionId: string, move: string): string {

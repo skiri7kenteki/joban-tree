@@ -1,7 +1,7 @@
 {
   "name": "joban-tree",
   "private": true,
-  "version": "0.55.0",
+  "version": "0.56.0",
   "description": "将棋の序盤対策ツリーをスマホ・iPad で作る PWA",
   "license": "GPL-3.0-or-later",
   "type": "module",
