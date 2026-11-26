@@ -187,6 +187,12 @@ for (const size of SIZES) {
       await page.getByTestId('backup-merge-dialog').getByRole('button', { name: 'やめる' }).click();
       await page.getByTestId('backup-merge').scrollIntoViewIfNeeded();
       await shot(page, size.name, 'settings-data');
+      // 段階22-3：Google ドライブの欄（クライアント ID が入ったときの見た目。仮の番号で出す）
+      await page.evaluate(() => localStorage.setItem('joban-tree.drive-client-id', 'shots'));
+      await page.reload();
+      await page.getByTestId('drive-section').scrollIntoViewIfNeeded();
+      await shot(page, size.name, 'settings-drive');
+      await page.evaluate(() => localStorage.removeItem('joban-tree.drive-client-id'));
     });
   });
 }

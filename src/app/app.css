@@ -3467,3 +3467,10 @@ button.move-bar-center.move-bar-action {
   margin: 0;
   font-size: var(--font-size-small);
 }
+
+/* 段階22-3：設定の「データ」の中の Google ドライブの欄 */
+.drive-box {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}

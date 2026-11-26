@@ -23,6 +23,7 @@
 //   （v0.17.0 の #/review/<id>/study/<研究手順の id> は、その 1 本だけの復習として開く）
 
 import { signal } from '@preact/signals';
+import { takeLoginReturn } from '../drive/session';
 
 export type Route =
   | { name: 'home' }
@@ -95,9 +96,18 @@ function safeDecode(text: string): string {
   }
 }
 
+// 段階22-3：Google のログインからの戻りは URL の # の後ろに付くので、画面の URL として読む前に受け取って消す
+// （読み込む順番に頼ると、ビルドで順番が変わったときに戻りが画面の URL として読まれる）
+takeLoginReturn();
+
 export const route = signal<Route>(parse(location.hash));
 
 window.addEventListener('hashchange', () => {
+  // 開いたままのアプリの URL の # の後ろだけが変わる形で戻ったとき（受け取ったら、読み込み直して結果を出す）
+  if (takeLoginReturn()) {
+    location.reload();
+    return;
+  }
   route.value = parse(location.hash);
 });
 

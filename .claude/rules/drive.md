@@ -1,0 +1,25 @@
+---
+paths:
+  - "src/drive/**"
+  - "src/app/DriveSection.tsx"
+---
+
+# Google ドライブ（段階22-3）
+
+> この機能の仕様を変えたら、このファイルを直す。下のパスのファイルを読んだときだけ読み込まれる。
+> 依頼と了承した判断は `docs/claude/stage22.md`、持ち主の準備は `docs/google-drive-setup.md`。
+
+- **今できること（v0.50.1）：ログインの確認だけ**。研究のデータは読み書きも送信もしない。持ち主の実機（iPhone のホーム画面のアプリで戻れるか）で確かめてから、同期（読む → `src/tree/merge.ts` で合わせる → 書き戻す。v0.51.0）を作る
+- **ログイン**：画面を移して戻る方式（`response_type=token`）。サーバー・秘密の鍵・Google の JavaScript（CDN）・ライブラリは使わない。Google の公式の説明では古い方式の扱い（持ち主は承知の上で選んだ 2026-11-26）。
+  権限は `drive.appdata` だけ。更新用の長く使える鍵は受け取らない（1 時間ほどで切れる）
+  - 戻りは URL の `#access_token=…`。**画面の切り替え（`app/router.ts`）が URL を読む直前に、router.ts の中で `takeLoginReturn()` を呼ぶ**（読み込む順番に頼らない。頼るとビルドで順番が変わり、受け取れなかった）。受け取る前に URL を `#/settings` に置きかえる
+  - このアプリから始めたログインか（`state`。15 分以内・1 回で使い切り）を確かめる。違う戻りの鍵は使わない
+  - 開いたままのアプリで # の後ろだけが変わる戻り（`hashchange`）でも受け取り、読み込み直す。戻った結果は読んでも消さない（初回の isolation の読み込み直しで消えないように。次の操作か 2 分まで出す）
+- **鍵**は localStorage `joban-tree.drive-token`（期限の 1 分前から使わない。401 なら消す）。**バックアップに入れない**（`PREF_KEYS` に入れない）。画面・記録に鍵を出さない
+- **承知していること**：localStorage は `https://skiri7kenteki.github.io` 全体で共通（同じアカウントのほかの GitHub Pages のスクリプトから鍵が読める。鍵は約 1 時間・`drive.appdata` だけ）。
+  この方式では、鍵の付いた戻り先の URL がブラウザの閲覧履歴に残ることがある（アプリが消せるのは今の 1 件の表示だけ）。
+  戻った後に「戻る」で Google の画面へ行くと、もう一度戻って「確かめられませんでした」と出ることがある（実機で確かめる）
+- **クライアント ID** は `src/drive/config.ts`（秘密ではない）。空の間は欄を出さない。localStorage `joban-tree.drive-client-id` は e2e 用
+- 通信は `fetch`（`cache: 'no-store'`）。service worker は別の場所への通信に触らない（`sw.ts` の fetch は同じ場所だけ）。COOP/COEP の下で、画面の移動と CORS の `fetch` は使える
+- 公開設定は「本番」（依頼書の「テスト中」から変更）。手順書では、個人用（Personal）が選べるならおすすめと書いた（持ち主が選ぶ。選んだら、ここに書く）
+- テスト：`tests/unit/drive-auth.test.ts`、`e2e/phase22-3.spec.ts`（Google は `page.route` の偽物。本物には通信しない）

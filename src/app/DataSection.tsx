@@ -15,6 +15,7 @@ import { APP_VERSION } from '../components/Footer';
 import { currentBackup, hideNudgeUntil, lastBackupAt, loadSnapshot, markBackedUp, mergeFromBackup, nudgeHiddenUntilStored, readAllData, restoreFromBackup } from '../storage/backup';
 import { mergeBackups, type MergeResult } from '../tree/merge';
 import { MergeSummary } from './MergeSummary';
+import { DriveSection } from './DriveSection';
 import { askPersist, persistState, type PersistState } from '../storage/persist';
 import {
   KIND_LABELS,
@@ -304,6 +305,8 @@ export function DataSection() {
           {error}
         </p>
       )}
+
+      <DriveSection />
 
       {pending && (
         <Dialog title={pending.fromSnapshot ? '戻す前のデータに戻す' : 'バックアップから戻す'} onClose={() => !busy && setPending(null)} testId="backup-restore-dialog">
