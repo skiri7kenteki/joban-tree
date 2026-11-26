@@ -61,6 +61,67 @@ function conditionText(table: readonly Candidate[]): string {
 }
 
 /**
+ * 行の ⋯ の窓の上の詳しい情報（段階23）：印と本命との差・評価値・読み筋・理由・この手を通る研究手順の名前の全部・局面メモ。
+ * 定跡帳の一覧の行には出さないものを、ここで読む。無いものは出さない
+ */
+export function RowDetail({
+  table,
+  move,
+  sfen,
+  names,
+  memo,
+}: {
+  table: readonly Candidate[];
+  move: string;
+  sfen: string;
+  /** この手を通る研究手順（今たどっているものが先） */
+  names: readonly { id: string; name: string }[];
+  memo: string;
+}) {
+  const entry = table.find((c) => c.move === move);
+  const pv = entry ? pvText(sfen, move, entry.pv ?? [], entry.mark === 'bad' ? PV_MAX : PV_SHOW) : '';
+  const score = entry ? evalText(entry) : '';
+  const condition = entry ? conditionText([entry]) : '';
+  return (
+    <div class="row-detail" data-testid="row-detail">
+      {entry && (
+        <p class="row-detail-line">
+          <MarkTag mark={entry.mark} text={markText(table, entry)} />
+          {move === hardMove(table) && <HardTag />}
+          {score && <span class="num">評価値 {score}</span>}
+        </p>
+      )}
+      {pv && (
+        <p class="row-detail-line">
+          {entry?.mark === 'bad' ? '咎め方' : '読み筋'}：{pv}
+        </p>
+      )}
+      {entry?.reason && <p class="row-detail-line">理由：{entry.reason}</p>}
+      {move === hardMove(table) && <HardNote />}
+      {condition && <p class="muted memo-sub">{condition}</p>}
+      {names.length > 0 && (
+        <>
+          <p class="menu-section-title">この手の研究手順（{names.length}本）</p>
+          <ul class="row-detail-studies">
+            {names.map((s) => (
+              <li key={s.id} data-testid="row-detail-study">
+                {s.name}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+      {memo && (
+        <>
+          <p class="menu-section-title">局面メモ</p>
+          <p class="row-detail-memo">{memo}</p>
+        </>
+      )}
+    </div>
+  );
+}
+
+/**
  * 局面メモを書く欄（保存・消す）。書きかけのまま窓を離れたら（閉じる・ほかのボタン）自動で保存する。
  * 全部消した書きかけは保存しない（消すのは［メモを消す］か［メモを保存］を押したときだけ）
  */

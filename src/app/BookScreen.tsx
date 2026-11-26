@@ -16,6 +16,8 @@
 // - 段階20-2：一覧の見出しの行の右端に［エンジンに聞く］（src/app/AskEngine.tsx）
 // - 段階21-1：自分の手番の局面に候補の表（本命・次善・悪手。src/tree/candidates.ts、窓は src/app/CandidateDialogs.tsx）。行に印、研究手順の無い手は薄い行、
 //   見出しの行は表の要約（局面メモは候補の窓の下へ）。行の ⋯ で印を付け替える。食い違いは「どちらを本命にするか」。表の変更も「取り消す」で戻る
+// - 段階23：一覧の行は 2 段（指し手と札／研究手順の名前）。点の差・割合の棒・本数は出さず、詳しい情報は行の ⋯ の窓の上（RowDetail）。
+//   見出しの行は中身を出さず［候補・メモ］（相手の手番は［メモ］）
 // - 段階21-2：研究手順の無い悪手の行を押すと、盤の上で咎め方を ‹ › でたどる（「咎め方を見ています［戻る］」）。研究手順には入れない
 // - 段階22-4：同じ局面（手数を除いた SFEN）を通る研究手順をつなぐ。手順前後で来た手の行に「手順前後」、押して手順が切り替わったら画面の下に知らせる。
 //   ⋯「研究手順の一覧（n本）」（StudyList.tsx）。定跡帳のタブの「その他」の行からは、盤は平手から（同じ側の全部）、一覧とまとめて稽古はその他の分だけ
@@ -28,9 +30,9 @@ import { PromotionBox, useMoveInput } from '../components/useMoveInput';
 import { STARTPOS_SFEN, moveText, sfenKey, sideToMove, type Side } from '../shogi/position';
 import { buildBookIndex } from '../games/compare';
 import { conflictAt, positionId, studyMovesAt, type Conflict } from '../tree/positions';
-import { MARK_TEXT, candidatesKifLine, chooseMain, markText, refutation, setMark, setReason, summaryText, tableOf, type Candidate, type CandidateMark } from '../tree/candidates';
+import { MARK_TEXT, candidatesKifLine, chooseMain, markText, refutation, setMark, setReason, tableOf, type Candidate, type CandidateMark } from '../tree/candidates';
 import { ensurePositions, isMarkedBad, noteAt, positionNotes, positionsNow, restoreTable, saveNote, saveTable, tableSnapshot, type TableSnapshot } from './positions';
-import { CandidateWindow, MarkChooser, MarkTag, MemoDialog } from './CandidateDialogs';
+import { CandidateWindow, MarkChooser, MarkTag, MemoDialog, RowDetail } from './CandidateDialogs';
 import { MainChoice } from './ConflictNotice';
 import { settings } from './settings';
 import { studyBookUrl } from './addToBook';
@@ -719,6 +721,11 @@ function BookViewScreen({
   /** この局面の窓（自分の手番は候補の表、相手の手番は局面メモ） */
   const openPositionWindow = () => setDialog({ kind: mine ? 'cand' : 'memo' });
   const openRow = (move: string) => setDialog({ kind: 'row', move, branch: connections.branches.some((b) => b.move === move) });
+  /** この手を指す研究手順（行の ⋯ の窓に出す。ほかのグループの手順前後も）。今たどっているものが先 */
+  const studiesOfMove = (move: string) => {
+    const all = [...(connections.branches.find((b) => b.move === move)?.studies ?? []), ...(studyMoves.find((m) => m.move === move)?.studies ?? [])];
+    return currentFirst([...new Map(all.map((s) => [s.id, s])).values()], current?.id);
+  };
   const place = index === 0 ? '初期局面' : `${index}手目 ${texts[index - 1] ?? ''} の局面`;
   /** 局面メモの書きかけを保存する（窓は閉じない・切りかえない） */
   async function autoSaveMemo(text: string) {
@@ -836,6 +843,7 @@ function BookViewScreen({
             onTransposed={openTransposed}
             table={table}
             memo={memo}
+            mine={mine}
             onSummary={openPositionWindow}
             onAsk={() => setDialog({ kind: 'ask' })}
             picking={picking}
@@ -994,11 +1002,12 @@ function BookViewScreen({
 
       {dialog?.kind === 'row' && (mine || cutPlan) && (
         <Dialog
-          title={mine ? moveText(sfen, dialog.move, prevMove) : `${moveText(sfen, dialog.move, prevMove)} から先`}
+          title={moveText(sfen, dialog.move, prevMove)}
           onClose={() => setDialog(null)}
           testId="book-cut-dialog"
-          sheet={mine}
+          sheet
         >
+          <RowDetail table={table} move={dialog.move} sfen={sfen} names={studiesOfMove(dialog.move)} memo={memo} />
           {conflict && !conflict.ok && conflict.moves.some((m) => m.move === dialog.move) && <ConflictBox conflict={conflict} busy={busy} onChoose={chooseMainHere} />}
           {mine && (
             <MarkChooser
@@ -1011,7 +1020,7 @@ function BookViewScreen({
           )}
           {cutPlan && (
             <>
-              {mine && <p class="menu-section-title">研究手順</p>}
+              <p class="menu-section-title">この手から先を消す</p>
               <CutText count={cutPlan.count} kept={cutPlan.put} />
               {/* 手順前後で来る研究手順も消えるときは、消える名前を出す（盤でたどっていない研究手順なので） */}
               {cutPlan.remove.some((s) => !startsWith(s.moves, here)) && (
@@ -1208,6 +1217,12 @@ function CutText({ count, kept }: { count: number; kept: readonly Study[] }) {
   );
 }
 
+/** 今たどっている研究手順を先に */
+const currentFirst = <S extends { id: string }>(list: readonly S[], currentId: string | undefined): S[] => [
+  ...list.filter((s) => s.id === currentId),
+  ...list.filter((s) => s.id !== currentId),
+];
+
 /** 盤の下から一覧の 3 行目までの高さの見込み（まだ測っていないとき。間＋見出し＋3 行） */
 /** 「この局面からの研究」の 1 行の高さ（行が無いときの見込み。px） */
 const ROW_GUESS = 44;
@@ -1231,6 +1246,7 @@ function BookBranches({
   onTransposed,
   table,
   memo,
+  mine,
   onSummary,
   onAsk,
   picking,
@@ -1253,6 +1269,8 @@ function BookBranches({
   /** 候補の表（相手の手番は空） */
   table: readonly Candidate[];
   memo: string;
+  /** 自分の手番 */
+  mine: boolean;
   /** この局面の窓を開く */
   onSummary: () => void;
   onAsk: () => void;
@@ -1267,7 +1285,7 @@ function BookBranches({
   /** 手の印：候補の表にあれば本命・次善・悪手、無くて食い違いなら「食い違い」 */
   const tagOf = (move: string) => {
     const entry = table.find((c) => c.move === move);
-    if (entry) return <MarkTag mark={entry.mark} text={markText(table, entry)} testId="book-mark-tag" />;
+    if (entry) return <MarkTag mark={entry.mark} text={MARK_TEXT[entry.mark]} testId="book-mark-tag" />;
     return diffMoves.has(move) ? (
       <span class="diff-tag" data-testid="book-conflict-tag">
         食い違い
@@ -1276,9 +1294,21 @@ function BookBranches({
   };
   /** 表にあるが研究手順の無い手（薄い行で出す） */
   const tableOnly = table.filter((c) => !branches.some((b) => b.move === c.move) && !transposed.some((t) => t.move === c.move));
-  /** 名前の並び：今たどっている研究手順を先に */
-  const names = (list: readonly Study[]) =>
-    [...list.filter((s) => s.id === current?.id), ...list.filter((s) => s.id !== current?.id)].map((s) => s.name).join('・');
+  /** 行の下の段：研究手順の名前（今たどっているものが先）。2 本以上なら「ほか n 本」（入りきらない名前は … になるが、本数は残す） */
+  const names = (list: readonly Study[]) => (
+    <span class="book-sub">
+      <span class="book-names">{currentFirst(list, current?.id)[0].name}</span>
+      {list.length > 1 && <span class="book-more">ほか {list.length - 1} 本</span>}
+    </span>
+  );
+  /** 行の下の段の言葉（研究手順の名前でないもの） */
+  const subText = (text: string) => (
+    <span class="book-sub">
+      <span class="book-names">{text}</span>
+    </span>
+  );
+  /** 見出しの行の小さなボタン（中身は出さない。✎ はメモがある印） */
+  const summary = `${memo ? '✎ ' : ''}${mine ? '候補・メモ' : 'メモ'}`;
   return (
     <div class="card candidates book-list" ref={listRef} data-testid="study-book-list">
       <div class="candidates-head book-list-head">
@@ -1292,23 +1322,11 @@ function BookBranches({
         ) : (
           <>
             <strong data-testid="study-book-head">研究 {count}本</strong>
-            {/* 段階21-1：候補の表の要約（押すと候補の窓）。表が無くメモがあれば、メモの 1 行目 */}
-            {table.length > 0 ? (
-              <button type="button" class="book-memo" data-testid="book-table" onClick={onSummary}>
-                <span class="book-memo-text">
-                  {memo && '✎ '}
-                  {/* 幅の狭いスマホでは「候補 n・」を隠して、本命の手が切れないように */}
-                  <span class="book-table-count">{summaryText(table, sfen, prev).split('・')[0]}・</span>
-                  {summaryText(table, sfen, prev).split('・')[1]}
-                </span>
+            {/* 段階23：候補の表か局面メモがあるときだけ。押すと候補の窓（相手の手番は局面メモの窓） */}
+            {(table.length > 0 || memo) && (
+              <button type="button" class="book-memo" data-testid={table.length > 0 ? 'book-table' : 'book-memo'} onClick={onSummary}>
+                <span class="book-memo-text">{summary}</span>
               </button>
-            ) : (
-              memo && (
-                <button type="button" class="book-memo" data-testid="book-memo" aria-label={`局面メモ：${firstLine(memo)}`} onClick={onSummary}>
-                  <span aria-hidden="true">✎ </span>
-                  <span class="book-memo-text">{firstLine(memo)}</span>
-                </button>
-              )
             )}
             {/* 段階20-2：今の局面だけをエンジンで数秒調べる */}
             <button type="button" class="btn book-ask" data-testid="book-ask" onClick={onAsk}>
@@ -1331,7 +1349,6 @@ function BookBranches({
               >
                 <span class="candidate-line">
                   <span class="candidate-move">
-                    {isCurrent ? '▶ ' : ''}
                     {moveText(sfen, b.move, prev)}
                     {tagOf(b.move)}
                     {b.transposed && (
@@ -1340,12 +1357,7 @@ function BookBranches({
                       </span>
                     )}
                   </span>
-                  <span class="book-names">{names(b.studies)}</span>
-                  {/* その手を通る研究手順の割合の棒（段階12-3。本数はこの局面を通る研究手順の数に対して） */}
-                  <span class="book-bar" aria-hidden="true" data-testid="study-book-bar">
-                    <span class="book-bar-fill" style={{ width: `${Math.round((b.studies.length / Math.max(count, 1)) * 100)}%` }} />
-                  </span>
-                  {b.studies.length >= 2 && <span class="book-count num">（{b.studies.length}）</span>}
+                  {names(b.studies)}
                 </span>
               </button>
               <button type="button" class="candidate-menu" aria-label={`${moveText(sfen, b.move, prev)} の操作`} data-testid="book-branch-menu" onClick={() => onMenu(b.move)}>
@@ -1362,7 +1374,7 @@ function BookBranches({
                   {moveText(sfen, t.move, prev)}
                   {tagOf(t.move)}
                 </span>
-                <span class="book-names">手順前後：{t.study.name}</span>
+                {subText(`手順前後：${t.study.name}`)}
               </span>
             </button>
             <button type="button" class="candidate-menu" aria-label={`${moveText(sfen, t.move, prev)} の操作`} data-testid="book-transposed-menu" onClick={() => onMenu(t.move)}>
@@ -1378,7 +1390,7 @@ function BookBranches({
                   {moveText(sfen, c.move, prev)}
                   {tagOf(c.move)}
                 </span>
-                <span class="book-names">{c.mark === 'bad' && c.pv?.length ? '咎め方を見る ›' : '研究手順なし'}</span>
+                {subText(c.mark === 'bad' && c.pv?.length ? '咎め方を見る ›' : '研究手順なし')}
               </span>
             </button>
             <button type="button" class="candidate-menu" aria-label={`${moveText(sfen, c.move, prev)} の操作`} data-testid="book-cand-menu" onClick={() => onMenu(c.move)}>
@@ -1398,8 +1410,8 @@ function BookBranches({
                 onClick={() => onEnding(s)}
               >
                 <span class="candidate-line">
-                  <span class="candidate-move book-end-label">{isCurrent ? '▶ ' : ''}ここで終わる研究</span>
-                  <span class="book-names">{s.name}</span>
+                  <span class="candidate-move book-end-label">ここで終わる研究</span>
+                  {subText(s.name)}
                 </span>
               </button>
             </li>

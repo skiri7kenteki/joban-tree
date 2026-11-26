@@ -206,12 +206,6 @@ export function markText(table: readonly Candidate[], c: Candidate): string {
   return c.eval && base !== null ? `${word} ${signed(c.eval.value - base)}` : word;
 }
 
-/** 見出しの行の要約（候補 3・本命 ▲２四歩） */
-export function summaryText(table: readonly Candidate[], sfen: string, prev?: string): string {
-  const main = table.find((c) => c.mark === 'main');
-  return `候補 ${table.length}・${main ? `本命 ${moveText(sfen, main.move, prev)}` : '本命なし'}`;
-}
-
 /** 評価値の文字（無ければ空） */
 export function evalText(c: Pick<Candidate, 'eval'>): string {
   return c.eval ? formatScore(c.eval) : '';

@@ -1204,21 +1204,11 @@
 }
 
 .book-names {
-  flex: 1 1 auto;
+  flex: 0 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.book-count {
-  flex: 0 0 auto;
-  color: var(--color-text-muted);
-}
-
-.book-current .candidate-move,
-.book-current .book-names {
-  color: var(--color-mark-text);
 }
 
 .book-end-label {
@@ -2041,24 +2031,6 @@ button.move-bar-center.move-bar-action {
   font-weight: 600;
 }
 
-/* その手を通る研究手順の割合の棒（段階13：名前の下に細く。名前の幅を広げるため） */
-.book-bar {
-  grid-area: bar;
-  align-self: start;
-  width: min(100%, 120px);
-  height: 3px;
-  border-radius: 2px;
-  background: var(--color-track);
-  overflow: hidden;
-}
-
-.book-bar-fill {
-  display: block;
-  height: 100%;
-  border-radius: 2px;
-  background: var(--color-progress);
-}
-
 /* ---- 段階12-4：残りの画面をそろえる ---- */
 
 /* 候補手のカードの見出しは明朝体（行の高さは変えない） */
@@ -2236,29 +2208,42 @@ button.move-bar-center.move-bar-action {
   }
 }
 
-/* 定跡帳の「この局面からの研究」の行：手・名前（本数）、名前の下に細い棒。名前の幅を広げる */
+/* 定跡帳の一覧の行は 2 段（段階23）：上に指し手と札、下に研究手順の名前。2 段で 44px に収める（盤の大きさを変えないため） */
 .book-row .candidate-line {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  grid-template-areas:
-    'move names count'
-    '. bar .';
-  column-gap: var(--space-2);
-  row-gap: 2px;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
 }
 
 .book-row .candidate-move {
-  grid-area: move;
-  min-width: 5.2em;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 1.1875rem;
+  line-height: 1.2;
+  white-space: nowrap;
 }
 
-.book-row .book-names {
-  grid-area: names;
+.book-sub {
+  display: flex;
+  gap: var(--space-2);
+  min-width: 0;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  line-height: 1.35;
 }
 
-.book-row .book-count {
-  grid-area: count;
+.book-more {
+  flex: 0 0 auto;
+}
+
+.book-list .book-row {
+  padding-left: var(--space-2);
+}
+
+/* 今たどっている研究手順の行：木の茶の左の線と淡い茶の地 */
+.book-list .candidate-list li:has(.book-current) {
+  background: var(--color-mark-soft);
+  box-shadow: inset 3px 0 0 var(--color-mark);
 }
 
 /* ---- 段階13-2：細部の仕上げ（レイアウトは変えない） ---- */
@@ -3070,8 +3055,7 @@ button.move-bar-center.move-bar-action {
   border-top: 1px dashed var(--color-border);
 }
 
-.book-list .book-table-only .candidate-move,
-.book-list .book-table-only .book-names {
+.book-list .book-table-only .candidate-move {
   color: var(--color-text-muted);
   font-weight: 400;
 }
@@ -3151,14 +3135,32 @@ button.move-bar-center.move-bar-action {
   margin: var(--space-2) 0;
 }
 
-.cand-pick + .memo-sub {
-  margin-top: var(--space-2);
+/* 行の ⋯ の窓の上の詳しい情報（段階23） */
+.row-detail-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-1);
 }
 
-@media (max-width: 379px) {
-  .book-table-count {
-    display: none;
-  }
+.row-detail-line .mark-tag {
+  margin-left: 0;
+}
+
+.row-detail-studies {
+  margin: 0 0 var(--space-2);
+  padding-left: 1.2em;
+}
+
+.row-detail-memo {
+  margin: 0 0 var(--space-2);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.cand-pick + .memo-sub {
+  margin-top: var(--space-2);
 }
 
 .ask-confirm {

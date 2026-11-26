@@ -35,14 +35,13 @@ async function writeMemo(page: Page, text: string) {
   await expect(page.getByTestId('book-cand-dialog')).toBeHidden();
 }
 
-test('局面メモ：書く → 見出しの行に 1 行目 → ほかの局面には出ない → 同じ局面ならほかの研究手順でも出る → 消す', async ({ page }) => {
+test('局面メモ：書く → 見出しの行にボタン（段階23 から中身は出さない）→ ほかの局面には出ない → 同じ局面ならほかの研究手順でも出る → 消す', async ({ page }) => {
   await setup(page, [A, B]);
   await page.goto(`./#/book/${KEY}/s-a/17`);
   await expect(page.getByTestId('study-book-head')).toBeVisible();
   await expect(page.getByTestId('book-memo')).toHaveCount(0);
   await writeMemo(page, '▲5八玉には△6二玉が本筋\n▲3六歩なら△8四飛');
-  await expect(page.getByTestId('book-memo')).toContainText('▲5八玉には△6二玉が本筋');
-  await expect(page.getByTestId('book-memo')).not.toContainText('▲3六歩なら');
+  await expect(page.getByTestId('book-memo')).toHaveText('✎ 候補・メモ');
 
   // 1 手戻ると別の局面（メモ無し）
   await page.getByTestId('study-prev').click();
@@ -51,7 +50,7 @@ test('局面メモ：書く → 見出しの行に 1 行目 → ほかの局面�
   // 研究手順 B の同じ局面（読み込み直しても残る）
   await page.goto(`./#/book/${KEY}/s-b/17`);
   await page.reload();
-  await expect(page.getByTestId('book-memo')).toContainText('▲5八玉には△6二玉が本筋');
+  await expect(page.getByTestId('book-memo')).toHaveText('✎ 候補・メモ');
 
   // 窓で全文を読む・消す
   await page.getByTestId('book-memo').click();
@@ -67,7 +66,9 @@ test('局面メモ：書く → 見出しの行に 1 行目 → ほかの局面�
   await page.getByTestId('book-memo-text').fill('相手の手番のメモ');
   await page.getByTestId('book-memo-save').click();
   await expect(page.getByTestId('book-memo-dialog')).toBeHidden();
-  await expect(page.getByTestId('book-memo')).toContainText('相手の手番のメモ');
+  await expect(page.getByTestId('book-memo')).toHaveText('✎ メモ');
+  await page.getByTestId('book-memo').click();
+  await expect(page.getByTestId('book-memo-text')).toHaveValue('相手の手番のメモ');
 });
 
 test('食い違い：行に印 → 定跡帳のタブに知らせ → 見るでその局面 → 本命を選ぶと消える → 取り消し', async ({ page }) => {
@@ -88,7 +89,7 @@ test('食い違い：行に印 → 定跡帳のタブに知らせ → 見るで�
   await expect(page.getByTestId('book-conflict-box')).toContainText('食い違い');
   await page.locator('[data-testid="conflict-main"][data-move="5a5b"]').click();
   await expect(page.getByTestId('book-conflict-tag')).toHaveCount(0);
-  await expect(page.getByTestId('book-table')).toHaveText('候補 2・本命 △５二玉');
+  await expect(page.getByTestId('book-table')).toHaveText('候補・メモ');
   await expect(page.getByTestId('book-mark-tag')).toHaveText(['次善', '本命']);
 
   // 取り消すと食い違いに戻る → もう一度選ぶ
@@ -97,7 +98,7 @@ test('食い違い：行に印 → 定跡帳のタブに知らせ → 見るで�
   await expect(page.getByTestId('book-table')).toHaveCount(0);
   await page.getByTestId('book-branch-menu').first().click();
   await page.locator('[data-testid="conflict-main"][data-move="5a6b"]').click();
-  await expect(page.getByTestId('book-table')).toHaveText('候補 2・本命 △６二玉');
+  await expect(page.getByTestId('book-table')).toHaveText('候補・メモ');
 
   await page.goto('./');
   await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${2} 本`);

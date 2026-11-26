@@ -1,5 +1,5 @@
 // 段階21-1（v0.47.0）：自分の手の候補表（本命・次善・悪手）。持ち主の判断 2026-11-25「すべておすすめの通りで」
-// - 定跡帳の行に印（本命・次善 −80・悪手 −450）、研究手順の無い手は薄い行、見出しの行は要約。候補の窓
+// - 定跡帳の行に印（本命・次善・悪手。段階23 から点の差は ⋯ の窓と候補の窓）、研究手順の無い手は薄い行、見出しの行は［候補・メモ］。候補の窓
 // - 行の ⋯ で付け替え → 取り消し。研究手順が通っている手を悪手にするときは、消してから。悪手の印のある手は盤で指しても足さない
 // - エンジンに聞くの［表に残す］・もう一度残す（確認）・盤で指して調べる（ENGINE_AVAILABLE=1 のときだけ）
 // - 表があっても盤の大きさは変わらず、1 画面に収まる
@@ -64,13 +64,13 @@ const tapMove = async (page: Page, from: string, to: string) => {
   await page.locator(`[data-testid="study-board"] [data-square="${to}"]`).click();
 };
 
-test('行の印と見出しの行の要約 → 候補の窓 → 行の ⋯ で付け替え → 取り消し', async ({ page }) => {
+test('行の印と見出しの行のボタン → 候補の窓 → 行の ⋯ で付け替え → 取り消し', async ({ page }) => {
   await setup(page, [A, B]);
   await putTable(page, TABLE);
   await openAt17(page);
 
-  await expect(page.getByTestId('book-table')).toHaveText('候補 3・本命 △６二玉');
-  await expect(page.getByTestId('book-mark-tag')).toHaveText(['本命', '次善 −80', '悪手 −450']);
+  await expect(page.getByTestId('book-table')).toHaveText('候補・メモ');
+  await expect(page.getByTestId('book-mark-tag')).toHaveText(['本命', '次善', '悪手']);
   // 段階21-2：読み筋のある悪手の行は「咎め方を見る」
   await expect(page.getByTestId('book-cand-row')).toContainText('咎め方を見る');
   await expect(page.getByTestId('book-conflict-tag')).toHaveCount(0);
@@ -95,10 +95,10 @@ test('行の印と見出しの行の要約 → 候補の窓 → 行の ⋯ で�
   await page.getByTestId('book-branch-menu').nth(1).click();
   await page.getByTestId('mark-main').click();
   await expect(page.getByTestId('book-toast')).toContainText('△５二玉 を本命にしました');
-  await expect(page.getByTestId('book-table')).toHaveText('候補 3・本命 △５二玉');
+  await expect(page.getByTestId('book-table')).toHaveText('候補・メモ');
   await page.getByTestId('book-toast-undo').click();
-  await expect(page.getByTestId('book-table')).toHaveText('候補 3・本命 △６二玉');
-  await expect(page.getByTestId('book-mark-tag')).toHaveText(['本命', '次善 −80', '悪手 −450']);
+  await expect(page.getByTestId('book-table')).toHaveText('候補・メモ');
+  await expect(page.getByTestId('book-mark-tag')).toHaveText(['本命', '次善', '悪手']);
 
   // 薄い行の ⋯：理由を書く → 表から外す → 取り消し
   await page.getByTestId('book-cand-menu').click();
@@ -110,7 +110,7 @@ test('行の印と見出しの行の要約 → 候補の窓 → 行の ⋯ で�
   await page.getByTestId('book-cand-menu').click();
   await page.getByTestId('mark-remove').click();
   await expect(page.getByTestId('book-cand-row')).toHaveCount(0);
-  await expect(page.getByTestId('book-table')).toHaveText('候補 2・本命 △６二玉');
+  await expect(page.getByTestId('book-table')).toHaveText('候補・メモ');
   await page.getByTestId('book-toast-undo').click();
   await expect(page.getByTestId('book-cand-row')).toHaveCount(1);
 });
@@ -134,7 +134,7 @@ test('悪手の印のある手は盤で指しても足さない。研究手順�
 
   await page.getByTestId('book-toast-undo').click();
   await expect(page.getByTestId('study-book-branch')).toHaveCount(2);
-  await expect(page.getByTestId('book-mark-tag')).toHaveText(['本命', '次善 −80', '悪手 −450']);
+  await expect(page.getByTestId('book-mark-tag')).toHaveText(['本命', '次善', '悪手']);
 });
 
 for (const [w, h] of [
@@ -180,7 +180,7 @@ test.describe('エンジンを使う', () => {
     await ask.getByTestId('ask-save').click();
     await expect(ask).toBeHidden();
     await expect(page.getByTestId('book-toast')).toContainText('候補の表に残しました');
-    await expect(page.getByTestId('book-table')).toContainText('・本命 ');
+    await expect(page.getByTestId('book-table')).toHaveText('候補・メモ');
     // 研究の手 2 つには印が付き、悪手にはならない
     await expect(page.getByTestId('study-book-branch').getByTestId('book-mark-tag')).toHaveCount(2);
     await expect(page.getByTestId('study-book-branch').locator('[data-mark="bad"]')).toHaveCount(0);

@@ -396,7 +396,7 @@ test.describe('12-3 定跡帳', () => {
     await expect(page).toHaveURL(/#\/practice$/);
   });
 
-  test('定跡帳の盤の画面：［復習］は墨、「この局面からの研究」に、その手を通る研究手順の割合の棒（名前の下）', async ({ page }) => {
+  test('定跡帳の盤の画面：［復習］は墨、「この局面からの研究」の行（割合の棒は段階23 でやめた）', async ({ page }) => {
     await openHome(page);
     await page.getByTestId('study-import-file').setInputFiles({
       name: 's.json',
@@ -409,15 +409,6 @@ test.describe('12-3 定跡帳', () => {
     for (let i = 0; i < 3; i++) await page.getByTestId('study-prev').click();
     await expect(page.getByTestId('study-book-branch')).toHaveCount(2);
     expect(await page.getByTestId('book-head-review').evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgb(45, 45, 45)');
-    const bars = page.getByTestId('study-book-bar');
-    await expect(bars).toHaveCount(2);
-    for (const i of [0, 1]) {
-      const [bar, fill] = await Promise.all([bars.nth(i).boundingBox(), bars.nth(i).locator('.book-bar-fill').boundingBox()]);
-      expect(Math.round((fill!.width / bar!.width) * 100)).toBe(50);
-      // 棒は名前の下（段階13。名前の幅を広げるため）
-      const names = (await page.getByTestId('study-book-branch').nth(i).locator('.book-names').boundingBox())!;
-      expect(bar!.y).toBeGreaterThanOrEqual(names.y + names.height - 1);
-    }
   });
 });
 
