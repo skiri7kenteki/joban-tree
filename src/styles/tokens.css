@@ -43,6 +43,11 @@
   /* キーボードで動かしたときのフォーカスの枠 */
   --color-focus: #8b6b4f;
 
+  /* 一覧の 4 画面の見出し（段階24）：墨の文字、下に木の茶の線と、真ん中の明るい木の色のひし形。ほかの所には使わない */
+  --color-title: #292722;
+  --color-title-line: #96704d;
+  --color-title-diamond: #c3a17a;
+
   /* 覚えた割合の輪と棒（緑）と、その残り */
   --color-progress: #2e7d32;
   --color-track: #ebe6dd;
@@ -114,6 +119,7 @@
   --font-size-small: 13px;
   --font-size-heading: 18px;
   --font-size-title: 21px;
+  --font-size-page-title: 22px;
 
   --space-1: 4px;
   --space-2: 8px;

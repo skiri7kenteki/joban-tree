@@ -58,7 +58,7 @@ export function PracticeScreen() {
   return (
     <>
       <div class="screen-header list-header">
-        <h1>稽古</h1>
+        <h1 class="page-title">稽古</h1>
         <span class="muted num" data-testid="practice-today-count">
           今日 {plan.today.length}本
         </span>

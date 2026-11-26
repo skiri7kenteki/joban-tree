@@ -229,7 +229,7 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
             ‹<span class="back-text"> 設定</span>
           </button>
         )}
-        <h1>{tab === 'studies' ? '定跡帳' : 'ツリー'}</h1>
+        <h1 class={tab === 'studies' ? 'page-title' : undefined}>{tab === 'studies' ? '定跡帳' : 'ツリー'}</h1>
         {tab === 'studies' && studies && (
           <span class="muted num" data-testid="study-count">
             研究手順 {studyCount} 本

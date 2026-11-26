@@ -28,7 +28,7 @@ export function SettingsScreen() {
   return (
     <>
       <div class="screen-header">
-        <h1>設定</h1>
+        <h1 class="page-title">設定</h1>
       </div>
       <p class="muted">変えるとすぐ保存されます（この端末の中だけ）。</p>
       {isGenerating() && <p class="notice">生成中です。エンジンの設定は、次の生成から使われます。</p>}

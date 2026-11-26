@@ -80,7 +80,7 @@ export function GamesScreen() {
   return (
     <>
       <div class="screen-header list-header">
-        <h1>実戦</h1>
+        <h1 class="page-title">実戦</h1>
         {games && (
           <span class="muted num" data-testid="games-count">
             {games.length}局

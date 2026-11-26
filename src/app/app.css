@@ -3488,6 +3488,53 @@ button.move-bar-center.move-bar-action {
   background: color-mix(in srgb, var(--color-bg) 85%, transparent);
 }
 
+/* 段階24：一覧の 4 画面（定跡帳・稽古・実戦・設定）の見出し。明朝の文字の下に、左右に分かれた線と真ん中の小さなひし形。
+   箱の高さは 4 画面とも 42px（文字 30px＋飾り 12px）。定跡帳・稽古・実戦は前の 28px の見出しと同じで下の中身は動かない。
+   設定は前が 21px だったので約 10px 下がる（飾りと下の文字の間を 4 画面でそろえるため）。
+   2 文字の名前は線の幅（64px）の真ん中に置く */
+.screen-header > h1.page-title {
+  position: relative;
+  flex: 0 0 auto;
+  min-width: 64px;
+  overflow: visible;
+  padding: 0 0 12px;
+  color: var(--color-title);
+  font-size: var(--font-size-page-title);
+  line-height: 30px;
+  letter-spacing: 0.08em;
+  text-indent: 0.08em; /* 最後の字の後の字間と釣り合わせて、真ん中を合わせる */
+  text-align: center;
+}
+
+/* 線：左の 25px を描き、同じ形を影で右へ写す（間の 14px にひし形） */
+.page-title::before {
+  content: '';
+  position: absolute;
+  bottom: 5px;
+  left: calc(50% - 32px);
+  width: 25px;
+  height: 2px;
+  background: var(--color-title-line);
+  box-shadow: 39px 0 0 var(--color-title-line);
+}
+
+.page-title::after {
+  content: '';
+  position: absolute;
+  bottom: 2px;
+  left: calc(50% - 4px);
+  width: 8px;
+  height: 8px;
+  background: var(--color-title-diamond);
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
+
+/* 横の本数は、見出しの文字の下の線（ベースライン）にそろえる */
+.screen-header > .page-title,
+.screen-header > .page-title ~ .muted {
+  align-self: baseline;
+}
+
 /* 段階22-4：定跡帳の行の「手順前後」の小さな印 */
 .transposed-tag {
   margin-left: var(--space-1);

@@ -168,7 +168,9 @@ test.describe('12-1 色・文字・部品の土台（段階16 で明るい対局
     // 一覧の画面：地は #F7F5F1、見出しは帯なし（地と同じ）で墨の明朝（「書き出し」は段階20-3 で設定へ移した）
     expect(await style('.app', 'background-color')).toBe('rgb(247, 245, 241)');
     expect(await style('.list-header', 'background-color')).toBe('rgba(0, 0, 0, 0)');
-    expect(await style('.list-header h1', 'color')).toBe('rgb(45, 45, 45)');
+    // 段階24：4 画面の見出しは少し暖かい墨（#292722）の 22px
+    expect(await style('.list-header h1', 'color')).toBe('rgb(41, 39, 34)');
+    expect(await style('.list-header h1', 'font-size')).toBe('22px');
     // 集計は白いカード 1 枚。グループの見出しはカードの外、行はグループごとに白いカード 1 枚の中（行に影は付けない）
     expect(await style('.book-summary', 'background-color')).toBe('rgb(255, 255, 255)');
     expect(await style('.tree-group', 'background-color')).toBe('rgba(0, 0, 0, 0)');
