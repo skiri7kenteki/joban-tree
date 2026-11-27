@@ -14,9 +14,11 @@ import { MoveBar } from '../components/MoveBar';
 import { OnceHint } from '../components/OnceHint';
 import { PromotionBox, useMoveInput } from '../components/useMoveInput';
 import { STEP_LABELS, REASON_TEXT, judgeAnswer, nextRecord, practicePlies, practiceStart, startOfDay, type PracticeReason, type PracticeRecord } from '../practice/practice';
+import { practiceRowLabel } from '../practice/groups';
 import { studyPositions } from '../review/studyReview';
 import { STARTPOS_SFEN, moveText } from '../shogi/position';
-import { bookPool } from '../tree/organize';
+import { bookPool, studyGroupKey } from '../tree/organize';
+import { bookOrder } from '../tree/studyBook';
 import { moveTexts } from '../tree/studies';
 import type { Study } from '../tree/types';
 import { studyBookUrl } from './addToBook';
@@ -103,11 +105,11 @@ function makeQueue(target: PracticeTarget, studies: readonly Study[], records: R
     if (!s || !able(s)) return [];
     return [fromPlan(new Set([s.id]))[0] ?? { id: s.id }];
   }
-  const pool = bookPool(target.key, studies, templates).filter(able);
-  const ids = new Set(pool.map((s) => s.id));
-  const planned = fromPlan(ids);
-  const seen = new Set(planned.map((q) => q.id));
-  return [...planned, ...pool.filter((s) => !seen.has(s.id)).map((s) => ({ id: s.id }))];
+  // まとめて稽古は、日が来ていなくても定跡帳の全部を手順の近い順に（段階26-1）。今日の稽古に入っているものには理由の印を付ける
+  const planned = new Map(fromPlan(null).map((q) => [q.id, q]));
+  return bookOrder(bookPool(target.key, studies, templates))
+    .filter(able)
+    .map((s) => planned.get(s.id) ?? { id: s.id });
 }
 
 type Phase =
@@ -140,6 +142,7 @@ function PlayView({ queue }: { queue: QueueItem[] }) {
     <StudyPlay
       key={`${qi}:${study.id}`}
       study={study}
+      label={practiceRowLabel(study, bookPool(studyGroupKey(study, templates), studies, templates), templates)}
       item={item}
       start={practiceStart(study, templates)}
       plies={practicePlies(study, templates)}
@@ -152,6 +155,7 @@ function PlayView({ queue }: { queue: QueueItem[] }) {
 
 function StudyPlay({
   study,
+  label,
   item,
   start,
   plies,
@@ -160,6 +164,8 @@ function StudyPlay({
   onNext,
 }: {
   study: Study;
+  /** 見出しの文字（稽古のタブの行と同じ） */
+  label: string;
   item: QueueItem;
   start: number;
   plies: number[];
@@ -318,7 +324,7 @@ function StudyPlay({
           <span class="book-kicker">
             稽古 {index + 1}／{total}本・{mySideText}
           </span>
-          <span class="book-label">{study.name}</span>
+          <span class="book-label">{label}</span>
         </h1>
       </div>
 

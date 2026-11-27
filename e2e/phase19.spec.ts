@@ -81,6 +81,8 @@ test('通して指す：まちがえたら正解を指して続く → 明日。
 
   // 稽古のタブ：今日は終わり。「これから」に明日
   await expect(page.getByTestId('practice-start')).toBeDisabled();
+  // 段階26-1：「これから」は定跡帳の見出しで閉じている
+  await page.getByTestId('practice-later').getByTestId('practice-group-head').click();
   await expect(page.getByTestId('practice-later-item')).toContainText('明日');
   await expect(page.getByTestId('practice-summary-wrong')).toContainText('1');
 
@@ -115,7 +117,7 @@ test('実戦で違う手を指した研究手順が、今日の稽古のいち�
   await expect(page.getByTestId('practice-item')).toHaveCount(2);
   await expect(page.getByTestId('practice-item').first()).toHaveAttribute('data-reason', 'game');
   await expect(page.getByTestId('practice-item').first()).toContainText('青野流 △6二玉型');
-  await expect(page.getByTestId('practice-item').first()).toContainText('実戦で違う手（11/20）');
+  await expect(page.getByTestId('practice-item').first()).toContainText('実戦で違う手');
 });
 
 test('定跡帳：集計・★ の行の［稽古］・グループの ⋯ の［稽古］', async ({ page }) => {

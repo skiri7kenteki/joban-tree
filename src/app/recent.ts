@@ -49,7 +49,7 @@ export function forgetOpened(id: string): void {
   write(RECENT_KEY, recentOpened.value);
 }
 
-/** 閉じているグループの key（初めては全部開いている） */
+/** 初めの形から変えた見出しの key。ふつうは「閉じている」（初めは開いている）。稽古の「これから」（practice-later:）だけは「開いている」（初めは閉じている。段階26-1） */
 export const collapsedGroups = signal<string[]>(hasStorage ? read(COLLAPSED_KEY, [], isStrings) : []);
 
 // トップ画面の「ツリー｜研究手順」の切り替え（段階7-2、端末に覚えていた）は、段階11-1 で画面の下のタブ（URL で分かる）にしたのでやめた

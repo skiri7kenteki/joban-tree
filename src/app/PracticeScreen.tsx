@@ -1,19 +1,20 @@
 // 稽古のタブ（段階19、#/practice。前の「復習」のタブを置きかえた。持ち主の判断 2026-11-24「おすすめの通りで」）。
 // - 集計：今日の稽古・身についた（1 週以上空くところまで進んだ / 稽古できる研究手順）・前回まちがい
 // - ［今日の稽古を始める（n本）］→ 今日の稽古を 1 本ずつ続けて（#/practice/play）
-// - 今日：実戦で違う手 → 前回まちがい → 日が来た → はじめて（1 日 5 本まで）。行を押すとその 1 本だけ稽古
-// - これから：次の稽古の日の近い順。行を押すと前倒しで稽古できる
-// 計算は src/practice/practice.ts、記録は IndexedDB の practice
+// - 段階26-1：今日・これからとも定跡帳ごとの見出しで畳む（今日は初めは開き、これからは閉じる）。中は手順の近い順の 1 行 44px
+// - 今日の定跡帳の順は稽古する順（実戦で違う手 → 前回まちがい → 日が来た → はじめて〔1 日 5 本まで〕）、これからは次の稽古の日の近い順
+// - 行を押すとその 1 本だけ稽古（前倒しもできる）。見出しの［まとめて稽古］はその定跡帳の全部
+// 計算は src/practice/practice.ts・groups.ts、記録は IndexedDB の practice
 
+import type { ComponentChildren } from 'preact';
 import { useEffect, useState } from 'preact/hooks';
-import { Words } from '../components/Words';
+import { groupPractice, practiceRowLabel, type PracticeGroup } from '../practice/groups';
 import { REASON_TEXT, dueText, summarizePractice, type PracticeReason } from '../practice/practice';
-import { otherStudyKey, studyGroupKey } from '../tree/organize';
 import type { Study } from '../tree/types';
-import type { OpeningTemplate } from '../tree/templates';
 import { ensureGames, gameList } from './games';
 import { gameDate } from './GamesScreen';
 import { ensurePractice, planNow, practiceRecords } from './practice';
+import { collapsedGroups, toggleGroup } from './recent';
 import { go } from './router';
 import { ensureStudies, library } from './studies';
 import { allTemplates, myTemplates, refreshMyTemplates } from './TemplateDialogs';
@@ -24,14 +25,6 @@ const REASON_CLASS: Record<PracticeReason, string> = {
   due: 'kind-tag',
   new: 'kind-tag',
 };
-
-/** 研究手順のグループの名前（「横歩取り・☖後手」） */
-export function studyGroupText(study: Study, templates: readonly OpeningTemplate[]): string {
-  const key = studyGroupKey(study, templates);
-  const side = study.mySide === 'black' ? '☗先手' : '☖後手';
-  if (key === otherStudyKey(study.mySide)) return side;
-  return `${key.slice(key.indexOf(':') + 1, key.lastIndexOf('|'))}・${side}`;
-}
 
 export function PracticeScreen() {
   const studies = library.value;
@@ -103,55 +96,90 @@ export function PracticeScreen() {
 
           {plan.today.length > 0 && (
             <>
-              <h2 class="list-section-title">今日</h2>
-              <ul class="tree-list" data-testid="practice-today">
-                {plan.today.map((item) => (
-                  <li class="tree-row" key={item.study.id}>
-                    <button type="button" class="tree-item practice-item" data-testid="practice-item" data-reason={item.reason} onClick={() => go(`/practice/play/${item.study.id}`)}>
-                      <span class="tree-item-name">
-                        <span class="study-star" aria-hidden="true">
-                          ★
-                        </span>
-                        <Words text={item.study.name} />
-                      </span>
-                      <span class="tree-item-meta">{studyGroupText(item.study, templates)}</span>
-                      <span class="game-item-marks">
-                        <span class={REASON_CLASS[item.reason]}>
-                          {REASON_TEXT[item.reason]}
-                          {item.reason === 'game' && item.gameAt !== undefined && `（${gameDate(item.gameAt)}）`}
-                        </span>
-                      </span>
-                    </button>
-                  </li>
+              <SectionTitle title="今日" count={plan.today.length} />
+              <div data-testid="practice-today">
+                {groupPractice(plan.today, studies, records, templates).map((g) => (
+                  // 「今日」は初めは開いている（閉じたら覚える）
+                  <GroupBlock key={g.key} group={g} openKey={`practice-today:${g.key}`} openAtFirst meta={`今日 ${g.items.length}本`}>
+                    {g.items.map((item) => (
+                      <PracticeRow key={item.study.id} testId="practice-item" reason={item.reason} study={item.study} label={practiceRowLabel(item.study, g.pool, templates)}>
+                        <span class={REASON_CLASS[item.reason]}>{REASON_TEXT[item.reason]}</span>
+                      </PracticeRow>
+                    ))}
+                  </GroupBlock>
                 ))}
-              </ul>
+              </div>
             </>
           )}
 
           {plan.later.length > 0 && (
             <>
-              <h2 class="list-section-title">これから</h2>
-              <ul class="tree-list" data-testid="practice-later">
-                {plan.later.map(({ study, record }) => (
-                  <li class="tree-row" key={study.id}>
-                    <button type="button" class="tree-item practice-item" data-testid="practice-later-item" onClick={() => go(`/practice/play/${study.id}`)}>
-                      <span class="tree-item-name">
-                        <span class="study-star" aria-hidden="true">
-                          ★
-                        </span>
-                        <Words text={study.name} />
-                      </span>
-                      <span class="tree-item-meta num">
-                        {studyGroupText(study, templates)}・次は {gameDate(record.dueAt)}（{dueText(record, now)}）
-                      </span>
-                    </button>
-                  </li>
+              <SectionTitle title="これから" count={plan.later.length} />
+              <div data-testid="practice-later">
+                {groupPractice(plan.later, studies, records, templates).map((g) => (
+                  // 「これから」は初めは閉じている（開いたら覚える）
+                  <GroupBlock key={g.key} group={g} openKey={`practice-later:${g.key}`} meta={g.nextDue === undefined ? '' : `次は ${gameDate(g.nextDue)}`}>
+                    {g.items.map(({ study, record }) => (
+                      <PracticeRow key={study.id} testId="practice-later-item" study={study} label={practiceRowLabel(study, g.pool, templates)}>
+                        <span class="practice-row-due num">{dueText(record, now)}</span>
+                      </PracticeRow>
+                    ))}
+                  </GroupBlock>
                 ))}
-              </ul>
+              </div>
             </>
           )}
         </>
       )}
     </>
+  );
+}
+
+function SectionTitle({ title, count }: { title: string; count: number }) {
+  return (
+    <div class="practice-section">
+      <h2>{title}</h2>
+      <span class="muted num">{count}本</span>
+    </div>
+  );
+}
+
+/** 定跡帳 1 つ分：見出し（押すと開閉。右に［まとめて稽古］）と、開いていれば細い行の一覧 */
+function GroupBlock<T>({ group: g, openKey, openAtFirst = false, meta, children }: { group: PracticeGroup<T>; openKey: string; openAtFirst?: boolean; meta: string; children: ComponentChildren }) {
+  // 覚えるのは「初めの形から変えた」見出しの key（定跡帳のタブ・ツリーの一覧と同じ置き場所）
+  const open = collapsedGroups.value.includes(openKey) !== openAtFirst;
+  return (
+    <section class="practice-group" data-testid="practice-group" data-key={g.key}>
+      <div class="practice-group-row">
+        <button type="button" class="practice-group-head" aria-expanded={open} data-testid="practice-group-head" onClick={() => toggleGroup(openKey)}>
+          <span class="tree-group-caret" aria-hidden="true">
+            {open ? '▼' : '▶'}
+          </span>
+          <span class="practice-group-names">
+            <span class="practice-group-name">{g.name}</span>
+            <span class="practice-group-meta num" data-testid="practice-group-meta">
+              身についた {g.learned}／{g.total}
+              {meta && `・${meta}`}
+            </span>
+          </span>
+        </button>
+        <button type="button" class="btn practice-group-all" data-testid="practice-group-all" onClick={() => go(`/practice/group/${encodeURIComponent(g.key)}`)}>
+          まとめて稽古
+        </button>
+      </div>
+      {open && <ul class="practice-rows">{children}</ul>}
+    </section>
+  );
+}
+
+/** 1 行 44px。押すとその 1 本だけ稽古（日が来ていなくても前倒しでできる） */
+function PracticeRow({ testId, reason, study, label, children }: { testId: string; reason?: PracticeReason; study: Study; label: string; children: ComponentChildren }) {
+  return (
+    <li>
+      <button type="button" class="practice-row" data-testid={testId} data-reason={reason} data-study={study.id} onClick={() => go(`/practice/play/${study.id}`)}>
+        <span class="practice-row-text">{label}</span>
+        {children}
+      </button>
+    </li>
   );
 }

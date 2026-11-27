@@ -22,7 +22,7 @@ src/data/bundled-trees.json 同梱ツリーの一覧（段階6-3。scripts/bundl
 src/storage/                IndexedDB への保存（db.ts が開く。trees.ts・review.ts・templates.ts・studies.ts、版 4 にするときの移し替えは migrate.ts。
                             段階17：データの保護 persist.ts、まとめてのバックアップの読み書き backup.ts。ファイルの形は src/tree/backupFile.ts、画面は src/app/DataSection.tsx）
 src/games/                  実戦の照らし合わせ（段階18。棋譜の読み取り game.ts・定跡帳との照らし合わせと集計 compare.ts。保存は src/storage/games.ts、画面は src/app/GamesScreen.tsx・GameScreen.tsx）
-src/practice/               稽古（段階19。間隔反復・今日の稽古の並び practice.ts。保存は src/storage/practice.ts、画面は src/app/PracticeScreen.tsx・PracticePlayScreen.tsx）
+src/practice/               稽古（段階19。間隔反復・今日の稽古の並び practice.ts、定跡帳ごとのまとめと行の文字 groups.ts。保存は src/storage/practice.ts、画面は src/app/PracticeScreen.tsx・PracticePlayScreen.tsx）
 src/tree/positions.ts       局面メモと食い違い（段階20-1。保存は src/storage/positions.ts、共有は src/app/positions.ts、定跡帳のタブの知らせは src/app/ConflictNotice.tsx）
 src/tree/ask.ts             エンジンに聞く（段階20-2。候補の並べ方・評価値の向き。窓は src/app/AskEngine.tsx）
 src/tree/basicStudies.ts    基本の研究（段階20-3。データは src/data/basic-studies.json〔手で書く〕、窓は src/app/BasicStudiesDialog.tsx）
