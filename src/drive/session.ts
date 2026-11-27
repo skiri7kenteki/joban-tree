@@ -51,7 +51,7 @@ export function takeLoginReturn(): boolean {
   const r = parseLoginReturn(location.hash);
   if (!r) return false;
   // 鍵の付いた URL は、すぐに履歴から消す
-  history.replaceState(history.state, '', `${location.pathname}${location.search}#/settings`);
+  history.replaceState(history.state, '', `${location.pathname}${location.search}#/settings/sync`);
   let sent: { state: string; at: number } | null = null;
   try {
     sent = JSON.parse(read(LOGIN_KEY) ?? 'null') as { state: string; at: number } | null;

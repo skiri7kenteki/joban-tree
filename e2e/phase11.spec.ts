@@ -60,6 +60,7 @@ test.describe('11-4 復習を小分けにする', () => {
     await openHome(page);
     // 設定で 1 回 5 問に
     await page.getByTestId('tab-settings').click();
+    await page.getByTestId('settings-row-trees').click();
     await expect(page.getByTestId('review-batch-10')).toHaveAttribute('aria-checked', 'true');
     await page.getByTestId('review-batch-5').click();
     await page.goto('./');

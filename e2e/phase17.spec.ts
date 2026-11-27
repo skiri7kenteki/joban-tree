@@ -2,6 +2,7 @@
 // - 設定の「データ」：データの保護の表示、［バックアップを保存］→ 全部消す →［バックアップから戻す］で研究手順・ツリー・復習の記録・戦型・設定が元どおり
 // - 戻す前のデータは端末の中に取っておき、［戻す前のデータに戻す］で元に戻せる
 // - おかしいファイルは断る。定跡帳の一覧の上の「しばらくバックアップしていません」（閉じたら 30 日は出さない）
+import { openSettings } from './settings';
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import { STARTPOS_SFEN, applyUsiMove, sfenKey } from '../src/shogi/position';
@@ -127,17 +128,17 @@ async function seed(page: Page) {
   ]);
   // 設定：定跡帳の「盤で指して書き込む」を切に、復習の 1 回の問題の数を 5 に（設定の画面で変えたものもバックアップに入る）
   await page.evaluate(() => localStorage.setItem('joban-tree:book-write', 'off'));
-  await page.goto('./#/settings');
+  await openSettings(page, 'trees');
   await page.getByTestId('review-batch-5').click();
 }
 
 test.describe('段階17 データを守る', () => {
-  test('設定の「データ」：保護の表示、バックアップを保存 → 全部消す → 戻す で元どおり。戻す前のデータにも戻せる', async ({ page }) => {
+  test('設定の「データ管理」：保護の表示、バックアップを保存 → 全部消す → 戻す で元どおり。戻す前のデータにも戻せる', async ({ page }) => {
     await seed(page);
     const before = await dump(page);
     expect((before.studies as unknown[]).length).toBe(2);
 
-    await page.goto('./#/settings');
+    await openSettings(page, 'data');
     const section = page.getByTestId('data-section');
     await expect(section).toBeVisible();
     // データの保護：守られているかどうかを出す（守られていなければ説明）
@@ -169,7 +170,7 @@ test.describe('段階17 データを守る', () => {
     await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${0} 本`);
 
     // 戻す：中身の数を見せて、置きかえることを確かめてから
-    await page.goto('./#/settings');
+    await openSettings(page, 'data');
     await page.getByTestId('backup-restore-file').setInputFiles({ name: 'b.json', mimeType: 'application/json', buffer: Buffer.from(text) });
     const dialog = page.getByTestId('backup-restore-dialog');
     await expect(dialog).toBeVisible();
@@ -183,18 +184,19 @@ test.describe('段階17 データを守る', () => {
     await expect(page.getByTestId('data-section')).toBeVisible();
     expect(await dump(page)).toEqual(before);
     // 設定も元どおり（復習の 1 回は 5 問）
+    await openSettings(page, 'trees');
     await expect(page.getByTestId('review-batch-5')).toHaveAttribute('aria-checked', 'true');
     await page.goto('./');
     await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${2} 本`);
 
     // 戻す前のデータ（全部消した状態）に戻せる。戻したら今のデータが、また戻す前のデータになる
-    await page.goto('./#/settings');
+    await openSettings(page, 'data');
     await page.getByTestId('snapshot-restore').click();
     await expect(page.getByTestId('backup-restore-summary')).toContainText('研究手順 0 本');
     await Promise.all([page.waitForEvent('load'), page.getByTestId('backup-restore-confirm').click()]);
     await page.goto('./');
     await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${0} 本`);
-    await page.goto('./#/settings');
+    await openSettings(page, 'data');
     await page.getByTestId('snapshot-restore').click();
     await expect(page.getByTestId('backup-restore-summary')).toContainText('研究手順 2 本');
     await Promise.all([page.waitForEvent('load'), page.getByTestId('backup-restore-confirm').click()]);
@@ -204,7 +206,7 @@ test.describe('段階17 データを守る', () => {
   test('おかしいファイル・新しい版のファイルは断り、データは変えない。知らない種類は知らせる', async ({ page }) => {
     await seed(page);
     const before = await dump(page);
-    await page.goto('./#/settings');
+    await openSettings(page, 'data');
     const pick = (obj: unknown) =>
       page.getByTestId('backup-restore-file').setInputFiles({ name: 'x.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(obj)) });
     await pick({ app: 'joban-tree', kind: 'studies', version: 1, studies: STUDIES });
@@ -234,9 +236,10 @@ test.describe('段階17 データを守る', () => {
     await expect(nudge).toBeVisible();
     const close = (await page.getByTestId('backup-nudge-close').boundingBox())!;
     expect(close.height).toBeGreaterThanOrEqual(44);
-    // 設定で保存 → 設定の画面へ
+    // 設定で保存 → データ管理の下の画面へ。開いたらすぐ［バックアップを保存］が押せる
     await page.getByTestId('backup-nudge-open').click();
-    await expect(page.getByTestId('data-section')).toBeVisible();
+    await expect(page).toHaveURL(/#\/settings\/data$/);
+    await expect(page.getByTestId('backup-save')).toBeEnabled();
     await page.goto('./');
     await page.getByTestId('backup-nudge-close').click();
     await expect(nudge).toHaveCount(0);

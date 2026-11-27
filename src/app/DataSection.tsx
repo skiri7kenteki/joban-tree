@@ -1,8 +1,8 @@
-// 設定の「データ」の欄（段階17、v0.41.0〜。持ち主の依頼書 stage17-prompt・判断 2026-11-23「おすすめの通りで」）と、
+// 設定の「データ管理」の下の画面の中身（段階17、v0.41.0〜。持ち主の依頼書 stage17-prompt・判断 2026-11-23「おすすめの通りで」）と、
 // 定跡帳の一覧の上の「しばらくバックアップしていません」の知らせ。
 // - データの保護：守られています／守られていません（navigator.storage.persisted）。守られていなければ説明と［守るように頼む］
 // - ［バックアップを保存］：研究手順・ツリー・復習の記録・自分で登録した戦型・実戦の棋譜（段階18）・設定を 1 つの JSON にして、共有の画面（使えなければダウンロード）へ。
-//   iPhone/iPad は「押した直後」でないと共有を断るので、ファイルの中身は画面を開いたときに作っておく（押したときに await を挟まない）
+//   iPhone/iPad は「押した直後」でないと共有を断るので、ファイルの中身はこの下の画面を開いたときに作っておく（押したときに await を挟まない）
 // - ［バックアップから戻す］：ファイルを選ぶ → 中身の数を見せる → 「今のデータを全部置きかえる」を確かめてから戻す。戻す前のデータは端末の中に取っておく
 // - ［戻す前のデータに戻す］：戻したことがあるときだけ。戻したあとはアプリを読み込み直す
 // - ［ほかの端末のバックアップを合わせる］（段階22-2）：ファイルを選ぶ → この端末で変わる数と消える研究手順を見せる（MergeSummary）→ 合わせる。
@@ -15,7 +15,6 @@ import { APP_VERSION } from '../components/Footer';
 import { currentBackup, hideNudgeUntil, lastBackupAt, loadSnapshot, markBackedUp, mergeFromBackups, nudgeHiddenUntilStored, readAllData, restoreFromBackup } from '../storage/backup';
 import { mergeBackups, type MergeResult } from '../tree/merge';
 import { MergeSummary } from './MergeSummary';
-import { DriveSection } from './DriveSection';
 import { askPersist, persistState, type PersistState } from '../storage/persist';
 import {
   KIND_LABELS,
@@ -228,7 +227,6 @@ export function DataSection() {
 
   return (
     <section class="card settings-section" data-testid="data-section">
-      <h2>データ</h2>
       <div class="data-row">
         <span>データの保護</span>
         <strong class={persist === 'persisted' ? 'status-ok' : persist === 'not-persisted' ? 'status-ng' : ''} data-testid="persist-state" data-state={persist ?? ''}>
@@ -306,8 +304,6 @@ export function DataSection() {
         </p>
       )}
 
-      <DriveSection />
-
       {pending && (
         <Dialog title={pending.fromSnapshot ? '戻す前のデータに戻す' : 'バックアップから戻す'} onClose={() => !busy && setPending(null)} testId="backup-restore-dialog">
           <RestoreSummary pending={pending} />
@@ -367,7 +363,7 @@ export function BackupNudge({ studies }: { studies: readonly Study[] }) {
   return (
     <div class="notice backup-nudge" role="status" data-testid="backup-nudge">
       <span class="backup-nudge-text">しばらくバックアップしていません</span>
-      <button type="button" class="btn btn-ghost" data-testid="backup-nudge-open" onClick={() => go('/settings')}>
+      <button type="button" class="btn btn-ghost" data-testid="backup-nudge-open" onClick={() => go('/settings/data')}>
         設定で保存
       </button>
       <button

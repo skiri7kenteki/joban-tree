@@ -333,6 +333,7 @@ test.describe('8-1 書き出し・取り込み', () => {
     // 段階20-3：書き出しは定跡帳のタブの右上から、設定の「データ」へ移した
     await expect(page.getByTestId('study-export-open')).toHaveCount(0);
     await page.getByTestId('tab-settings').click();
+    await page.getByTestId('settings-row-data').click();
     await page.getByTestId('study-export-open').click();
     await expect(page.getByTestId('study-export-count')).toContainText('2 本');
     await page.getByTestId('study-export-none').click();

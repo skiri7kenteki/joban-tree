@@ -8,7 +8,7 @@ src/main.tsx                アプリ本体の入口（画面の切り替え）
 src/app/                    画面（トップ・入力・閲覧・設定・復習・研究手順・研究手順の復習）、生成・検証の実行と自動保存・Wake Lock、エンジンの用意、設定、共有
 src/components/Board.tsx    将棋盤（SVG）と持ち駒
 src/components/Dialog.tsx   重ねて出す小窓（確認・メニュー）
-src/components/Footer.tsx   バージョンと「気づきを送る」（段階11-1 から設定のタブの下に AppInfo として。Footer は速度測定ページだけ）
+src/components/Footer.tsx   バージョンと「気づきを送る」（アプリでは設定のタブの行に出し、窓 FeedbackDialog を使う。Footer は速度測定ページだけ）
 src/components/TabBar.tsx   画面の下のタブ（段階11-1）
 src/components/KifuList.tsx 手順の一覧＝棋譜欄（段階11-5。ツリーの中身は src/tree/treeKifu.ts）
 src/components/MoveBar.tsx  盤の下の固定バー（段階11-2）

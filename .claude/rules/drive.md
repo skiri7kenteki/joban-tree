@@ -9,7 +9,7 @@ paths:
 > この機能の仕様を変えたら、このファイルを直す。下のパスのファイルを読んだときだけ読み込まれる。
 > 依頼と了承した判断は `docs/claude/history.md` の「段階22」、持ち主の準備は `docs/google-drive-setup.md`。
 
-- **同期（v0.51.0）**：設定の「データ」の［Google ドライブで同期］。押したときだけ。読む → `src/tree/merge.ts` の `mergeAll` で合わせる → 書き戻す。流れは `src/drive/sync.ts`（通信と保存は差し替えられる。何台もの流れは偽物でテストする）、通信は `api.ts`、本物のつなぎは `run.ts`、覚えは `state.ts`、実行と操作止めは `src/app/syncing.tsx`、欄と一言は `src/app/DriveSection.tsx`
+- **同期（v0.51.0）**：設定の「Google ドライブで同期」の下の画面（`#/settings/sync`）の［Google ドライブで同期］。同期の前のデータに戻すボタンは「データ管理」の下の画面。押したときだけ。読む → `src/tree/merge.ts` の `mergeAll` で合わせる → 書き戻す。流れは `src/drive/sync.ts`（通信と保存は差し替えられる。何台もの流れは偽物でテストする）、通信は `api.ts`、本物のつなぎは `run.ts`、覚えは `state.ts`、実行と操作止めは `src/app/syncing.tsx`、欄と一言は `src/app/DriveSection.tsx`
   - ログインしていなければ Google のログインへ移り、戻ったら続けて同期する（`joban-tree.drive-sync-pending`。2 分まで。途中で読み込み直しても続ける）
   - ファイルは**端末ごとに 1 つ**（`joban-tree-sync-<端末の名前>.json`。appDataFolder）。中身はバックアップと同じ形で、**`prefs` は空**（鍵も入らない）。各端末は自分のファイルだけを書く
   - **前に合わせたときから変わったファイルだけ読む**（`joban-tree.drive-sync` の `seen`：id → modifiedTime と md5）。毎回全部読むと、指し直す前の自分の手順がよみがえるため。自分が送ったファイルは「読んだ」ことにする。中身が前に送ったものと同じ（並び順の違いは同じ）なら送らない
@@ -21,7 +21,7 @@ paths:
   - 欄の「研究や実戦のデータを…送り」の説明は、送ることを知らせる文なので常に出す（ui.md の「説明文は常に出さない」の例外）
 - **ログイン**：画面を移して戻る方式（`response_type=token`）。サーバー・秘密の鍵・Google の JavaScript（CDN）・ライブラリは使わない。Google の公式の説明では古い方式の扱い（持ち主は承知の上で選んだ 2026-11-26）。
   権限は `drive.appdata` だけ。更新用の長く使える鍵は受け取らない（1 時間ほどで切れる）
-  - 戻りは URL の `#access_token=…`。**画面の切り替え（`app/router.ts`）が URL を読む直前に、router.ts の中で `takeLoginReturn()` を呼ぶ**（読み込む順番に頼らない。頼るとビルドで順番が変わり、受け取れなかった）。受け取る前に URL を `#/settings` に置きかえる
+  - 戻りは URL の `#access_token=…`。**画面の切り替え（`app/router.ts`）が URL を読む直前に、router.ts の中で `takeLoginReturn()` を呼ぶ**（読み込む順番に頼らない。頼るとビルドで順番が変わり、受け取れなかった）。受け取る前に URL を `#/settings/sync` に置きかえる（同期の続きは同期の欄が出たときに始まるので、この下の画面でないと始まらない）
   - このアプリから始めたログインか（`state`。15 分以内・1 回で使い切り）を確かめる。違う戻りの鍵は使わない
   - 開いたままのアプリで # の後ろだけが変わる戻り（`hashchange`）でも受け取り、読み込み直す。失敗の理由と同期の結果は読んでも消さない（読み込み直しで消えないように。［同期］か［この端末のログインを消す］を押すか、2 分たつまで出す）
 - **鍵**は localStorage `joban-tree.drive-token`（期限の 1 分前から使わない。401 なら消す）。**バックアップに入れない**（`PREF_KEYS` に入れない）。画面・記録に鍵を出さない

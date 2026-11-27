@@ -3,6 +3,7 @@
 //   bash：SHOTS=1 npx playwright test e2e/screens.spec.ts
 //   PowerShell：$env:SHOTS=1; npx playwright test e2e/screens.spec.ts
 // 保存先は screenshots/<大きさ>-<画面>.png（.gitignore 済み）。新しい画面を作ったら、ここに撮る画面を足す
+import { openSettings } from './settings';
 import { expect, test, type Page } from '@playwright/test';
 import { STARTPOS_SFEN, applyUsiMove, sfenKey } from '../src/shogi/position';
 import type { Study } from '../src/tree/types';
@@ -155,7 +156,7 @@ for (const size of SIZES) {
       await shot(page, size.name, 'practice-board');
 
       // 実戦：将棋ウォーズの名前 → 棋譜を貼る → 結果 → 実戦のタブ
-      await page.goto('./#/settings');
+      await openSettings(page, 'games');
       await page.getByTestId('wars-name').fill('gote_user');
       await page.getByTestId('wars-name').press('Tab');
       await page.goto('./#/games');
@@ -168,10 +169,14 @@ for (const size of SIZES) {
       await expect(page.getByTestId('games-empty')).toHaveCount(0);
       await shot(page, size.name, 'games');
 
-      // 設定
-      await page.goto('./#/settings');
-      await expect(page.getByTestId('data-section')).toBeVisible();
+      // 設定のタブと下の画面
+      await openSettings(page);
       await shot(page, size.name, 'settings');
+      for (const sub of ['practice', 'games', 'engine', 'trees', 'sync', 'data'] as const) {
+        await openSettings(page, sub);
+        await shot(page, size.name, `settings-${sub}`);
+      }
+      await expect(page.getByTestId('backup-save')).toBeEnabled();
       // 段階22-2：ほかの端末のバックアップを合わせる確認の窓（1 本足して 1 本消すファイル）
       // backupFile.ts は読み込まない（Vite 専用の書き方の templates.ts につながり、Playwright が起動できなくなる）
       const gone = STUDIES[1];
@@ -191,10 +196,7 @@ for (const size of SIZES) {
       await shot(page, size.name, 'merge');
       await page.getByTestId('backup-merge-dialog').getByRole('button', { name: 'やめる' }).click();
       await page.getByTestId('backup-merge').scrollIntoViewIfNeeded();
-      await shot(page, size.name, 'settings-data');
-      // 段階22-3：Google ドライブの欄
-      await page.getByTestId('drive-section').scrollIntoViewIfNeeded();
-      await shot(page, size.name, 'settings-drive');
+      await shot(page, size.name, 'settings-data-bottom');
       // 前の同期から 1 日以上の一言（定跡帳のタブ）
       await page.evaluate(() => localStorage.setItem('joban-tree.last-sync', String(Date.now() - 2 * 24 * 60 * 60 * 1000)));
       await page.goto('./#/');

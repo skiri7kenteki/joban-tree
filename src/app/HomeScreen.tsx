@@ -9,7 +9,7 @@
 //   - ツリーの JSON（形式 6 まで）を取り込むと、中の研究手順も研究手順として取り込む（同じ手順がすでにあれば足さない）
 //   - 端末の保存場所を新しい版にしたときの移し替えの結果を、一度だけ知らせる
 // 段階20-3：「＋ 研究手順を登録」に「基本の研究を入れる」（BasicStudiesDialog）。「書き出し」（タブの右上・グループの ⋯）と 1 本ずつの JSON・KIF で渡すは外した
-//   （書き出しは設定の「データ」へ。DataSection）
+//   （書き出しは設定の「データ管理」へ。DataSection）
 // 段階11-1：画面の下のタブに分けた。list='studies' が定跡帳のタブ（#/。いちばん目立つのは「＋ 研究手順を登録」）、
 //   list='trees' がツリーのタブ（#/trees。「＋ 新しいツリーを作る」・最近開いた・ツリーの取り込み）。画面の上の「ツリー｜研究手順」の切り替えはやめた
 // v0.29.0：名前・メモで絞り込む欄はやめた（持ち主の依頼 2026-11-21。使わなかったため）
@@ -46,7 +46,7 @@ import { parseStudiesJson, planStudyImport, resolveStudyImport, type StudyConfli
 import type { Study, TreeData } from '../tree/types';
 import { generation, isGenerating, openTree, treeVersion } from './generation';
 import { collapsedGroups, forgetOpened, recentOpened, toggleGroup } from './recent';
-import { bookPath, bookTemplatePath, go } from './router';
+import { backTo, bookPath, bookTemplatePath, go } from './router';
 import { OUTCOME_TEXT, shareFile } from './share';
 import { TemplatePicker, allTemplates, myTemplates, refreshMyTemplates } from './TemplateDialogs';
 import { KifPasteDialog } from './addToBook';
@@ -232,7 +232,7 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
     <>
       <div class="screen-header list-header">
         {tab === 'trees' && (
-          <button type="button" class="btn btn-ghost btn-back" aria-label="‹ 設定" data-testid="trees-back" onClick={() => go('/settings')}>
+          <button type="button" class="btn btn-ghost btn-back btn-back-labeled" aria-label="‹ 設定" data-testid="trees-back" onClick={() => backTo('/settings/trees')}>
             ‹<span class="back-text"> 設定</span>
           </button>
         )}

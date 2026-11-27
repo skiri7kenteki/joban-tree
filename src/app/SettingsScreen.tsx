@@ -1,270 +1,182 @@
-// 設定画面：評価関数・スレッド数・ハッシュ・W・ラベルのしきい値・検証の時間・プリセットの中身、オフラインの準備。
-// 変えたらすぐ保存する（端末の中だけ）。エンジンの設定は、次に生成するときから使われる。
+// 設定のタブ：グループの小見出し＋行の目次（設定の整理）。行を押すと下の画面（#/settings/<名前>。中身は SettingsPages.tsx）へ進む。
+// 「気づきを送る」と「設定を初期値に戻す」は窓を開く。バージョン情報は版を出すだけ。
 
-import { useEffect, useRef, useState } from 'preact/hooks';
-import { EVALS, isOfflineReady, prepareOffline, type EvalId } from '../engine/config';
-import { MAX_SEARCH_THREADS } from '../engine/config';
-import type { PcInfo } from '../engine/pcEngine';
-import type { PresetId } from '../tree/presets';
-import { availablePresets, defaultPcThreads, defaultThreads, pcEngine } from './engineService';
-import { isGenerating } from './generation';
-import { AppInfo } from '../components/Footer';
-import { DataSection } from './DataSection';
-import { setWarsName, warsName } from './games';
-import { go } from './router';
-import { HASH_CHOICES, PC_HASH_CHOICES, REVIEW_BATCH_CHOICES, presetLabel, resetSettings, settings, updateSettings, type AppSettings, type PresetValues } from './settings';
+import { useEffect, useState } from 'preact/hooks';
+import { APP_VERSION, FeedbackDialog, screenBeforeSettings } from '../components/Footer';
+import { Dialog } from '../components/Dialog';
+import { TABS } from '../components/TabBar';
+import { lastSyncAt } from '../drive/state';
+import { lastBackupAt } from '../storage/backup';
+import { warsName } from './games';
+import { backTo, go, type SettingsPage } from './router';
+import { resetSettings, settings } from './settings';
+import { driveChanged } from './syncing';
+import { PAGES } from './SettingsPages';
+import { evalSummary, lastBackupSummary, lastSyncSummary, skipSameSummary, warsNameSummary } from './settingsSummary';
 
-export function SettingsScreen() {
+export function SettingsScreen({ page }: { page?: SettingsPage }) {
+  // 下の画面は、いつもいちばん上から見せる
+  useEffect(() => window.scrollTo(0, 0), [page]);
+  return page ? <SettingsSubScreen key={page} page={page} /> : <SettingsTop />;
+}
+
+/** 下の画面：上は「‹ 設定」と画面の名前 */
+function SettingsSubScreen({ page }: { page: SettingsPage }) {
+  const { title, Body } = PAGES[page];
+  return (
+    <>
+      <div class="screen-header list-header settings-sub-header">
+        <button
+          type="button"
+          class="btn btn-ghost btn-back btn-back-labeled"
+          aria-label="‹ 設定"
+          data-testid="settings-back"
+          onClick={() => backTo('/settings')}
+        >
+          ‹<span class="back-text"> 設定</span>
+        </button>
+        <h1>{title}</h1>
+      </div>
+      <Body />
+    </>
+  );
+}
+
+/** 行のアイコン（手書きの SVG。稽古と実戦は下のタブと同じ絵） */
+const tabIcon = (name: 'practice' | 'games') => TABS.find((t) => t.name === name)!.icon;
+const ICONS = {
+  practice: tabIcon('practice'),
+  games: tabIcon('games'),
+  // 円柱
+  data: (
+    <>
+      <ellipse cx="12" cy="5.5" rx="7.5" ry="2.8" />
+      <path d="M4.5 5.5v13c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8v-13M4.5 12c0 1.5 3.4 2.8 7.5 2.8s7.5-1.3 7.5-2.8" />
+    </>
+  ),
+  // 雲
+  sync: <path d="M7 18.5a4.5 4.5 0 01-.6-9 6 6 0 0111.5 1.2 3.9 3.9 0 01-.6 7.8z" />,
+  // チップ
+  engine: (
+    <>
+      <rect x="6" y="6" width="12" height="12" rx="2" />
+      <rect x="9.5" y="9.5" width="5" height="5" />
+      <path d="M9 3v3M15 3v3M9 18v3M15 18v3M3 9h3M3 15h3M18 9h3M18 15h3" />
+    </>
+  ),
+  // 枝分かれ
+  trees: (
+    <>
+      <circle cx="6" cy="12" r="2.2" />
+      <circle cx="18" cy="6" r="2.2" />
+      <circle cx="18" cy="18" r="2.2" />
+      <path d="M8.2 12H12V6h3.8M12 12v6h3.8" />
+    </>
+  ),
+  // 封筒
+  feedback: (
+    <>
+      <rect x="3.5" y="5.5" width="17" height="13" rx="2" />
+      <path d="M4 7l8 6 8-6" />
+    </>
+  ),
+  // i
+  info: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 11v5.5M12 7.8v.2" />
+    </>
+  ),
+  // 丸い矢印
+  reset: (
+    <>
+      <path d="M5 12a7 7 0 107-7H8" />
+      <path d="M10.5 2L7.5 5l3 3" />
+    </>
+  ),
+};
+
+/** 1 行の中身：左にアイコンと名前、右に今の値と › */
+function RowContent({ icon, name, value, valueTestId, arrow }: { icon: keyof typeof ICONS; name: string; value?: string; valueTestId?: string; arrow: boolean }) {
+  return (
+    <>
+      <svg class="settings-row-icon" viewBox="0 0 24 24" aria-hidden="true">
+        {ICONS[icon]}
+      </svg>
+      <span class="settings-row-name">{name}</span>
+      <span class="settings-row-value num" data-testid={valueTestId}>
+        {value}
+      </span>
+      {arrow && (
+        <span class="settings-row-arrow" aria-hidden="true">
+          ›
+        </span>
+      )}
+    </>
+  );
+}
+
+/** 下の画面へ進む行 */
+function PageRow({ page, name, value }: { page: SettingsPage; name: string; value?: string }) {
+  return (
+    <button type="button" class="settings-row" data-testid={`settings-row-${page}`} onClick={() => go(`/settings/${page}`)}>
+      <RowContent icon={page} name={name} value={value} valueTestId={`settings-value-${page}`} arrow />
+    </button>
+  );
+}
+
+function Group({ title, children }: { title: string; children: preact.ComponentChildren }) {
+  return (
+    <section>
+      <h2 class="settings-group-title">{title}</h2>
+      <div class="settings-list">{children}</div>
+    </section>
+  );
+}
+
+function SettingsTop() {
+  // 同期中に目次へ戻った場合も、終わったら「最後の同期」の表示を新しくする
+  void driveChanged.value;
   const s = settings.value;
-  const pc = pcEngine.value;
+  const [feedback, setFeedback] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
-  const isolated = self.crossOriginIsolated;
-  const maxThreads = Math.min(MAX_SEARCH_THREADS, navigator.hardwareConcurrency || 1);
-
-  const set = (patch: Partial<AppSettings>) => updateSettings({ ...s, ...patch });
-  const setPreset = (id: PresetId, patch: Partial<PresetValues>) =>
-    updateSettings({ ...s, presets: { ...s.presets, [id]: { ...s.presets[id], ...patch } } });
 
   return (
     <>
       <div class="screen-header">
         <h1 class="page-title">設定</h1>
       </div>
-      <p class="muted">変えるとすぐ保存されます（この端末の中だけ）。</p>
-      {isGenerating() && <p class="notice">生成中です。エンジンの設定は、次の生成から使われます。</p>}
-
-      {/* 段階18：実戦の照らし合わせで、自分の側を決める */}
-      <section class="card settings-section">
-        <h2>実戦</h2>
-        <label class="form-field">
-          <span>将棋ウォーズのユーザー名</span>
-          <input
-            type="text"
-            class="text-input"
-            data-testid="wars-name"
-            value={warsName.value}
-            autocomplete="off"
-            autocapitalize="off"
-            spellcheck={false}
-            maxLength={40}
-            onChange={(e) => setWarsName((e.currentTarget as HTMLInputElement).value)}
-          />
-        </label>
-        <p class="muted">棋譜の先手・後手の名前と照らして、あなたの側を自動で決めます。</p>
-      </section>
-
-      {/* 段階17：データの保護とまとめてのバックアップ */}
-      <DataSection />
-
-      {/* 段階26-2：稽古の早送り */}
-      <section class="card settings-section">
-        <h2>稽古</h2>
-        <div class="form-field">
-          <span>同じ出だしを早送り</span>
-          <div class="btn-row" role="radiogroup" aria-label="同じ出だしを早送り">
-            {[true, false].map((on) => (
-              <button
-                type="button"
-                key={String(on)}
-                role="radio"
-                aria-checked={s.skipSameStart === on}
-                data-testid={on ? 'skip-same-on' : 'skip-same-off'}
-                class={s.skipSameStart === on ? 'btn btn-toggle on' : 'btn btn-toggle'}
-                onClick={() => set({ skipSameStart: on })}
-              >
-                {on ? 'する' : 'しない'}
-              </button>
-            ))}
-          </div>
+      <Group title="学習">
+        <PageRow page="practice" name="稽古" value={skipSameSummary(s.skipSameStart)} />
+        <PageRow page="games" name="実戦" value={warsNameSummary(warsName.value)} />
+      </Group>
+      <Group title="データ">
+        <PageRow page="data" name="データ管理" value={lastBackupSummary(lastBackupAt())} />
+        <PageRow page="sync" name="Google ドライブで同期" value={lastSyncSummary(lastSyncAt())} />
+      </Group>
+      <Group title="くわしい設定">
+        <PageRow page="engine" name="エンジン" value={evalSummary(s.evalId)} />
+        <PageRow page="trees" name="ツリー（以前の機能）" />
+      </Group>
+      <Group title="サポート">
+        <button type="button" class="settings-row" data-testid="feedback-open" onClick={() => setFeedback(true)}>
+          <RowContent icon="feedback" name="気づきを送る" arrow />
+        </button>
+      </Group>
+      <Group title="その他">
+        <div class="settings-row">
+          <RowContent icon="info" name="バージョン情報" value={`v${APP_VERSION}`} valueTestId="app-version" arrow={false} />
         </div>
-      </section>
+        <button type="button" class="settings-row danger" data-testid="reset-settings" onClick={() => setConfirmReset(true)}>
+          <RowContent icon="reset" name="設定を初期値に戻す" arrow={false} />
+        </button>
+      </Group>
 
-      {/* 段階11-4：復習は決まった数で 1 回が終わる */}
-      <section class="card settings-section">
-        <h2>復習</h2>
-        <div class="form-field">
-          <span>1 回の問題の数</span>
-          <div class="btn-row" role="radiogroup" aria-label="1 回の問題の数">
-            {REVIEW_BATCH_CHOICES.map((n) => (
-              <button
-                type="button"
-                key={n}
-                role="radio"
-                aria-checked={s.reviewBatch === n}
-                data-testid={`review-batch-${n}`}
-                class={s.reviewBatch === n ? 'btn btn-toggle on' : 'btn btn-toggle'}
-                onClick={() => set({ reviewBatch: n })}
-              >
-                {n} 問
-              </button>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section class="card settings-section">
-        <h2>エンジン</h2>
-        <div class="form-field">
-          <span>評価関数</span>
-          <div class="btn-row" role="radiogroup" aria-label="評価関数">
-            {(Object.keys(EVALS) as EvalId[]).map((id) => (
-              <button
-                type="button"
-                key={id}
-                role="radio"
-                aria-checked={s.evalId === id}
-                data-testid={`eval-${id}`}
-                class={s.evalId === id ? 'btn btn-toggle on' : 'btn btn-toggle'}
-                onClick={() => set({ evalId: id })}
-              >
-                {EVALS[id].label}
-              </button>
-            ))}
-          </div>
-          <span class="muted">
-            mini は強め・読みは浅め（初回 約{EVALS.mini.approxMB}MB）
-          </span>
-        </div>
-
-        {pc ? (
-          <PcEngineFields info={pc} s={s} set={set} />
-        ) : (
-          <>
-            <label class="form-field">
-              <span>スレッド数（同時に計算する数）</span>
-              {isolated ? (
-                <select value={s.threads} data-testid="threads" onChange={(e) => set({ threads: Number((e.target as HTMLSelectElement).value) })}>
-                  <option value={0}>おまかせ（{defaultThreads()}）</option>
-                  {Array.from({ length: maxThreads }, (_, i) => i + 1).map((n) => (
-                    <option key={n} value={n}>
-                      {n}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <span class="muted">この端末では 1 スレッドだけ使えます</span>
-              )}
-            </label>
-
-            <label class="form-field">
-              <span>ハッシュ（エンジンが使うメモリ）</span>
-              <select value={s.hashMB} data-testid="hash" onChange={(e) => set({ hashMB: Number((e.target as HTMLSelectElement).value) })}>
-                {HASH_CHOICES.map((mb) => (
-                  <option key={mb} value={mb}>
-                    {mb} MB
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <OfflineStatus evalId={s.evalId} />
-          </>
-        )}
-      </section>
-
-      <section class="card settings-section">
-        <h2>応手の選び方とラベル</h2>
-        <p class="muted" data-testid="label-help">
-          最善手との差で「本線」「有力」「疑問手」（咎められる手。オレンジ）に分けます。
-        </p>
-        <NumberField
-          label="採用する応手：最善手から何点以内（W）"
-          value={s.windowCp}
-          unit="点"
-          testId="window"
-          onChange={(v) => set({ windowCp: v })}
-        />
-        <NumberField
-          label="「本線」：最善手との差がこれ以下"
-          value={s.thresholds.mainMax}
-          unit="点"
-          testId="main-max"
-          onChange={(v) => set({ thresholds: { ...s.thresholds, mainMax: v } })}
-        />
-        <NumberField
-          label="「有力」：差がこれ以下（これより大きいと「疑問手」）"
-          value={s.thresholds.goodMax}
-          unit="点"
-          testId="good-max"
-          onChange={(v) => set({ thresholds: { ...s.thresholds, goodMax: v } })}
-        />
-        <NumberField label="1 回で増やす局面の数の上限" value={s.maxNodes} unit="局面" testId="max-nodes" onChange={(v) => set({ maxNodes: v })} />
-        <NumberField
-          label="「この手を検証」で調べる時間"
-          value={s.verifyMs / 1000}
-          unit="秒"
-          step={0.5}
-          testId="verify-sec"
-          onChange={(v) => set({ verifyMs: v * 1000 })}
-        />
-      </section>
-
-      <section class="card settings-section">
-        <h2>プリセットの中身</h2>
-        {availablePresets().map((id) => {
-          const p = s.presets[id];
-          return (
-            <fieldset key={id} class="preset-field" data-testid={`preset-${id}`}>
-              <legend>{presetLabel(id)}</legend>
-              <NumberField
-                label="全体の時間"
-                value={p.totalMs / 1000}
-                unit="秒"
-                testId={`${id}-total`}
-                onChange={(v) => setPreset(id, { totalMs: v * 1000 })}
-              />
-              <NumberField
-                label="相手の局面を調べる時間"
-                value={p.movetimeMs}
-                unit="ミリ秒"
-                step={100}
-                testId={`${id}-movetime`}
-                onChange={(v) => setPreset(id, { movetimeMs: v })}
-              />
-              <NumberField
-                label="自分の対応を調べる時間（0 なら調べず「未検証」のまま）"
-                value={p.replyMs}
-                unit="ミリ秒"
-                step={100}
-                testId={`${id}-reply`}
-                onChange={(v) => setPreset(id, { replyMs: v })}
-              />
-              <NumberField
-                label="候補手の数（N）"
-                value={p.multiPV}
-                unit="手"
-                testId={`${id}-multipv`}
-                onChange={(v) => setPreset(id, { multiPV: v })}
-              />
-              <NumberField
-                label="深さ（往復の数）"
-                value={p.maxRounds}
-                unit="往復"
-                testId={`${id}-rounds`}
-                onChange={(v) => setPreset(id, { maxRounds: v })}
-              />
-            </fieldset>
-          );
-        })}
-      </section>
-
-      {/* 一覧画面から移した（段階4-2） */}
-      <section class="card settings-section">
-        <h2>エンジンの速度測定</h2>
-        <p class="muted">1 秒あたり何局面調べられるかを測ります。</p>
-        <a class="btn" href={`${import.meta.env.BASE_URL}bench.html`} data-testid="open-bench">
-          速度測定のページを開く
-        </a>
-      </section>
-
-      <div class="btn-row">
-        {!confirmReset ? (
-          <button type="button" class="btn btn-danger" data-testid="reset-settings" onClick={() => setConfirmReset(true)}>
-            設定を初期値に戻す…
-          </button>
-        ) : (
-          <>
-            <span>すべての設定を初期値に戻しますか？（ツリーは消えません）</span>
+      {feedback && <FeedbackDialog screen={screenBeforeSettings()} onClose={() => setFeedback(false)} />}
+      {confirmReset && (
+        <Dialog title="設定を初期値に戻す" onClose={() => setConfirmReset(false)} testId="reset-dialog">
+          <p>すべての設定を初期値に戻しますか？（ツリーとウォーズの名前は消えません）</p>
+          <div class="btn-row">
             <button
               type="button"
               class="btn btn-danger"
@@ -276,145 +188,12 @@ export function SettingsScreen() {
             >
               戻す
             </button>
-            <button type="button" class="btn" onClick={() => setConfirmReset(false)}>
+            <button type="button" class="btn" data-testid="reset-cancel" onClick={() => setConfirmReset(false)}>
               やめる
             </button>
-          </>
-        )}
-      </div>
-
-      {/* 段階18：ツリーのタブをなくし、入口をここに残した（データは消していない） */}
-      <section class="card settings-section">
-        <h2>ツリー（以前の機能）</h2>
-        <p class="muted">エンジンで応手を調べたツリーの一覧です。</p>
-        <button type="button" class="btn" data-testid="open-trees" onClick={() => go('/trees')}>
-          ツリーの一覧を開く
-        </button>
-      </section>
-
-      {/* 段階11-1：画面のいちばん下から移した */}
-      <AppInfo />
-    </>
-  );
-}
-
-/** PC 版（start.bat から開いたとき）のエンジンの設定 */
-function PcEngineFields({ info, s, set }: { info: PcInfo; s: AppSettings; set: (patch: Partial<AppSettings>) => void }) {
-  return (
-    <>
-      <p class="notice" data-testid="pc-engine-info">
-        PC のエンジン（Windows 版やねうら王）を使います。{info.cpuName && `CPU：${info.cpuName}`}
-      </p>
-      <label class="form-field">
-        <span>PC のスレッド数</span>
-        <select value={s.pcThreads} data-testid="pc-threads" onChange={(e) => set({ pcThreads: Number((e.target as HTMLSelectElement).value) })}>
-          <option value={0}>おまかせ（{defaultPcThreads(info)}）</option>
-          {Array.from({ length: info.cpus }, (_, i) => i + 1).map((n) => (
-            <option key={n} value={n}>
-              {n}
-            </option>
-          ))}
-        </select>
-        <span class="muted">多いほど速いが、PC のほかの作業が重くなります。</span>
-      </label>
-      <label class="form-field">
-        <span>PC のハッシュ（エンジンが使うメモリ）</span>
-        <select value={s.pcHashMB} data-testid="pc-hash" onChange={(e) => set({ pcHashMB: Number((e.target as HTMLSelectElement).value) })}>
-          {PC_HASH_CHOICES.filter((mb) => !info.totalMemMB || mb <= info.totalMemMB / 4).map((mb) => (
-            <option key={mb} value={mb}>
-              {mb} MB
-            </option>
-          ))}
-        </select>
-      </label>
-    </>
-  );
-}
-
-/** 数の入力欄（入力を終えたとき＝欄を離れたときに保存。範囲外は近い値に直る） */
-function NumberField({
-  label,
-  value,
-  unit,
-  step = 1,
-  testId,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  unit: string;
-  step?: number;
-  testId: string;
-  onChange: (value: number) => void;
-}) {
-  // 範囲外の値は保存のときに直るので、直った値を欄に出し直す（最新の値をここに覚えておく）
-  const latest = useRef(value);
-  latest.current = value;
-  return (
-    <label class="form-field form-field-number">
-      <span>{label}</span>
-      <span class="form-field-input">
-        <input
-          type="number"
-          inputMode="decimal"
-          step={step}
-          value={value}
-          data-testid={testId}
-          onChange={(e) => {
-            const input = e.target as HTMLInputElement;
-            const n = Number(input.value);
-            if (input.value !== '' && Number.isFinite(n)) onChange(n);
-            setTimeout(() => {
-              input.value = String(latest.current);
-            }, 0);
-          }}
-        />
-        <span class="muted">{unit}</span>
-      </span>
-    </label>
-  );
-}
-
-/** オフラインで使えるか（エンジンと評価関数が端末に保存されているか） */
-function OfflineStatus({ evalId }: { evalId: EvalId }) {
-  const [state, setState] = useState<'checking' | 'ready' | 'missing' | 'loading' | 'error'>('checking');
-  const [detail, setDetail] = useState('');
-
-  useEffect(() => {
-    setState('checking');
-    isOfflineReady(evalId)
-      .then((ok) => setState(ok ? 'ready' : 'missing'))
-      .catch(() => setState('missing'));
-  }, [evalId]);
-
-  async function prepare() {
-    setState('loading');
-    try {
-      await prepareOffline(evalId, (done, total) => setDetail(`${done}/${total}`));
-      setState('ready');
-    } catch (e) {
-      setDetail(e instanceof Error ? e.message : String(e));
-      setState('error');
-    }
-  }
-
-  return (
-    <div class="form-field" data-testid="offline-status" data-state={state}>
-      <span>オフライン（電波がなくても生成できるか）</span>
-      {state === 'checking' && <span class="muted">確認中…</span>}
-      {state === 'ready' && <span class="status-ok">準備できています（{EVALS[evalId].label}）</span>}
-      {(state === 'missing' || state === 'error') && (
-        <>
-          <span class="muted">
-            {EVALS[evalId].label} はまだ端末に保存されていません（一度生成すると保存されます）。
-            {state === 'error' && `失敗しました：${detail}`}
-          </span>
-          <button type="button" class="btn" data-testid="offline-prepare" onClick={() => void prepare()}>
-            今すぐ保存する（約{EVALS[evalId].approxMB}MB）
-          </button>
-        </>
+          </div>
+        </Dialog>
       )}
-      {state === 'loading' && <span class="muted">保存中… {detail}</span>}
-    </div>
+    </>
   );
 }

@@ -3,6 +3,7 @@
 //   （段階21-1 から、自分の手番は候補の窓のいちばん下。メモも表も無ければ ⋯ の「候補・局面メモ」から）
 // - 食い違い：自分の手番の同じ局面で研究手順によって自分の手が違う → 行に印・定跡帳のタブに知らせ・本命を選ぶと消える（段階21-1 で「このままでよい」から変えた）。手順前後の手は「手順前後」の行
 // - 稽古：ほかの研究手順の手はまちがいにしない。まちがえたとき・ほかの研究の手のとき、その局面の局面メモ
+import { openSettings } from './settings';
 import { expect, test, type Page } from '@playwright/test';
 import type { Study } from '../src/tree/types';
 
@@ -153,7 +154,7 @@ test('局面メモは端末の保存場所（positions）に入る', async ({ pa
   await setup(page, [A]);
   await page.goto(`./#/book/${KEY}/s-a/17`);
   await writeMemo(page, 'メモ');
-  await page.goto('./#/settings');
+  await openSettings(page, 'data');
   const file = await page.evaluate(async () => {
     const req = indexedDB.open('joban-tree');
     const db: IDBDatabase = await new Promise((r) => (req.onsuccess = () => r(req.result)));

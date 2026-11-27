@@ -1,4 +1,4 @@
-// 画面の下のタブ（段階11-1。段階19 から 定跡帳／稽古／実戦／設定。ツリーは設定の「ツリー（以前の機能）」から）。一覧の画面にだけ出す（盤のある画面では出さない）。
+// 画面の下のタブ（段階11-1。段階19 から 定跡帳／稽古／実戦／設定。ツリーは設定の「ツリー（以前の機能）」の下の画面から）。一覧の画面にだけ出す（盤のある画面では出さない）。
 // タブを押すと URL が変わる（履歴に積まれるので、戻るボタンで前のタブに戻れる）。アイコンは手書きの簡単な図形（SVG）。
 
 import { go, route, TAB_PATHS, type TabName } from '../app/router';
@@ -10,7 +10,8 @@ interface TabDef {
   icon: preact.JSX.Element;
 }
 
-const TABS: TabDef[] = [
+/** 下のタブ。設定の行のアイコンにも同じ絵を使う */
+export const TABS: TabDef[] = [
   {
     name: 'home',
     label: '定跡帳',
@@ -69,8 +70,9 @@ export function TabBar({ current }: { current: TabName }) {
             aria-current={t.name === current ? 'page' : undefined}
             data-testid={t.testId}
             onClick={() => {
-              // 今のタブをもう一度押しても何もしない（ツリーの一覧で設定を押したときは設定へ）
-              if (t.name !== current || route.value.name !== t.name) go(TAB_PATHS[t.name]);
+              // 今のタブをもう一度押しても何もしない（ツリーの一覧・設定の下の画面で設定を押したときは設定の目次へ）
+              const r = route.value;
+              if (t.name !== current || r.name !== t.name || (r.name === 'settings' && r.page)) go(TAB_PATHS[t.name]);
             }}
           >
             <svg class="tabbar-icon" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true">

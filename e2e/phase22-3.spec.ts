@@ -1,5 +1,6 @@
 // 段階22-3（v0.51.0）：Google ドライブで同期。ログインへ行って戻る → 鍵を URL から消す → 読む → 合わせる → 書き戻す。
 // Google のログインの画面とドライブの API は route で偽物にする（本物の Google には通信しない）
+import { openSettings, reopenSettings } from './settings';
 import { readFileSync } from 'node:fs';
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import type { Study } from '../src/tree/types';
@@ -108,15 +109,9 @@ async function openApp(page: Page, studies: Study[] = []) {
   }
 }
 
-async function openSettings(page: Page) {
-  await page.goto('./#/');
-  await page.goto('./#/settings');
-  await expect(page.getByTestId('data-section')).toBeVisible();
-}
-
 /** ［Google ドライブで同期］を押して、結果が出るまで待つ（ログインと読み込み直しをはさんでもよい） */
 async function sync(page: Page, expected: string) {
-  await openSettings(page);
+  await reopenSettings(page, 'sync');
   await page.getByTestId('drive-sync').click();
   await expect(page.getByTestId('drive-message')).toContainText(expected, { timeout: 30_000 });
   await expect(page.getByTestId('drive-busy')).toHaveCount(0);
@@ -154,7 +149,7 @@ test('同期を押す → ログインして戻ると、続けて同期する。
   await google.attach(page);
   await openApp(page, [ONLY_A]);
   await page.evaluate(() => localStorage.setItem('joban-tree.wars-name', 'wars-secret-name'));
-  await openSettings(page);
+  await reopenSettings(page, 'sync');
   await expect(page.getByTestId('drive-last')).toHaveText('まだありません');
   // 開いただけでは、ドライブと通信しない
   expect(google.calls).toHaveLength(0);
@@ -162,7 +157,7 @@ test('同期を押す → ログインして戻ると、続けて同期する。
 
   await expect(page.getByTestId('drive-message')).toContainText('同期しました', { timeout: 30_000 });
   await expect(page.getByTestId('drive-last')).not.toHaveText('まだありません');
-  expect(page.url()).toMatch(/\/joban-tree\/#\/settings$/);
+  expect(page.url()).toMatch(/\/joban-tree\/#\/settings\/sync$/);
   expect(await page.evaluate(() => crossOriginIsolated)).toBe(true);
 
   expect(google.logins[0].searchParams.get('client_id')).toBe(CLIENT_ID);
@@ -183,6 +178,7 @@ test('同期を押す → ログインして戻ると、続けて同期する。
   expect(files[0].text).not.toContain('fake-token');
   expect(files[0].text).not.toContain('wars-secret-name');
 
+  await openSettings(page, 'data');
   const save = page.getByTestId('backup-save');
   await expect(save).toBeEnabled();
   const [download] = await Promise.all([page.waitForEvent('download'), save.click()]);
@@ -216,7 +212,7 @@ test('2 台で順に同期するとそろう。消した研究も伝わる。同
   await names(b, ['iPad で足した研究']);
 
   // 同期の前のデータに戻す → 次の同期で消えない（戻したものが勝つ）
-  await openSettings(b);
+  await reopenSettings(b, 'data');
   await b.getByTestId('snapshot-restore').click();
   await Promise.all([b.waitForEvent('load'), b.getByTestId('backup-restore-confirm').click()]);
   await names(b, ['iPad で足した研究', 'Android で足した研究']);
@@ -231,7 +227,7 @@ test('ドライブのエラー・オフライン・ログイン切れは、理�
   await sync(a, '同期しました');
   const filesBefore = JSON.stringify([...google.files]);
 
-  await openSettings(b);
+  await reopenSettings(b, 'sync');
   await b.evaluate(() => localStorage.setItem('joban-tree.drive-token', JSON.stringify({ token: 'old', expiresAt: Date.now() + 3_000_000 })));
   google.fail = 0;
   await sync(b, 'つながりませんでした');
@@ -242,7 +238,7 @@ test('ドライブのエラー・オフライン・ログイン切れは、理�
   await expect(b.getByTestId('drive-logout')).toHaveCount(0);
   await expect(b.getByTestId('drive-last')).toHaveText('まだありません');
   // 開き直しても、失敗の文のまま（前の成功の文は出ない）
-  await openSettings(b);
+  await reopenSettings(b, 'sync');
   await expect(b.getByTestId('drive-message')).toContainText('期限が切れました');
   await names(b, ['Android で足した研究']);
   expect(JSON.stringify([...google.files])).toBe(filesBefore);
@@ -256,7 +252,7 @@ test('同期している間は、戻るボタンで画面を移っても操作�
   await b.evaluate(() => localStorage.setItem('joban-tree.drive-token', JSON.stringify({ token: 'fake-token', expiresAt: Date.now() + 3_000_000 })));
   let release = () => {};
   google.holdSend = new Promise((r) => (release = r));
-  await openSettings(b);
+  await reopenSettings(b, 'sync');
   await b.getByTestId('drive-sync').click();
   await expect(b.getByTestId('drive-busy')).toBeVisible();
   await b.goBack();
@@ -273,7 +269,7 @@ test('取りやめた・印の違う戻りは受け取らず、ドライブと�
   const google = new FakeGoogle((state) => ({ error: 'access_denied', state }));
   await google.attach(page);
   await openApp(page);
-  await openSettings(page);
+  await reopenSettings(page, 'sync');
   await page.getByTestId('drive-sync').click();
   await expect(page.getByTestId('drive-message')).toContainText('取りやめられました', { timeout: 30_000 });
   await expect(page.getByTestId('drive-logout')).toHaveCount(0);
@@ -292,13 +288,13 @@ test('開いたままのアプリで # の後ろだけが変わる戻りでも�
   const google = new FakeGoogle();
   await google.attach(page);
   await openApp(page);
-  await openSettings(page);
+  await reopenSettings(page, 'sync');
   await page.evaluate(() => localStorage.setItem('joban-tree.drive-login', JSON.stringify({ state: 'same-page', at: Date.now() })));
   await page.goto('./#/');
   const back = new URLSearchParams(good('same-page')).toString();
   await page.evaluate((hash) => (location.hash = hash), back);
   await expect(page.getByTestId('drive-message')).toContainText('同期しました', { timeout: 30_000 });
-  expect(page.url()).toMatch(/\/joban-tree\/#\/settings$/);
+  expect(page.url()).toMatch(/\/joban-tree\/#\/settings\/sync$/);
 });
 
 test('前の同期から 1 日以上なら、定跡帳のタブと設定に一言（幅 360）', async ({ page }) => {
@@ -311,6 +307,7 @@ test('前の同期から 1 日以上なら、定跡帳のタブと設定に一�
   const over = () => page.evaluate(() => document.scrollingElement!.scrollWidth - document.scrollingElement!.clientWidth);
   expect(await over()).toBeLessThanOrEqual(0);
   await page.getByTestId('sync-nudge-open').click();
+  await expect(page).toHaveURL(/#\/settings\/sync$/);
   await expect(page.getByTestId('drive-late')).toBeVisible();
   expect(await over()).toBeLessThanOrEqual(0);
   await page.goto('./#/');

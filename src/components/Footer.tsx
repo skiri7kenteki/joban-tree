@@ -1,5 +1,5 @@
 // 画面のいちばん下。左にバージョン（スマホに更新が届いたかを確かめるため）、右に「気づきを送る」。
-// 段階11-1 から、アプリの画面では設定のタブの下（AppInfo）に出す。Footer は速度測定のページ（src/bench）だけで使う。
+// アプリの画面では、設定のタブの行（バージョン情報・気づきを送る）に出す。Footer は速度測定のページ（src/bench）だけで使う。
 //
 // 気づきを送る：GitHub の Issue 作成画面を開く（「かんたん予定」と同じ仕組み）。
 // アプリからは送信しない。開いた GitHub の画面で、利用者が自分で送る。
@@ -28,21 +28,8 @@ route.subscribe((r) => {
   if (r.name !== 'settings') lastScreen = r.name;
 });
 
-/** 設定のタブのいちばん下：バージョンと「気づきを送る」（段階11-1） */
-export function AppInfo() {
-  const [open, setOpen] = useState(false);
-  return (
-    <section class="app-info">
-      <span class="num" data-testid="app-version">
-        v{APP_VERSION}
-      </span>
-      <button type="button" class="btn" data-testid="feedback-open" onClick={() => setOpen(true)}>
-        気づきを送る
-      </button>
-      {open && <FeedbackDialog screen={lastScreen} onClose={() => setOpen(false)} />}
-    </section>
-  );
-}
+/** 気づきの「画面：」に書く画面（設定のタブより前に開いていた画面） */
+export const screenBeforeSettings = (): Route['name'] => lastScreen;
 
 export function Footer() {
   const [open, setOpen] = useState(false);
@@ -59,7 +46,7 @@ export function Footer() {
   );
 }
 
-function FeedbackDialog({ screen, onClose }: { screen: Route['name']; onClose: () => void }) {
+export function FeedbackDialog({ screen, onClose }: { screen: Route['name']; onClose: () => void }) {
   const [text, setText] = useState('');
   const [hint, setHint] = useState('');
   // ホーム画面アプリ（iPad）から普通のリンクを開くと、Safari 本体ではなくアプリに重なる画面で開く。

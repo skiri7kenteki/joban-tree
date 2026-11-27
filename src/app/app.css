@@ -1630,19 +1630,6 @@
   stroke-width: 2.2;
 }
 
-/* 設定のタブのいちばん下：バージョンと「気づきを送る」（画面の下から移した） */
-.app-info {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--space-2);
-  margin-top: var(--space-6);
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--color-border);
-  color: var(--color-text-muted);
-  font-size: var(--font-size-small);
-}
-
 /* 復習のタブ（段階11-1） */
 .reviews-heading {
   margin-top: var(--space-4);
@@ -2504,7 +2491,7 @@ button.move-bar-center.move-bar-action {
   background: var(--color-surface);
 }
 
-/* ---- 段階17：データを守る（設定の「データ」の欄と、定跡帳の一覧の上のすすめ） ---- */
+/* ---- 段階17：データを守る（設定の「データ管理」の欄と、定跡帳の一覧の上のすすめ） ---- */
 .data-row {
   display: flex;
   align-items: baseline;
@@ -3650,13 +3637,6 @@ button.move-bar-center.move-bar-action {
   font-size: var(--font-size-small);
 }
 
-/* 段階22-3：設定の「データ」の中の Google ドライブの欄 */
-.drive-box {
-  margin-top: var(--space-3);
-  padding-top: var(--space-3);
-  border-top: 1px solid var(--color-border);
-}
-
 /* 同期している間、画面全体を覆って操作を止める（src/app/syncing.tsx） */
 .sync-overlay {
   position: fixed;
@@ -3722,4 +3702,102 @@ button.move-bar-center.move-bar-action {
   font-weight: 400;
   color: var(--color-mark);
   white-space: nowrap;
+}
+
+/* 設定の整理：設定のタブは「グループの小見出し＋白いカードの中の行」 */
+.settings-group-title {
+  margin: var(--space-3) var(--space-1) var(--space-1);
+  color: var(--color-text-muted);
+  font-family: inherit;
+  font-size: var(--font-size-small);
+  font-weight: 400;
+}
+
+.settings-list {
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 50px;
+  padding: 0 var(--space-3);
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+}
+
+button.settings-row {
+  cursor: pointer;
+}
+
+.settings-row + .settings-row {
+  border-top: 1px solid var(--color-border);
+}
+
+/* カードの角で切れないように、フォーカスの枠は内側に */
+.settings-row:focus-visible {
+  outline-offset: -3px;
+}
+
+.settings-row-icon {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.settings-row-name {
+  white-space: nowrap;
+}
+
+.settings-row-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-small);
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-row-arrow {
+  flex: none;
+  color: var(--color-text-muted);
+  font-size: 20px;
+}
+
+.settings-row.danger {
+  color: var(--color-danger);
+}
+
+/* 設定の下の画面とツリーの一覧の戻るボタンは、スマホでも「‹ 設定」と文字を出す */
+.screen-header > .btn-back.btn-back-labeled {
+  gap: var(--space-1);
+  flex: none;
+  padding: 0 var(--space-2) 0 0;
+  font-size: var(--font-size-body);
+  white-space: nowrap;
+}
+
+.screen-header > .btn-back.btn-back-labeled .back-text {
+  font-size: var(--font-size-body);
+}
+
+/* 設定の下の画面の名前は、長い名前（Google ドライブで同期）が切れないように、ふつうの画面の見出しの大きさ */
+.list-header.settings-sub-header h1 {
+  font-size: var(--font-size-title);
 }

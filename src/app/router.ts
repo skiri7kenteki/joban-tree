@@ -16,7 +16,8 @@
 //   #/book/<key>/t/<戦型の id> … 定跡帳を、その戦型の出発点で開く（新しい研究を始めるとき。研究手順がまだ無くても開ける。段階10-1）
 //   #/book/<key>/m/<手.手.手…> … 定跡帳を、平手からその手順の局面で開く（実戦の外れた局面から研究を足すとき。研究の木の外でもよい。段階18）
 //   #/study-import … 変化付き KIF から研究手順をまとめて取り込む（段階8-2）
-//   #/settings   … 設定のタブ
+//   #/settings   … 設定のタブ（行の目次）
+//   #/settings/<名前> … 設定の下の画面（practice 稽古・games 実戦・data データ管理・sync Google ドライブ・engine エンジン・trees ツリー（以前の機能））
 //   #/review/<id> … 復習モード
 //   #/review/<id>/study … 研究手順だけの復習（そのツリーの開始局面を通る研究手順）
 //   #/study-review/<研究手順の id>・#/study-review/group/<key> … （段階19 で稽古に置きかえた。その 1 本・そのグループの稽古へ）
@@ -24,6 +25,10 @@
 
 import { signal } from '@preact/signals';
 import { takeLoginReturn } from '../drive/session';
+
+/** 設定の下の画面の名前 */
+export const SETTINGS_PAGES = ['practice', 'games', 'data', 'sync', 'engine', 'trees'] as const;
+export type SettingsPage = (typeof SETTINGS_PAGES)[number];
 
 export type Route =
   | { name: 'home' }
@@ -33,7 +38,7 @@ export type Route =
   | { name: 'games' }
   | { name: 'game'; id: string }
   | { name: 'new'; study?: boolean }
-  | { name: 'settings' }
+  | { name: 'settings'; page?: SettingsPage }
   | { name: 'tree'; id: string; study?: string; ply?: number }
   | { name: 'study'; id: string; edit?: boolean; ply?: number }
   | { name: 'book'; key: string; study?: string; ply?: number; template?: string; line?: string[] }
@@ -45,6 +50,10 @@ function parse(hash: string): Route {
   if (path === '/new') return { name: 'new' };
   if (path === '/new/study') return { name: 'new', study: true };
   if (path === '/settings') return { name: 'settings' };
+  if (path.startsWith('/settings/')) {
+    const page = SETTINGS_PAGES.find((p) => path === `/settings/${p}`);
+    return page ? { name: 'settings', page } : { name: 'settings' };
+  }
   if (path === '/trees') return { name: 'trees' };
   if (path === '/reviews' || path === '/practice') return { name: 'practice' };
   if (path === '/practice/play') return { name: 'practice-play' };
@@ -102,18 +111,37 @@ takeLoginReturn();
 
 export const route = signal<Route>(parse(location.hash));
 
-window.addEventListener('hashchange', () => {
+/** この履歴の 1 件が、どの画面から来たか（history.state に覚える。読み込み直しても残る） */
+const cameFrom = (): unknown => (history.state as { from?: unknown } | null)?.from;
+const markCameFrom = (from: string): void => {
+  history.replaceState({ ...(history.state as object | null), from }, '');
+};
+// 開いた最初の 1 件には「どこから」が無い（後で戻ってきたときに、別の画面を覚えないように）
+if (cameFrom() === undefined) markCameFrom('');
+
+window.addEventListener('hashchange', (event) => {
   // 開いたままのアプリの URL の # の後ろだけが変わる形で戻ったとき（受け取ったら、読み込み直して結果を出す）
   if (takeLoginReturn()) {
     location.reload();
     return;
   }
+  // 新しく進んだ 1 件にだけ覚える（戻る・進むで来た 1 件は、前に覚えたまま）
+  if (cameFrom() === undefined) markCameFrom(new URL(event.oldURL).hash.replace(/^#/, ''));
   route.value = parse(location.hash);
 });
 
 /** 画面を移る（例：go('/new')） */
 export function go(path: string): void {
   location.hash = path;
+}
+
+/**
+ * 「‹ 設定」：その画面（parent）から来たなら 1 つ戻る（端末の戻ると同じ。履歴がたまらない）。
+ * ほかから直接来たなら（定跡帳の知らせ・Google のログインの戻りなど）、今の 1 件を parent に置きかえる
+ */
+export function backTo(parent: string): void {
+  if (cameFrom() === parent) history.back();
+  else replaceTo(parent);
 }
 
 /** 研究手順のグループの復習へ */

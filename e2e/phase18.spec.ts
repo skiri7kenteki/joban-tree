@@ -3,6 +3,7 @@
 // - 同じ棋譜をもう一度貼ると「もう入っています」。自分の側はユーザー名で決まる・決まらなければ選ぶ
 // - 一覧の集計・次に研究する所・⋯ で消す。タブは 定跡帳／復習／実戦／設定、ツリーは設定から
 // - 結果の画面も 1 画面に収める
+import { openSettings } from './settings';
 import { expect, test, type Page } from '@playwright/test';
 import type { Study } from '../src/tree/types';
 
@@ -55,7 +56,7 @@ async function setup(page: Page, studies: Study[] = [RESEARCH]) {
 }
 
 async function setWarsName(page: Page, name: string) {
-  await page.getByTestId('tab-settings').click();
+  await openSettings(page, 'games');
   await page.getByTestId('wars-name').fill(name);
   await page.getByTestId('wars-name').press('Tab');
 }
@@ -74,6 +75,7 @@ test('タブは 定跡帳／稽古／実戦／設定（段階19 で復習→稽�
   await page.getByTestId('tab-games').click();
   await expect(page.getByTestId('games-empty')).toBeVisible();
   await page.getByTestId('tab-settings').click();
+  await page.getByTestId('settings-row-trees').click();
   await page.getByTestId('open-trees').click();
   await expect(page.getByTestId('new-tree')).toBeVisible();
   await expect(page.getByTestId('tab-settings')).toHaveAttribute('aria-current', 'page');

@@ -1,5 +1,6 @@
 // 段階12：デザインの刷新（C 案「対局室」）。段階16（v0.40.0）で「明るい対局室」に（藍と金をやめた）
 // 12-1 色・文字・部品の土台：明るい地・白いカード・墨の主なボタン・明朝体の見出し。全画面で文字と地の色の差と、藍・金が残っていないことを確かめる
+import { openSettings } from './settings';
 import { expect, test, type Page } from '@playwright/test';
 import { STARTPOS_SFEN, applyUsiMove, sfenKey } from '../src/shogi/position';
 import { TREE_APP, TREE_FORMAT_VERSION, type Study, type TreeData, type TreeNode } from '../src/tree/types';
@@ -293,10 +294,12 @@ test.describe('12-1 色・文字・部品の土台（段階16 で明るい対局
     await page.goto('./#/games');
     await expect(page.getByTestId('games-empty')).toBeVisible();
     await check('実戦のタブ');
-    await page.goto('./#/settings');
-    await check('設定');
-    // 段階16：藍と金がどの画面にも残っていない（設定のタブ）
-    expect(await oldColors(page)).toEqual([]);
+    // 段階16：藍と金がどの画面にも残っていない（設定のタブと下の画面）
+    for (const sub of [undefined, 'practice', 'games', 'data', 'sync', 'engine', 'trees'] as const) {
+      await openSettings(page, sub);
+      await check(`設定 ${sub ?? ''}`);
+      expect(await oldColors(page)).toEqual([]);
+    }
 
     expect(found).toEqual([]);
   });
@@ -434,7 +437,7 @@ test.describe('12-4 残りの画面', () => {
 
   test('復習で正解すると、指したマスに木の茶の光が一瞬出る。結果は白いカード（文字と地の差も足りる）', async ({ page }) => {
     await openHome(page);
-    await page.getByTestId('tab-settings').click();
+    await openSettings(page, 'trees');
     await page.getByTestId('review-batch-5').click();
     await page.goto('./');
     await page.getByTestId('study-import-file').setInputFiles({
@@ -598,7 +601,7 @@ test.describe('段階12 の追加：駒と駒台（v0.34.0）', () => {
       buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies: [MID] })),
     });
     await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${1} 本`);
-    await page.goto('./#/settings');
+    await openSettings(page, 'trees');
     await page.getByTestId('review-batch-5').click();
     await openStudyReview(page);
     const progress = page.getByTestId('review-progress');

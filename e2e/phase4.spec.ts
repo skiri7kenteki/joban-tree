@@ -289,6 +289,7 @@ test.describe('4-2 スマホ縦（390×844）', () => {
     await expect(page.getByTestId('tree-item-position')).toHaveText('自分：☖後手・…△３四歩 ▲２六歩 △８四歩');
     await expect(page.getByText('エンジンの速度測定')).toHaveCount(0);
     await page.getByTestId('tab-settings').click();
+    await page.getByTestId('settings-row-engine').click();
     await expect(page.getByTestId('open-bench')).toHaveAttribute('href', /bench\.html$/);
   });
 

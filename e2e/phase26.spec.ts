@@ -7,6 +7,7 @@
 // - 続けて稽古すると、2 本目は分かれ目の 1 つ前の自分の手から。早送り中は盤で指せず、［とばす］。早送りした手は記録に数えない
 // - 1 回目にまちがえた手・前回まちがえた手は早送りしない。1 本だけの稽古と、設定で切ったときは出発点から
 // - 盤の大きさと位置は変わらない
+import { openSettings } from './settings';
 import { expect, test, type Page } from '@playwright/test';
 import type { Study } from '../src/tree/types';
 
@@ -236,7 +237,7 @@ test('前回まちがえた手が分からない（覚えが無い）研究手�
 
 test('設定で「しない」にすると、2 本目も出発点から', async ({ page }) => {
   await setup(page, [B, A]);
-  await page.goto('./#/settings');
+  await openSettings(page, 'practice');
   await expect(page.getByTestId('skip-same-on')).toHaveAttribute('aria-checked', 'true');
   if (process.env.SHOTS) {
     await page.getByTestId('skip-same-on').evaluate((e) => e.closest('section')!.scrollIntoView({ block: 'center' }));

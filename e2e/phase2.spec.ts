@@ -1,5 +1,6 @@
 // 画面の通し確認（段階2）：取り込み・名前の変更・削除・書き出し・設定・オフライン・盤の向き・気づきを送る
 // エンジンを使わないものだけ（エンジンを使う流れは app.spec.ts）
+import { openSettings } from './settings';
 import { expect, test, type Page } from '@playwright/test';
 import { inTreeMenu, treeMenu } from './treeMenu';
 import { STARTPOS_SFEN, applyUsiMove, sfenKey } from '../src/shogi/position';
@@ -139,19 +140,22 @@ test('盤は常に先手が手前（自分が後手でも、9 一が左上・1 �
 test('設定：変えた値が保存され、プリセットのボタンに反映される。初期値に戻せる', async ({ page }) => {
   await openHome(page);
   await page.getByTestId('tab-settings').click();
-  await expect(page.getByRole('heading', { name: '設定' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: '設定', exact: true })).toBeVisible();
+  await page.getByTestId('settings-row-trees').click();
   await page.getByTestId('normal-total').fill('90');
   await page.getByTestId('normal-total').blur();
   await page.getByTestId('window').fill('-10');
   await page.getByTestId('window').blur();
   // 範囲外の値は直る
   await expect(page.getByTestId('window')).toHaveValue('0');
+  await openSettings(page, 'engine');
   await page.getByTestId('eval-mini').click();
   await expect(page.getByTestId('eval-mini')).toHaveAttribute('aria-checked', 'true');
 
   await page.reload();
-  await expect(page.getByTestId('normal-total')).toHaveValue('90');
   await expect(page.getByTestId('eval-mini')).toHaveAttribute('aria-checked', 'true');
+  await openSettings(page, 'trees');
+  await expect(page.getByTestId('normal-total')).toHaveValue('90');
 
   await page.goto('./#/new');
   await expect(page.getByTestId('start-normal')).toHaveText('ふつう（1分30秒）');
@@ -161,11 +165,13 @@ test('設定：変えた値が保存され、プリセットのボタンに反�
   await expect(page.getByTestId('start-precise')).toHaveCount(0);
   await expect(page.getByTestId('pc-engine-note')).toHaveCount(0);
 
-  await page.goto('./#/settings');
+  await openSettings(page);
   await page.getByTestId('reset-settings').click();
   await page.getByTestId('reset-confirm').click();
+  await openSettings(page, 'trees');
   await expect(page.getByTestId('normal-total')).toHaveValue('120');
   await expect(page.getByTestId('window')).toHaveValue('300');
+  await openSettings(page, 'engine');
   await expect(page.getByTestId('eval-micro')).toHaveAttribute('aria-checked', 'true');
 });
 

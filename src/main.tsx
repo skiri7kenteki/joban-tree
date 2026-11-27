@@ -60,7 +60,7 @@ function App() {
           <BookScreen key={`book:${r.key}:${r.line?.join('.') ?? ''}`} bookKey={r.key} id={r.study} ply={r.ply} template={r.template} line={r.line} />
         )}
         {r.name === 'study-import' && <StudyKifImportScreen />}
-        {r.name === 'settings' && <SettingsScreen />}
+        {r.name === 'settings' && <SettingsScreen page={r.page} />}
         {r.name === 'review' && !r.studies && <ReviewScreen key={r.id} id={r.id} />}
         {r.name === 'review' && r.studies && <StudyReviewScreen key={`tree/${r.id}`} target={{ kind: 'tree', treeId: r.id }} />}
       </main>

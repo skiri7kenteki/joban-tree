@@ -1,4 +1,4 @@
-// 設定の「データ」の中の Google ドライブの欄（段階22-3）と、定跡帳のタブの「前の同期から 1 日以上」の一言。
+// 設定の「Google ドライブで同期」の下の画面の中身（段階22-3）と、定跡帳のタブの「前の同期から 1 日以上」の一言。
 // ［Google ドライブで同期］：ログインしていなければ Google のログインへ移り、戻ったら続けて同期する。
 // 同期でこの端末のデータが変わったら、アプリを読み込み直して結果を出す
 
@@ -86,7 +86,7 @@ export function SyncNudge() {
   return (
     <div class="notice backup-nudge" role="status" data-testid="sync-nudge">
       <span class="backup-nudge-text">{LATE_TEXT}</span>
-      <button type="button" class="btn btn-ghost" data-testid="sync-nudge-open" onClick={() => go('/settings')}>
+      <button type="button" class="btn btn-ghost" data-testid="sync-nudge-open" onClick={() => go('/settings/sync')}>
         設定で同期
       </button>
       <button

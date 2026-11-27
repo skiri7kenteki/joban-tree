@@ -2,6 +2,7 @@
 // - 端末 A と B（別々の保存場所）：A で保存 → B で合わせる → 両方の研究が残る → 戻す前のデータに戻す
 // - 消した研究手順は、合わせた端末でも消える（確認の窓に名前）。取り消したものは、次に合わせても消えない
 // 合わせ方の細かい決まりは tests/unit/merge.test.ts
+import { openSettings, reopenSettings } from './settings';
 import { readFileSync } from 'node:fs';
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import type { Study } from '../src/tree/types';
@@ -38,8 +39,7 @@ async function device(browser: Browser, studies: Study[], size = { width: 390, h
 
 /** 設定の［バックアップを保存］でファイルを作る */
 async function saveBackup(page: Page): Promise<string> {
-  await page.goto('./#/');
-  await page.goto('./#/settings');
+  await reopenSettings(page, 'data');
   const save = page.getByTestId('backup-save');
   await expect(save).toBeEnabled();
   const [download] = await Promise.all([page.waitForEvent('download'), save.click()]);
@@ -47,8 +47,7 @@ async function saveBackup(page: Page): Promise<string> {
 }
 
 async function pickMerge(page: Page, text: string) {
-  await page.goto('./#/');
-  await page.goto('./#/settings');
+  await reopenSettings(page, 'data');
   await page.getByTestId('backup-merge-file').setInputFiles({ name: 'b.json', mimeType: 'application/json', buffer: Buffer.from(text) });
 }
 
@@ -102,7 +101,7 @@ test('A で保存して B で合わせると両方の研究が残る。戻す前
   await expect(b.getByTestId('merge-same')).toBeVisible();
   await confirmMerge(b);
 
-  await b.goto('./#/settings');
+  await openSettings(b, 'data');
   await b.getByTestId('snapshot-restore').click();
   await Promise.all([b.waitForEvent('load'), b.getByTestId('backup-restore-confirm').click()]);
   await names(b, ['共通の研究', 'Android で足した研究']);
@@ -122,7 +121,7 @@ test('消した研究手順は合わせた端末でも消える。戻したも�
   await names(b, ['共通の研究']);
 
   // B で［戻す前のデータに戻す］→ もう一度合わせても、戻した研究は残る
-  await b.goto('./#/settings');
+  await openSettings(b, 'data');
   await b.getByTestId('snapshot-restore').click();
   await Promise.all([b.waitForEvent('load'), b.getByTestId('backup-restore-confirm').click()]);
   await names(b, ['共通の研究', 'iPad で足した研究']);
