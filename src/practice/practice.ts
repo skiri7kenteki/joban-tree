@@ -5,7 +5,7 @@
 // - まちがえたら正解を見せ、盤で正解を指すと続く（止めずに最後まで）。数えるのは 1 回目の答えだけ
 // - 段階21-2：候補の表の次善・本命（とほかの研究手順の手）はまちがいにしない。悪手はまちがいで、咎め方を見せる（`judgeAnswer`）
 // - 間隔反復：全部正解なら 明日 → 3日 → 1週 → 2週 → 1か月 → 2か月（あとは 2 か月ごと）。1 か所でもまちがえたら翌日から（段を最初に戻す）。
-//   「身についた」＝ 1 週以上空くところまで進んだ研究手順
+//   同じ日の 2 回目からは、全部正解でも間隔を延ばさない。「身についた」＝ 1 週以上空くところまで進んだ研究手順
 // - 今日の稽古の並び：①実戦で違う手を指した（最後の稽古より後の実戦で）→ ②前回まちがい → ③日が来た（遅れている順）→ ④はじめて（1 日 5 本まで）
 
 import { studyQuestions, reviewStart } from '../review/studyReview';
@@ -56,9 +56,16 @@ function dayAfter(t: number, days: number): number {
   return new Date(d.getFullYear(), d.getMonth(), d.getDate() + days).getTime();
 }
 
-/** 稽古を 1 本終えたあとの記録（まちがい 0 なら段を 1 つ進め、1 つでもあれば最初の段に戻す） */
+/** まちがい 0 で稽古を終えたあとの段。同じ日の 2 回目からは進めない（日を空けて覚えているかを確かめるため。持ち主の判断 2026-11-27） */
+function nextStep(prev: PracticeRecord, now: number): number {
+  const up = startOfDay(prev.lastAt) === startOfDay(now) ? 0 : 1;
+  // バックアップや同期で段の多い記録が来ても、STEP_DAYS の中に収める
+  return Math.min(prev.step + up, STEP_DAYS.length - 1);
+}
+
+/** 稽古を 1 本終えたあとの記録（まちがい 0 なら段を進め〔1 日に 1 つまで〕、1 つでもあれば最初の段に戻す） */
 export function nextRecord(prev: PracticeRecord | undefined, studyId: string, mistakes: number, now: number, hardMistake = false): PracticeRecord {
-  const step = mistakes > 0 || !prev ? 0 : Math.min(prev.step + 1, STEP_DAYS.length - 1);
+  const step = mistakes > 0 || !prev ? 0 : nextStep(prev, now);
   return {
     studyId,
     step,

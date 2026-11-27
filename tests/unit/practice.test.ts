@@ -59,6 +59,26 @@ describe('間隔反復', () => {
     expect(wrong.firstAt).toBe(NOW);
   });
 
+  it('同じ日の 2 回目からは、全部正解でも段を進めない。次の日からはまた進む', () => {
+    const first = nextRecord(undefined, 's', 0, NOW);
+    const next = nextRecord(first, 's', 0, NOW + DAY);
+    expect(next.step).toBe(1);
+    // 同じ日にもう一度：段も次の稽古の日もそのまま（回数と最後の日時は進む）
+    const again = nextRecord(next, 's', 0, NOW + DAY + 60_000);
+    expect([again.step, again.dueAt, again.count, again.lastAt]).toEqual([1, next.dueAt, 3, NOW + DAY + 60_000]);
+    expect(nextRecord(again, 's', 0, NOW + 4 * DAY).step).toBe(2);
+    // 同じ日でも、まちがえたら最初の段（明日）に戻る
+    const wrong = nextRecord(next, 's', 1, NOW + DAY + 60_000);
+    expect([wrong.step, wrong.dueAt]).toEqual([0, startOfDay(NOW) + 2 * DAY]);
+    // まちがえた同じ日に正しく指し直しても、明日のまま
+    expect(nextRecord(wrong, 's', 0, NOW + DAY + 120_000).dueAt).toBe(wrong.dueAt);
+  });
+
+  it('段の数が上限を超えた記録を同じ日に稽古しても、次の稽古の日は壊れない', () => {
+    const r = nextRecord(rec('s', { step: 99, lastAt: NOW }), 's', 0, NOW + 60_000);
+    expect([r.step, r.dueAt]).toEqual([5, startOfDay(NOW) + 60 * DAY]);
+  });
+
   it('次の稽古の日の言葉', () => {
     expect(dueText(undefined, NOW)).toBe('はじめて');
     expect(dueText(rec('s', { dueAt: startOfDay(NOW) - DAY }), NOW)).toBe('今日');

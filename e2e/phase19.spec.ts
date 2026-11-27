@@ -48,7 +48,28 @@ test('タブは 定跡帳／稽古／実戦／設定。#/reviews は稽古へ', 
   await expect(page.getByTestId('tab-practice')).toHaveAttribute('aria-current', 'page');
 });
 
-test('通して指す：まちがえたら正解を指して続く → 明日。もう一度、全部正解なら 3 日後', async ({ page }) => {
+/** 稽古の記録の「最後に稽古した日時」を 1 日前にする（日をまたいだことにする） */
+const moveToYesterday = (page: Page, studyId: string) =>
+  page.evaluate(
+    (id) =>
+      new Promise<void>((resolve, reject) => {
+        const open = indexedDB.open('joban-tree');
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+          const tx = open.result.transaction('practice', 'readwrite');
+          const store = tx.objectStore('practice');
+          const get = store.get(id);
+          get.onsuccess = () => store.put({ ...get.result, lastAt: get.result.lastAt - 24 * 60 * 60 * 1000 });
+          tx.oncomplete = () => {
+            open.result.close();
+            resolve();
+          };
+        };
+      }),
+    studyId,
+  );
+
+test('通して指す：まちがえたら正解を指して続く → 明日。同じ日の 2 回目は延びず、次の日に全部正解なら 3 日後', async ({ page }) => {
   await setup(page, [A]);
   await page.getByTestId('tab-practice').click();
   await expect(page.getByTestId('practice-item')).toHaveCount(1);
@@ -88,6 +109,19 @@ test('通して指す：まちがえたら正解を指して続く → 明日。
 
   // 前倒しでもう一度：全部正解なら 3 日後
   await page.getByTestId('practice-later-item').click();
+  await waitAsk(page, 17);
+  await play(page, '51', '62');
+  await waitAsk(page, 19);
+  await play(page, '71', '72');
+  await waitAsk(page, 21);
+  await play(page, '63', '64');
+  // 同じ日の 2 回目：全部正解でも明日のまま
+  await expect(page.getByTestId('practice-end')).toContainText('全部正解。次は 明日');
+  await expect(page.locator('.practice-step.on')).toHaveText('明日');
+
+  // 日をまたいだことにしてもう一度：3 日後
+  await moveToYesterday(page, A.id);
+  await page.reload();
   await waitAsk(page, 17);
   await play(page, '51', '62');
   await waitAsk(page, 19);
