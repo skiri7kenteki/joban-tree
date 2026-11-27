@@ -37,6 +37,8 @@ export interface AppSettings {
   presets: Record<PresetId, PresetValues>;
   /** 復習の 1 回の問題の数（段階11-4。5／10／20） */
   reviewBatch: ReviewBatch;
+  /** 稽古で続けて指すとき、今日もう正しく指した同じ出だしを早送りする（段階26-2） */
+  skipSameStart: boolean;
 }
 
 /** 復習の 1 回の問題の数の選択肢（段階11-4、持ち主の判断 2026-11-20。初期値 10） */
@@ -69,6 +71,7 @@ export function defaultSettings(): AppSettings {
     verifyMs: 2000,
     presets,
     reviewBatch: 10,
+    skipSameStart: true,
   };
 }
 
@@ -114,6 +117,8 @@ export function normalizeSettings(raw: unknown): AppSettings {
     presets,
     // 段階11-4 で足した。前の版の設定には無いので初期値（10）
     reviewBatch: REVIEW_BATCH_CHOICES.includes(r.reviewBatch as ReviewBatch) ? (r.reviewBatch as ReviewBatch) : d.reviewBatch,
+    // 段階26-2 で足した。前の版の設定には無いので「する」
+    skipSameStart: r.skipSameStart !== false,
   };
 }
 

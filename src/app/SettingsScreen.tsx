@@ -56,6 +56,29 @@ export function SettingsScreen() {
       {/* 段階17：データの保護とまとめてのバックアップ */}
       <DataSection />
 
+      {/* 段階26-2：稽古の早送り */}
+      <section class="card settings-section">
+        <h2>稽古</h2>
+        <div class="form-field">
+          <span>同じ出だしを早送り</span>
+          <div class="btn-row" role="radiogroup" aria-label="同じ出だしを早送り">
+            {[true, false].map((on) => (
+              <button
+                type="button"
+                key={String(on)}
+                role="radio"
+                aria-checked={s.skipSameStart === on}
+                data-testid={on ? 'skip-same-on' : 'skip-same-off'}
+                class={s.skipSameStart === on ? 'btn btn-toggle on' : 'btn btn-toggle'}
+                onClick={() => set({ skipSameStart: on })}
+              >
+                {on ? 'する' : 'しない'}
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* 段階11-4：復習は決まった数で 1 回が終わる */}
       <section class="card settings-section">
         <h2>復習</h2>

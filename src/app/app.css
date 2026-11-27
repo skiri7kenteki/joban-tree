@@ -2734,6 +2734,12 @@ button.move-bar-center.move-bar-action {
   background: var(--color-surface);
 }
 
+/* 早送りした手（段階26-2）：淡い茶の塗り。自分で正解した丸（濃い茶）と見分ける */
+.practice-pip.skip {
+  background: color-mix(in srgb, var(--color-mark) 35%, var(--color-surface));
+  border-color: transparent;
+}
+
 .practice-pip.ok {
   background: var(--color-mark);
 }

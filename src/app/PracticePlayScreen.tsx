@@ -6,6 +6,7 @@
 // - 段階21-2：候補の表の次善・本命と、ほかの研究手順の自分の手（同じ局面・手順前後も）は、まちがいにしない（「△5二玉 は 次善 −80」）。
 //   悪手はまちがい。咎め方を盤で 1 手ずつ自動で見せて（相手の手と同じ 0.45 秒ずつ）戻り、正解を指すと続く
 // - まちがえたとき・まちがいにしないときは、その局面の局面メモをカードの下に出す（段階20-1）
+// - 段階26-2：続けて稽古するとき（今日の稽古・まとめて稽古）は、今日もう正しく指した同じ出だしを早送りする（`src/practice/skip.ts`。操作バーの真ん中は「とばす」）
 // - 盤の画面の決まり（段階14）：1 画面に収める。上の行に、今日の稽古に入った理由と、自分の手の数だけの丸（正解は茶・まちがいは朱）
 
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
@@ -14,7 +15,8 @@ import { MoveBar } from '../components/MoveBar';
 import { OnceHint } from '../components/OnceHint';
 import { PromotionBox, useMoveInput } from '../components/useMoveInput';
 import { STEP_LABELS, REASON_TEXT, judgeAnswer, nextRecord, practicePlies, practiceStart, startOfDay, type PracticeReason, type PracticeRecord } from '../practice/practice';
-import { practiceRowLabel } from '../practice/groups';
+import { practiceRowLabel, todayOrder } from '../practice/groups';
+import { answerKey, skipStart, wrongPliesOf } from '../practice/skip';
 import { studyPositions } from '../review/studyReview';
 import { STARTPOS_SFEN, moveText } from '../shogi/position';
 import { bookPool, studyGroupKey } from '../tree/organize';
@@ -26,6 +28,8 @@ import { boardFitProps, bottomInFrame, measureFitFrame, useBoardFit } from './bo
 import { ensureGames, gameList } from './games';
 import { gameDate } from './GamesScreen';
 import { ensurePractice, planNow, practiceRecords, savePractice } from './practice';
+import { correctToday, rememberAnswer, rememberWrong, wrongMemo } from './practiceMemory';
+import { settings } from './settings';
 import { back, go } from './router';
 import { ensureStudies, library } from './studies';
 import { buildBookIndex } from '../games/compare';
@@ -46,6 +50,8 @@ interface QueueItem {
 
 /** 相手の手を指すまでの間（ミリ秒） */
 const OPPONENT_DELAY = 450;
+/** 早送りの 1 手の間（ミリ秒。段階26-2） */
+const SKIP_DELAY = 200;
 
 export function PracticePlayScreen({ target }: { target: PracticeTarget }) {
   const studies = library.value;
@@ -88,7 +94,8 @@ export function PracticePlayScreen({ target }: { target: PracticeTarget }) {
       </>
     );
   }
-  return <PlayView queue={queue} />;
+  // 早送りは、続けて稽古するときだけ（行を押して 1 本だけのときは出発点から）
+  return <PlayView queue={queue} continuous={target.kind !== 'one'} />;
 }
 
 function makeQueue(target: PracticeTarget, studies: readonly Study[], records: ReadonlyMap<string, PracticeRecord>, games: Parameters<typeof planNow>[2]): QueueItem[] {
@@ -98,7 +105,12 @@ function makeQueue(target: PracticeTarget, studies: readonly Study[], records: R
     ...plan.today.filter((i) => !ids || ids.has(i.study.id)).map((i) => ({ id: i.study.id, reason: i.reason, ...(i.gameAt !== undefined ? { gameAt: i.gameAt } : {}) })),
     ...plan.later.filter((l) => !ids || ids.has(l.study.id)).map((l) => ({ id: l.study.id })),
   ];
-  if (target.kind === 'today') return fromPlan(null).filter((q) => q.reason);
+  // 今日の稽古は、定跡帳ごと・手順の近い順（段階26-2。同じ出だしが続くように）
+  if (target.kind === 'today') {
+    const today = new Set(plan.today.map((i) => i.study.id));
+    const queued = new Map(fromPlan(today).map((q) => [q.id, q]));
+    return todayOrder(plan.today, studies, records, templates).map((i) => queued.get(i.study.id)!);
+  }
   const able = (s: Study) => practicePlies(s, templates).length > 0;
   if (target.kind === 'one') {
     const s = studies.find((x) => x.id === target.studyId);
@@ -121,7 +133,7 @@ type Phase =
   | { kind: 'bad'; tried: string; tag: string; entry: Candidate; line: Refutation; step: number | null }
   | { kind: 'end'; record: PracticeRecord | null; saveError?: string };
 
-function PlayView({ queue }: { queue: QueueItem[] }) {
+function PlayView({ queue, continuous }: { queue: QueueItem[]; continuous: boolean }) {
   const studies = library.value ?? [];
   const templates = allTemplates();
   const [qi, setQi] = useState(0);
@@ -146,6 +158,7 @@ function PlayView({ queue }: { queue: QueueItem[] }) {
       item={item}
       start={practiceStart(study, templates)}
       plies={practicePlies(study, templates)}
+      skip={continuous && settings.value.skipSameStart}
       index={qi}
       total={queue.length}
       onNext={() => (qi + 1 < queue.length ? setQi(qi + 1) : back('/practice'))}
@@ -159,6 +172,7 @@ function StudyPlay({
   item,
   start,
   plies,
+  skip,
   index,
   total,
   onNext,
@@ -169,6 +183,8 @@ function StudyPlay({
   item: QueueItem;
   start: number;
   plies: number[];
+  /** 同じ出だしを早送りするか */
+  skip: boolean;
   index: number;
   total: number;
   onNext: () => void;
@@ -178,6 +194,9 @@ function StudyPlay({
   const end = positions.length - 1;
   const own = useMemo(() => new Set(plies), [plies]);
   const [ply, setPly] = useState(start);
+  /** 自分で指し始める番目（段階26-2。そこまでは両方の手をアプリが指す。早送りしないなら start）。始めたときに決める */
+  const [skipTo] = useState(() => (skip ? skipStart(study, plies, start, correctToday(), wrongPliesOf(practiceRecords.value?.get(study.id), wrongMemo())) : start));
+  const skipping = ply < skipTo;
   const [phase, setPhase] = useState<Phase>({ kind: 'play' });
   /** 自分の手の 1 回目の答え（手数 → 正解か） */
   const [answers, setAnswers] = useState<Map<number, boolean>>(new Map());
@@ -205,8 +224,8 @@ function StudyPlay({
       void finish();
       return;
     }
-    if (own.has(ply)) return;
-    const timer = setTimeout(() => setPly((p) => p + 1), OPPONENT_DELAY);
+    if (own.has(ply) && ply >= skipTo) return;
+    const timer = setTimeout(() => setPly((p) => p + 1), ply < skipTo ? SKIP_DELAY : OPPONENT_DELAY);
     return () => clearTimeout(timer);
   }, [ply, phase.kind]);
 
@@ -214,6 +233,8 @@ function StudyPlay({
     const wrongAt = [...answers].filter(([, ok]) => !ok).map(([p]) => p);
     const record = nextRecord(practiceRecords.value?.get(study.id), study.id, wrongAt.length, Date.now(), wrongAt.some(hardAt));
     try {
+      // どの手をまちがえたかは、早送りのために別に覚える（記録の形は変えない）
+      rememberWrong(study.id, record.lastAt, wrongAt);
       await savePractice(record);
       setPhase({ kind: 'end', record });
     } catch (e) {
@@ -221,7 +242,7 @@ function StudyPlay({
     }
   }
 
-  const asking = phase.kind !== 'end' && own.has(ply) && ply < end;
+  const asking = phase.kind !== 'end' && !skipping && own.has(ply) && ply < end;
   const sfen = positions[ply] ?? STARTPOS_SFEN;
   /** 悪手の咎め方を盤で見せている間 */
   const replaying = phase.kind === 'bad' && phase.step !== null;
@@ -232,6 +253,8 @@ function StudyPlay({
       const table = tableAt(ply);
       const other = otherStudyAt(bookIndex, sfen, move.usi, study.id);
       const judge = judgeAnswer(move.usi, study.moves[ply], table, other);
+      // 早送りに使うのは 1 回目の答えだけ（次善やまちがいの後の正解は入れない）
+      if (phase.kind === 'play' && !answers.has(ply)) rememberAnswer(answerKey(study, ply), judge.kind === 'correct');
       if (judge.kind === 'correct') {
         if (!answers.has(ply)) setAnswers(new Map(answers).set(ply, true));
         setJustOk(phase.kind === 'play');
@@ -311,6 +334,9 @@ function StudyPlay({
     return kept;
   });
 
+  /** 操作バーの真ん中の操作：早送り中は「とばす」、悪手の間は咎め方の操作 */
+  const barAction = skipping ? { label: 'とばす ≫', testId: 'practice-skip', run: () => setPly(skipTo) } : refuteAction;
+
   const lastOpp = ply > start && !own.has(ply - 1) ? texts[ply - 1] : null;
   const mistakes = [...answers].filter(([, ok]) => !ok).map(([p]) => p);
 
@@ -342,9 +368,9 @@ function StudyPlay({
               {item.reason === 'game' && item.gameAt !== undefined && `（${gameDate(item.gameAt)}）`}
             </span>
           )}
-          <span class="practice-pips" data-testid="practice-pips" aria-label={`自分の手 ${plies.length} 問`}>
+          <span class="practice-pips" data-testid="practice-pips" aria-label={`自分の手 ${plies.length} 問${skipTo > start ? `（早送り ${plies.filter((p) => p < skipTo).length} 問）` : ''}`}>
             {plies.map((p) => (
-              <span key={p} class={`practice-pip${answers.get(p) === true ? ' ok' : answers.get(p) === false ? ' ng' : p === ply && asking ? ' now' : ''}`} data-testid="practice-pip" />
+              <span key={p} class={`practice-pip${p < skipTo ? ' skip' : answers.get(p) === true ? ' ok' : answers.get(p) === false ? ' ng' : p === ply && asking ? ' now' : ''}`} data-testid="practice-pip" />
             ))}
           </span>
         </p>
@@ -370,11 +396,11 @@ function StudyPlay({
             onNext={() => setView(shown + 1 >= ply ? null : shown + 1)}
             canPrev={phase.kind === 'end' && shown > start}
             canNext={phase.kind === 'end' && shown < ply}
-            onCenter={refuteAction?.run}
-            centerLabel={refuteAction?.label}
+            onCenter={barAction?.run}
+            centerLabel={barAction?.label}
           >
-            {refuteAction ? (
-              <span data-testid={refuteAction.testId}>{refuteAction.label}</span>
+            {barAction ? (
+              <span data-testid={barAction.testId}>{barAction.label}</span>
             ) : shown === 0 ? (
               '初期局面'
             ) : (
@@ -384,19 +410,25 @@ function StudyPlay({
         </div>
 
         <div class="tree-side board-frame" ref={frameRef}>
-          <section class="card review-prompt practice-card" ref={cardRef} data-testid="practice-card" data-phase={phase.kind === 'end' ? 'end' : asking ? (phase.kind === 'play' ? 'ask' : phase.kind) : 'wait'}>
+          <section class="card review-prompt practice-card" ref={cardRef} data-testid="practice-card" data-phase={phase.kind === 'end' ? 'end' : skipping ? 'skip' : asking ? (phase.kind === 'play' ? 'ask' : phase.kind) : 'wait'}>
             {phase.kind === 'play' && asking && (
               <>
                 {lastOpp && (
                   <p>
-                    相手は <strong>{lastOpp}</strong>。
+                    相手は <strong>{lastOpp}</strong>。{skipTo > start && ply === skipTo && <span data-testid="practice-skip-end">ここから指します。</span>}
                   </p>
                 )}
                 <p>あなた（{mySideText}）の手は？</p>
                 <OnceHint id="answer-tap">盤の駒をタップ → 行き先をタップで答えます。</OnceHint>
               </>
             )}
-            {phase.kind === 'play' && !asking && <p class="muted">相手が指します…</p>}
+            {skipping && (
+              <>
+                <p>同じ出だしを早送り中…</p>
+                <p class="muted">{skipTo + 1}手目から、あなたが指します。</p>
+              </>
+            )}
+            {phase.kind === 'play' && !asking && !skipping && <p class="muted">相手が指します…</p>}
             {phase.kind === 'wrong' && (
               <>
                 <p class="status-ng" data-testid="practice-wrong">

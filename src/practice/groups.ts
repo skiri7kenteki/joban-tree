@@ -73,6 +73,16 @@ export interface PracticeGroup<T> {
   items: T[];
 }
 
+/** 今日の稽古を指す順（段階26-2）：定跡帳ごとにまとめ、中は手順の近い順（稽古のタブの並びと同じ）。定跡帳の順は items（理由の優先の順）で最初に出る順 */
+export function todayOrder<T extends { study: Study; record?: PracticeRecord }>(
+  items: readonly T[],
+  studies: readonly Study[],
+  records: ReadonlyMap<string, PracticeRecord>,
+  templates: readonly OpeningTemplate[],
+): T[] {
+  return groupPractice(items, studies, records, templates).flatMap((g) => g.items);
+}
+
 /** 今日の稽古・これからの稽古を定跡帳ごとにまとめる。定跡帳の順は items で最初に出る順 */
 export function groupPractice<T extends { study: Study; record?: PracticeRecord }>(
   items: readonly T[],
