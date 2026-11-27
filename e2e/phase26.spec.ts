@@ -187,6 +187,43 @@ for (const [w, h] of [
   });
 }
 
+// 早送りの後の盤の直し（v0.59.1）：字の幅は字体で変わる（Linux の Chromium では札の文が折り返した）ので、
+// どの字体でも同じになるように、テストの中で改行を差し込んで「1 回折り返して 3 行」を作る
+const wrapAfter = (testId: string) => `[data-testid="${testId}"]::after { content: '\\A'; white-space: pre; }`;
+const wrapBefore = (testId: string) => `[data-testid="${testId}"]::before { content: '\\A'; white-space: pre; }`;
+const cardHeight = async (page: Page) => (await page.getByTestId('practice-card').boundingBox())!.height;
+
+test('360×640：札の文が折り返して 3 行になっても（ここから指します・まちがえた後）、盤は変わらない', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 640 });
+  await setup(page, [B, A]);
+  await page.goto('./#/practice');
+  await page.addStyleTag({ content: wrapBefore('practice-skip-end') + wrapAfter('practice-answer') });
+  await page.getByTestId('practice-start').click();
+  await playFrom(page, 17);
+  await page.getByTestId('practice-next').click();
+  await expect(page.getByTestId('practice-card')).toHaveAttribute('data-phase', 'skip');
+  await page.waitForTimeout(300);
+  const during = await board(page);
+  const height = await cardHeight(page);
+
+  await waitAsk(page, 21);
+  // 差し込んだ改行で、本当に折り返している（「ここから指します。」が、同じ段落の相手の手より下の行にある）
+  const wrapped = await page.getByTestId('practice-skip-end').evaluate((e) => {
+    const rects = e.getClientRects();
+    return rects[rects.length - 1].top - e.parentElement!.querySelector('strong')!.getBoundingClientRect().top;
+  });
+  expect(wrapped).toBeGreaterThan(15);
+  await page.waitForTimeout(300);
+  expect(await board(page)).toEqual(during);
+  expect(await cardHeight(page)).toBe(height);
+
+  await tap(page, '93', '94');
+  await expect(page.getByTestId('practice-card')).toHaveAttribute('data-phase', 'wrong');
+  await page.waitForTimeout(300);
+  expect(await board(page)).toEqual(during);
+  expect(await cardHeight(page)).toBe(height);
+});
+
 test('［とばす］ですぐ指し始める。行を押した 1 本だけの稽古は、出発点から', async ({ page }) => {
   await setup(page, [B, A]);
   await page.goto('./#/practice');

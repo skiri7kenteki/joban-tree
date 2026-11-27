@@ -154,6 +154,23 @@ for (const size of SIZES) {
       await page.getByTestId('practice-start').first().click();
       await expect(page.getByTestId('practice-card')).toHaveAttribute('data-phase', 'ask');
       await shot(page, size.name, 'practice-board');
+      // 稽古の札の場面（はじめての手・まちがえた後・終わり。札の文の長さで盤が動かないかを見る）
+      await page.goto('./#/practice/play/s-a');
+      await page.reload();
+      await expect(page.getByTestId('practice-card')).toHaveAttribute('data-phase', 'ask');
+      await shot(page, size.name, 'practice-first');
+      const tapSquares = async (...squares: string[]) => {
+        for (const square of squares) await page.locator(`[data-testid="practice-board"] [data-square="${square}"]`).click();
+      };
+      await tapSquares('93', '94');
+      await expect(page.getByTestId('practice-card')).toHaveAttribute('data-phase', 'wrong');
+      await shot(page, size.name, 'practice-wrong');
+      for (const [ply, from, to] of [[17, '51', '62'], [19, '71', '72'], [21, '63', '64']] as const) {
+        await expect(page.getByTestId('practice-position')).toContainText(`${ply}手目`);
+        await tapSquares(from, to);
+      }
+      await expect(page.getByTestId('practice-card')).toHaveAttribute('data-phase', 'end');
+      await shot(page, size.name, 'practice-end');
 
       // 実戦：将棋ウォーズの名前 → 棋譜を貼る → 結果 → 実戦のタブ
       await openSettings(page, 'games');

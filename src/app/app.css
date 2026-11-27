@@ -2741,19 +2741,28 @@ button.move-bar-center.move-bar-action {
   box-shadow: 0 0 0 2px var(--color-mark-soft);
 }
 
+/* 稽古の札は、文が 1 回折り返して 3 行になっても、いつもの高さ（.review-prompt の 96px）に収める。
+   札が高くなると盤が縮んで、指そうとした所がずれるため（字の幅は字体で変わる。早送りの後の盤の直し、v0.59.1）。
+   上下の余白・段落の間・行の高さをここより広げない */
 .practice-card {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  justify-content: center;
+  gap: var(--space-1);
+  padding-top: var(--space-2);
+  padding-bottom: var(--space-2);
+  line-height: 1.4;
 }
 
 .practice-card p {
   margin: 0;
 }
 
+/* 正解の手は大きい字。行の高さは広げない（札の高さを変えないため） */
 .practice-answer {
   font-family: var(--font-serif);
   font-size: 20px;
+  line-height: 1;
 }
 
 /* 次の稽古までの間隔の並び（今の段を墨で塗る） */
