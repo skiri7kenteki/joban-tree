@@ -11,7 +11,7 @@
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { Dialog } from '../components/Dialog';
-import { APP_VERSION } from '../components/Footer';
+import { APP_VERSION } from './version';
 import { currentBackup, hideNudgeUntil, lastBackupAt, loadSnapshot, markBackedUp, mergeFromBackups, nudgeHiddenUntilStored, readAllData, restoreFromBackup } from '../storage/backup';
 import { mergeBackups, type MergeResult } from '../tree/merge';
 import { MergeSummary } from './MergeSummary';
@@ -27,7 +27,6 @@ import {
   type BackupFile,
 } from '../tree/backupFile';
 import type { Study } from '../tree/types';
-import { isGenerating } from './generation';
 import { settings } from './settings';
 import { go } from './router';
 import { shareFile } from './share';
@@ -169,11 +168,6 @@ export function DataSection() {
 
   async function merge() {
     if (!merging) return;
-    if (isGenerating()) {
-      setMerging(null);
-      setError('ツリーを生成しています。止めるか終わってから合わせてください。');
-      return;
-    }
     setBusy(true);
     try {
       await mergeFromBackups([merging.file.data], APP_VERSION);
@@ -203,11 +197,6 @@ export function DataSection() {
 
   async function restore() {
     if (!pending) return;
-    if (isGenerating()) {
-      setPending(null);
-      setError('ツリーを生成しています。止めるか終わってから戻してください。');
-      return;
-    }
     setBusy(true);
     try {
       await restoreFromBackup(pending.file.data, APP_VERSION);

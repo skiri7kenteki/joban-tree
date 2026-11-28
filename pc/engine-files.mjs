@@ -1,4 +1,4 @@
-// PC 用のやねうら王（Windows 版）と評価関数を、この PC に用意する（server.mjs と bake で使い回す）。Node.js の標準機能だけで動く。
+// PC 用のやねうら王（Windows 版）と評価関数を、この PC に用意する（server.mjs が使う）。Node.js の標準機能だけで動く。
 //
 // - エンジンの一覧（manifest.json）を GitHub Pages から取ってくる。ネットにつながらなければ前回の分を使う
 // - 動かすのは、manifest.json に書かれた sha256 と一致したエンジンだけ

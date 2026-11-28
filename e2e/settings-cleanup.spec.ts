@@ -10,7 +10,6 @@ const PAGES = [
   ['data', 'データ管理'],
   ['sync', 'Google ドライブで同期'],
   ['engine', 'エンジン'],
-  ['trees', 'ツリー（以前の機能）'],
 ] as const;
 
 async function open(page: Page) {
@@ -29,7 +28,10 @@ test('設定のタブは 390×844 で 1 画面に収まり、行は 48px 以上'
   await onTop(page);
   expect(await page.evaluate(() => document.scrollingElement!.scrollHeight)).toBeLessThanOrEqual(844);
   const rows = page.locator('.settings-row');
-  await expect(rows).toHaveCount(9);
+  await expect(rows).toHaveCount(7);
+  // 機能の整理：ツリー（以前の機能）と気づきを送るは無い
+  await expect(page.getByTestId('settings-row-trees')).toHaveCount(0);
+  await expect(page.getByTestId('feedback-open')).toHaveCount(0);
   const tabTop = (await page.getByTestId('tabbar').boundingBox())!.y;
   for (const row of await rows.all()) {
     const box = (await row.boundingBox())!;
@@ -85,22 +87,6 @@ test('下の画面で下のタブの［設定］を押すと目次へ。読み�
   await expect(page.getByTestId('tab-studies')).toHaveAttribute('aria-current', 'page');
 });
 
-test('ツリーの一覧の「‹ 設定」は、ツリーの下の画面へ戻る', async ({ page }) => {
-  await open(page);
-  await page.getByTestId('tab-settings').click();
-  await page.getByTestId('settings-row-trees').click();
-  await page.getByTestId('open-trees').click();
-  await expect(page.getByTestId('trees-back')).toHaveText('‹ 設定');
-  await page.getByTestId('trees-back').click();
-  await expect(page).toHaveURL(/#\/settings\/trees$/);
-  await page.getByTestId('settings-back').click();
-  await onTop(page);
-  // ツリーの一覧を直接開いたときも、ツリーの下の画面へ
-  await page.goto('./#/trees');
-  await page.getByTestId('trees-back').click();
-  await expect(page).toHaveURL(/#\/settings\/trees$/);
-});
-
 test('下の画面で変えた設定は、戻って開き直しても残り、行の右にも出る', async ({ page }) => {
   await open(page);
   await page.getByTestId('tab-settings').click();
@@ -122,7 +108,7 @@ test('下の画面で変えた設定は、戻って開き直しても残り、�
   // 初期値に戻す：やめると何も変わらない
   await page.getByTestId('reset-settings').click();
   const dialog = page.getByTestId('reset-dialog');
-  await expect(dialog).toContainText('すべての設定を初期値に戻しますか？（ツリーとウォーズの名前は消えません）');
+  await expect(dialog).toContainText('すべての設定を初期値に戻しますか？（ウォーズの名前は消えません）');
   await page.getByTestId('reset-cancel').click();
   await expect(dialog).toHaveCount(0);
   await expect(page.getByTestId('settings-value-practice')).toHaveText('早送り しない');
@@ -135,12 +121,13 @@ test('下の画面で変えた設定は、戻って開き直しても残り、�
   await expect(page.getByTestId('settings-value-games')).toHaveText('sample_user');
 });
 
-test('［気づきを送る］の窓が開き、版が行に出る', async ({ page }) => {
+test('版が行に出る。エンジンの画面に速度測定は無い', async ({ page }) => {
   await open(page);
   await page.getByTestId('tab-settings').click();
   await expect(page.getByTestId('app-version')).toHaveText(/^v\d+\.\d+\.\d+$/);
-  await page.getByTestId('feedback-open').click();
-  await expect(page.getByTestId('feedback-dialog')).toBeVisible();
+  await openSettings(page, 'engine');
+  await expect(page.getByTestId('good-max')).toBeVisible();
+  await expect(page.getByTestId('open-bench')).toHaveCount(0);
 });
 
 test('データ管理を開いたら、すぐ［バックアップを保存］が押せて、行の右の日付が変わる', async ({ page }) => {

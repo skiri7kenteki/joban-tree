@@ -1,16 +1,9 @@
-// ツリーの JSON（このアプリ専用のバックアップ・共有用）の書き出しと読み込み。
-// ほかの人から受け取ったファイルも読むので、中身は信用せず、形を確かめてから使う。
+// 前の版のツリー 1 本の形の確かめ（バックアップから戻す・同期で読むときに使う。ツリーの画面は消したが、データは持ち運ぶ）と、
+// 書き出すファイルの名前。ほかの人から受け取ったファイルも読むので、中身は信用せず、形を確かめてから使う。
 
 import { Position } from 'tsshogi';
 import { sfenKey } from '../shogi/position';
-import { TREE_APP, TREE_FORMAT_VERSION, type TreeData } from './types';
-
-/** JSON の文字列にする（そのまま保存しているデータと同じ形） */
-export function treeToJson(tree: TreeData): string {
-  return JSON.stringify(tree);
-}
-
-export type ParseResult = { ok: true; tree: TreeData } | { ok: false; message: string };
+import { TREE_APP, TREE_FORMAT_VERSION } from './types';
 
 const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const isString = (v: unknown): v is string => typeof v === 'string';
@@ -19,27 +12,6 @@ const isNumber = (v: unknown): v is number => typeof v === 'number' && Number.is
 function isScore(v: unknown): boolean {
   if (!isObject(v)) return false;
   return (v.kind === 'cp' && isNumber(v.value)) || (v.kind === 'mate' && isNumber(v.plies));
-}
-
-/** JSON の文字列からツリーを読む */
-export function parseTreeJson(text: string): ParseResult {
-  let raw: unknown;
-  try {
-    raw = JSON.parse(text);
-  } catch {
-    return { ok: false, message: 'JSON として読めませんでした。このアプリで書き出したファイルを選んでください。' };
-  }
-  if (!isObject(raw) || raw.app !== TREE_APP) {
-    return { ok: false, message: '将棋定跡帳のファイルではありません。' };
-  }
-  if (!isNumber(raw.version) || raw.version > TREE_FORMAT_VERSION) {
-    return { ok: false, message: 'アプリより新しい形式のファイルです。アプリを最新にしてから読み込んでください。' };
-  }
-  // 形式 1〜6 の確認（2 は局面に excluded、3 は自分の手に userChosen・loss、4 はツリーに source、5 は templateId、6 は studies が足せるだけなので、
-  // 古い形もそのまま読める。形を変えたときは、ここで古い形から新しい形に直す）
-  const problem = checkV1(raw);
-  if (problem) return { ok: false, message: `ファイルの中身が壊れています（${problem}）。` };
-  return { ok: true, tree: raw as unknown as TreeData };
 }
 
 /**

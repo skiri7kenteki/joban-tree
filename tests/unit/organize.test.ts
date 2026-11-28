@@ -1,20 +1,13 @@
-// 段階7-1：トップ画面の整理（どの戦型のツリーか・グループ分けと並び順・最近開いた）
+// 段階7-1：一覧のまとめ方（どの戦型か・グループ分けと並び順。研究手順のグループも同じ決まり）
 import { describe, expect, it } from 'vitest';
 import { STARTPOS_SFEN } from '../../src/shogi/position';
-import { parseTreeJson, treeToJson } from '../../src/tree/backup';
-import { copyBundledTree, type BundledTreeFile } from '../../src/tree/bundled';
-import { createTree } from '../../src/tree/generator';
 import {
   OTHER_GROUP,
-  addRecent,
   groupTrees,
-  recentItems,
   templateOf,
   type OrganizeItem,
 } from '../../src/tree/organize';
 import type { OpeningTemplate } from '../../src/tree/templates';
-import { TREE_FORMAT_VERSION } from '../../src/tree/types';
-import { SETTINGS } from './mock-engine';
 
 const YOKOFU = '7g7f 3c3d 2g2f 8c8d 2f2e 8d8e 6i7h 4a3b 2e2d 2c2d 2h2d 8e8f 8g8f 8b8f 2d3d';
 const tpl = (id: string, group: string, moves: string, mySide: 'black' | 'white' = 'black'): OpeningTemplate => ({
@@ -91,62 +84,15 @@ describe('グループ分けと並び順（groupTrees）', () => {
     expect(groups.map((g) => g.items.map((t) => t.name))).toEqual([['横歩後手'], ['横歩先手'], ['角換わり後手'], ['自分の'], ['その他1']]);
   });
 
-  it('グループの中は、用意済みのツリーがいちばん上、あとは更新日の新しい順。中身の無いグループは出さない', () => {
+  it('グループの中は更新日の新しい順。中身の無いグループは出さない', () => {
     const items = [
       item(YOKOFU, { name: '古い', updatedAt: 100 }),
-      item(`${YOKOFU} 2b3c`, { name: '用意済み', updatedAt: 50, source: { kind: 'bundled', id: 'b', version: 1, finishedAt: 1 } }),
       item(`${YOKOFU} 2b3c 5i5h`, { name: '新しい', updatedAt: 300 }),
       item(YOKOFU, { name: '中くらい', updatedAt: 200 }),
     ];
     const groups = groupTrees(items, TEMPLATES);
     expect(groups).toHaveLength(1);
-    expect(groups[0].items.map((t) => t.name)).toEqual(['用意済み', '新しい', '中くらい', '古い']);
+    expect(groups[0].items.map((t) => t.name)).toEqual(['新しい', '中くらい', '古い']);
     expect(groupTrees([], TEMPLATES)).toEqual([]);
-  });
-});
-
-describe('最近開いた', () => {
-  it('新しい順に 3 件まで。消したツリーは出さない。同じツリーは新しい日時の 1 件にまとめる', () => {
-    const items = [item(''), item(''), item(''), item(''), item('')];
-    let recent = addRecent([], items[0].id, 10);
-    recent = addRecent(recent, items[1].id, 20);
-    recent = addRecent(recent, items[2].id, 30);
-    recent = addRecent(recent, 'deleted', 40);
-    recent = addRecent(recent, items[0].id, 50);
-    expect(recent.filter((r) => r.id === items[0].id)).toHaveLength(1);
-    expect(recentItems(items, recent).map((t) => [t.id, t.openedAt])).toEqual([
-      [items[0].id, 50],
-      [items[2].id, 30],
-      [items[1].id, 20],
-    ]);
-  });
-
-  it('記録は 20 件まで（古いものから捨てる）', () => {
-    let recent: ReturnType<typeof addRecent> = [];
-    for (let i = 0; i < 25; i++) recent = addRecent(recent, `t${i}`, i);
-    expect(recent).toHaveLength(20);
-    expect(recent[0].id).toBe('t24');
-  });
-});
-
-describe('ツリーに作った戦型を記録する（形式 5）', () => {
-  it('createTree に templateId を渡すと記録し、JSON で読み書きできる。無ければ書かない', () => {
-    const base = { id: 'x', name: 'x', rootSfen: STARTPOS_SFEN, mySide: 'white' as const, prefix: { initialSfen: STARTPOS_SFEN, moves: [] }, settings: SETTINGS, now: 0 };
-    const tree = createTree({ ...base, templateId: 'yokofu-kihon' });
-    expect(tree.version).toBe(TREE_FORMAT_VERSION);
-    expect(TREE_FORMAT_VERSION).toBeGreaterThanOrEqual(5);
-    expect(tree.templateId).toBe('yokofu-kihon');
-    const back = parseTreeJson(treeToJson(tree));
-    expect(back.ok && back.tree.templateId).toBe('yokofu-kihon');
-    expect('templateId' in createTree(base)).toBe(false);
-    // 形式 4 のツリー（templateId なし）も読める。templateId がおかしければ読まない
-    expect(parseTreeJson(JSON.stringify({ ...createTree(base), version: 4 })).ok).toBe(true);
-    expect(parseTreeJson(JSON.stringify({ ...tree, templateId: 12 })).ok).toBe(false);
-  });
-
-  it('用意済みのツリーのコピーは、元の同梱テンプレートの id', () => {
-    const tree = createTree({ id: 'b', name: 'b', rootSfen: STARTPOS_SFEN, mySide: 'white', prefix: { initialSfen: STARTPOS_SFEN, moves: [] }, settings: SETTINGS, now: 0 });
-    const file = { app: 'joban-tree', kind: 'bundled-tree', version: 1, bundle: { id: 'b1', templateId: 'yokofu-33kaku-gote', version: 1, finishedAt: 1 }, tree } as unknown as BundledTreeFile;
-    expect(copyBundledTree(file, { id: 'c', name: 'c', now: 1, settings: SETTINGS }).templateId).toBe('yokofu-33kaku-gote');
   });
 });

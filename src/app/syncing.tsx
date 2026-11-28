@@ -2,11 +2,10 @@
 // （同期中に戻るボタンで画面を移れると、合わせる前の古い一覧を元に保存して、ほかの端末から来た中身を上書きするため）
 
 import { signal } from '@preact/signals';
-import { APP_VERSION } from '../components/Footer';
+import { APP_VERSION } from './version';
 import { runSync } from '../drive/run';
 import { clearDriveNote, clearSyncPending, currentToken, saveDriveNote, startLogin, type DriveNote } from '../drive/session';
 import { syncMessage } from '../drive/sync';
-import { isGenerating } from './generation';
 
 /** 同期している間 true */
 export const syncing = signal(false);
@@ -41,10 +40,6 @@ export function startSync(): void {
   const t = currentToken();
   if (!t) {
     startLogin();
-    return;
-  }
-  if (isGenerating()) {
-    finish({ ok: false, message: 'ツリーを生成しています。止めるか終わってから同期してください。' });
     return;
   }
   syncing.value = true;

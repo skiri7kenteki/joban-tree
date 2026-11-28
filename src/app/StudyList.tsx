@@ -157,7 +157,7 @@ export function StudyListDialog({
       </Dialog>
       {confirmBulk && (
         <Dialog title={`研究手順 ${picked.length} 本を消しますか？`} onClose={() => setConfirmBulk(false)} testId="study-bulk-dialog">
-          <p>元に戻せません（ツリーの手や局面は消えません）。</p>
+          <p>元に戻せません。</p>
           <div class="dialog-actions">
             <button type="button" class="btn btn-danger" data-testid="study-bulk-ok" disabled={busy} onClick={() => void removePicked()}>
               {picked.length} 本を消す
@@ -268,7 +268,7 @@ function StudyMenu({ study, onClose, onDone }: { study: Study; onClose: () => vo
           </button>
         ) : (
           <>
-            <span>この研究手順を消しますか？元に戻せません（ツリーの手や局面は消えません）。</span>
+            <span>この研究手順を消しますか？元に戻せません。</span>
             <button type="button" class="btn btn-danger" data-testid="study-menu-delete-ok" onClick={() => void remove()}>
               消す
             </button>

@@ -49,7 +49,7 @@ describe('どの作業でも守ること', () => {
   });
 
   it('外部の URL から読み込まない（外部 CDN を使わない）', () => {
-    const pages = ['index.html', 'bench.html'];
+    const pages = ['index.html'];
     const load = /<(script|link|img)\b[^>]*\b(src|href)=["']https?:\/\/|@import\s+url\(\s*["']?https?:|url\(\s*["']?https?:|import\s+.*from\s+["']https?:/;
     expect(find([...pages, ...code], load)).toEqual([]);
   });

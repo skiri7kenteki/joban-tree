@@ -160,7 +160,7 @@ export function TemplatePicker({ onPick, onClose }: { onPick: (t: OpeningTemplat
     const t = mode.t;
     return (
       <Dialog title={`「${t.name}」を消しますか？`} onClose={onClose} testId="template-picker">
-        <p>自分で登録したこの戦型を一覧から消します。元に戻せません。この戦型から作ったツリーは消えません。</p>
+        <p>自分で登録したこの戦型を一覧から消します。元に戻せません。</p>
         <div class="dialog-actions">
           <button type="button" class="btn btn-danger" data-testid="template-delete-ok" onClick={() => void remove(t)}>
             消す

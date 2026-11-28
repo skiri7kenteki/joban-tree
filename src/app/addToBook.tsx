@@ -1,7 +1,6 @@
 // 1 本の手順を定跡帳に足す（段階10-2、持ち主の判断 2026-11-19）。
-// 研究手順の画面と登録の画面（#/new/study）を片付けたので、1 本だけ足す入口はここにまとめる：
+// 1 本だけ足す入口はここにまとめる：
 //   - 棋譜を貼って 1 本登録（トップ画面の「＋ 研究手順を登録」の中。KifPasteDialog）
-//   - ツリーの閲覧画面・新しいツリーの画面の「定跡帳に足す」（AddToBookDialog）
 // 名前は初期値（分かれ目がわかる形）で、メモは空。名前・メモは定跡帳の ★ の行から直す。自分の側だけ確かめる。
 // 手が 0 本・戦型の出発点そのもので終わる手順は足さない。同じ手順がすでにあれば足さずに、それを定跡帳で開けるようにする
 
@@ -65,59 +64,6 @@ function SidePicker({ side, onChange, testPrefix }: { side: Side; onChange: (s: 
         </button>
       ))}
     </div>
-  );
-}
-
-/** 「定跡帳に足す」の窓（ツリーの閲覧画面・新しいツリーの画面）：手順と自分の側を確かめて足す */
-export function AddToBookDialog({
-  moves,
-  side: initialSide,
-  onDone,
-  onClose,
-}: {
-  moves: readonly string[];
-  side: Side;
-  onDone: (r: AddResult) => void;
-  onClose: () => void;
-}) {
-  const [side, setSide] = useState<Side>(initialSide);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
-  async function add() {
-    const problem = addProblem(moves, side);
-    if (problem) {
-      setError(problem);
-      return;
-    }
-    setBusy(true);
-    try {
-      onDone(await addMovesToBook(moves, side));
-    } catch (e) {
-      setError(`保存できませんでした（${e instanceof Error ? e.message : String(e)}）`);
-      setBusy(false);
-    }
-  }
-  return (
-    <Dialog title="定跡帳に足す" onClose={onClose} testId="add-book-dialog">
-      <p class="study-moves muted" data-testid="add-book-moves">
-        {studyMovesText({ moves: [...moves], mySide: side }, allTemplates())}
-      </p>
-      <SidePicker side={side} onChange={setSide} testPrefix="add-book" />
-      <p class="muted">名前は自動で付けます（あとで直せます）。</p>
-      {error && (
-        <p class="status-ng" role="alert">
-          {error}
-        </p>
-      )}
-      <div class="dialog-actions">
-        <button type="button" class="btn btn-primary" data-testid="add-book-ok" disabled={busy} onClick={() => void add()}>
-          定跡帳に足す
-        </button>
-        <button type="button" class="btn" onClick={onClose}>
-          やめる
-        </button>
-      </div>
-    </Dialog>
   );
 }
 

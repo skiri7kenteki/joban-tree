@@ -36,14 +36,6 @@ export default defineConfig({
       devOptions: { enabled: false },
     }),
   ],
-  build: {
-    rollupOptions: {
-      input: {
-        main: 'index.html',
-        bench: 'bench.html',
-      },
-    },
-  },
   worker: {
     // エンジンの Worker は importScripts を使うので classic 形式（iife）でまとめる
     format: 'iife',

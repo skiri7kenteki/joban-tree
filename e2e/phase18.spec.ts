@@ -68,19 +68,12 @@ async function paste(page: Page, text: string) {
   await page.getByTestId('games-paste-text').fill(text);
 }
 
-test('タブは 定跡帳／稽古／実戦／設定（段階19 で復習→稽古）。ツリーは設定の「ツリー（以前の機能）」から', async ({ page }) => {
+test('タブは 定跡帳／稽古／実戦／設定（段階19 で復習→稽古）', async ({ page }) => {
   await page.goto('./');
   await expect(page.getByTestId('isolation')).toHaveAttribute('data-state', 'isolated', { timeout: 30_000 });
   await expect(page.locator('.tabbar-label')).toHaveText(['定跡帳', '稽古', '実戦', '設定']);
   await page.getByTestId('tab-games').click();
   await expect(page.getByTestId('games-empty')).toBeVisible();
-  await page.getByTestId('tab-settings').click();
-  await page.getByTestId('settings-row-trees').click();
-  await page.getByTestId('open-trees').click();
-  await expect(page.getByTestId('new-tree')).toBeVisible();
-  await expect(page.getByTestId('tab-settings')).toHaveAttribute('aria-current', 'page');
-  await page.getByTestId('trees-back').click();
-  await expect(page.getByTestId('open-trees')).toBeVisible();
 });
 
 test('貼る → 結果 → この局面から研究を足す → 結果が変わる', async ({ page }) => {
@@ -193,6 +186,8 @@ for (const [w, h] of [
     await page.waitForTimeout(300);
     const el = await page.evaluate(() => ({ scroll: document.scrollingElement!.scrollHeight, client: document.scrollingElement!.clientHeight }));
     expect(el.scroll).toBeLessThanOrEqual(el.client);
+    // 見るだけの盤の駒台は高さ 24px
+    for (const side of ['black', 'white']) expect(Math.round((await page.getByTestId(`hand-${side}`).boundingBox())!.height)).toBe(24);
     const bar = (await page.getByTestId('game-nav').boundingBox())!;
     expect(bar.y + bar.height).toBeLessThanOrEqual(h);
     if (w < h) {

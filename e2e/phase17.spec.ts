@@ -1,5 +1,5 @@
 // 段階17（v0.41.0）：データを守る（持ち主の依頼書 stage17-prompt・判断 2026-11-23「おすすめの通りで」）
-// - 設定の「データ」：データの保護の表示、［バックアップを保存］→ 全部消す →［バックアップから戻す］で研究手順・ツリー・復習の記録・戦型・設定が元どおり
+// - 設定の「データ」：データの保護の表示、［バックアップを保存］→ 全部消す →［バックアップから戻す］で研究手順（メモ）・前の版のツリーと復習の記録・局面メモ・候補の理由・戦型・設定が元どおり
 // - 戻す前のデータは端末の中に取っておき、［戻す前のデータに戻す］で元に戻せる
 // - おかしいファイルは断る。定跡帳の一覧の上の「しばらくバックアップしていません」（閉じたら 30 日は出さない）
 import { openSettings } from './settings';
@@ -57,14 +57,14 @@ async function putRecords(page: Page, store: string, list: unknown[]) {
   );
 }
 
-/** 今のデータ全部（4 つの保存場所の中身と、バックアップに入れる端末の設定）。並びは id でそろえる */
+/** 今のデータ全部（5 つの保存場所の中身と、バックアップに入れる端末の設定）。並びは id でそろえる */
 async function dump(page: Page) {
   return page.evaluate(
     () =>
       new Promise<Record<string, unknown>>((resolve, reject) => {
         const open = indexedDB.open('joban-tree');
         open.onsuccess = () => {
-          const names = ['studies', 'trees', 'review', 'templates'];
+          const names = ['studies', 'trees', 'review', 'templates', 'positions'];
           const tx = open.result.transaction(names);
           const out: Record<string, unknown> = {};
           for (const n of names) {
@@ -87,14 +87,14 @@ async function dump(page: Page) {
   );
 }
 
-/** 全部消す（4 つの保存場所を空に、端末の設定も消す） */
+/** 全部消す（5 つの保存場所を空に、端末の設定も消す） */
 async function wipe(page: Page) {
   await page.evaluate(
     () =>
       new Promise<void>((resolve, reject) => {
         const open = indexedDB.open('joban-tree');
         open.onsuccess = () => {
-          const names = ['studies', 'trees', 'review', 'templates'];
+          const names = ['studies', 'trees', 'review', 'templates', 'positions'];
           const tx = open.result.transaction(names, 'readwrite');
           for (const n of names) tx.objectStore(n).clear();
           tx.oncomplete = () => {
@@ -116,9 +116,8 @@ async function seed(page: Page) {
     buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies: STUDIES })),
   });
   await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${2} 本`);
-  await page.goto('./#/trees');
-  await page.getByTestId('import-file').setInputFiles({ name: 't.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(tree())) });
-  await expect(page.getByTestId('tree-item')).toHaveCount(1);
+  // 前の版のツリー（画面は無いが、データは持ち運ぶ）は保存場所に直接入れる
+  await putRecords(page, 'trees', [tree()]);
   await putRecords(page, 'review', [
     { treeId: 'bk-tree', version: 1, nodes: { k1: { seen: 2, correct: 1, streak: 1, lastOk: true, lastAt: 5 } } },
     { treeId: 'studies', version: 1, nodes: { k2: { seen: 1, correct: 0, streak: 0, lastOk: false, lastAt: 6 } } },
@@ -126,10 +125,16 @@ async function seed(page: Page) {
   await putRecords(page, 'templates', [
     { id: 'my-x', name: '自分の戦型', group: '横歩取り', mySide: 'white', moves: ['7g7f', '3c3d'], note: '', reviewed: true, createdAt: 3, updatedAt: 4 },
   ]);
-  // 設定：定跡帳の「盤で指して書き込む」を切に、復習の 1 回の問題の数を 5 に（設定の画面で変えたものもバックアップに入る）
-  await page.evaluate(() => localStorage.setItem('joban-tree:book-write', 'off'));
-  await openSettings(page, 'trees');
-  await page.getByTestId('review-batch-5').click();
+  // 局面メモと、理由の入った候補の表
+  const key = sfenKey(applyUsiMove(STARTPOS_SFEN, '7g7f')!.sfen);
+  await putRecords(page, 'positions', [
+    { id: `white|${key}`, side: 'white', key, note: '局面メモの中身', candidates: [{ move: '3c3d', mark: 'main', reason: '角道を開ける理由' }], updatedAt: 7 },
+  ]);
+  // 設定：定跡帳の「盤で指して書き込む」を切に。画面から消したツリーの設定（復習の 1 回は 5 問）もバックアップで運ぶ
+  await page.evaluate(() => {
+    localStorage.setItem('joban-tree:book-write', 'off');
+    localStorage.setItem('joban-tree.settings', JSON.stringify({ version: 1, reviewBatch: 5, windowCp: 250 }));
+  });
 }
 
 test.describe('段階17 データを守る', () => {
@@ -160,6 +165,10 @@ test.describe('段階17 データを守る', () => {
     expect(file.data.trees).toHaveLength(1);
     expect(file.data.reviews).toHaveLength(2);
     expect(file.data.templates).toHaveLength(1);
+    // 画面に無いものも、そのままファイルに入る
+    expect(file.data.trees[0]).toEqual(JSON.parse(JSON.stringify(tree())));
+    expect(file.data.studies.find((x: Study) => x.id === 's-a').note).toBe('メモA');
+    expect(file.data.positions[0]).toMatchObject({ note: '局面メモの中身', candidates: [{ reason: '角道を開ける理由' }] });
     await expect(page.getByTestId('backup-message')).toContainText('ダウンロードしました');
     await expect(page.getByTestId('last-backup')).not.toHaveText('まだありません');
 
@@ -183,9 +192,12 @@ test.describe('段階17 データを守る', () => {
     await Promise.all([page.waitForEvent('load'), page.getByTestId('backup-restore-confirm').click()]);
     await expect(page.getByTestId('data-section')).toBeVisible();
     expect(await dump(page)).toEqual(before);
-    // 設定も元どおり（復習の 1 回は 5 問）
-    await openSettings(page, 'trees');
-    await expect(page.getByTestId('review-batch-5')).toHaveAttribute('aria-checked', 'true');
+    // 戻した後にもう一度保存したファイルにも、同じものが入っている
+    await openSettings(page, 'data');
+    await expect(page.getByTestId('backup-save')).toBeEnabled();
+    const [again] = await Promise.all([page.waitForEvent('download'), page.getByTestId('backup-save').click()]);
+    const file2 = JSON.parse(readFileSync((await again.path())!, 'utf8'));
+    expect(file2.data).toEqual(file.data);
     await page.goto('./');
     await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${2} 本`);
 

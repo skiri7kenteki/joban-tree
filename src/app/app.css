@@ -139,14 +139,6 @@
   resize: vertical;
 }
 
-.move-slider {
-  width: 100%;
-  accent-color: var(--color-primary);
-  padding: 0;
-  border: none;
-  background: transparent;
-}
-
 .side-choice {
   display: flex;
   align-items: center;
@@ -171,36 +163,6 @@
   max-width: 420px;
   margin: 0 auto;
   box-shadow: var(--shadow-raise);
-}
-
-/* 生成の進み具合 */
-.gen-panel {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  margin-bottom: var(--space-2);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
-  background: var(--color-surface);
-  font-size: var(--font-size-small);
-}
-
-.gen-panel progress {
-  width: 100%;
-  height: 6px;
-  accent-color: var(--color-primary);
-}
-
-.gen-error {
-  border-color: var(--color-danger);
-}
-
-.gen-error-text {
-  width: 100%;
-  color: var(--color-danger);
 }
 
 /* 閲覧画面：スマホ縦向きは上下、iPad 横向きなど広い画面は左右に並べる */
@@ -296,57 +258,11 @@
   cursor: pointer;
 }
 
-/* 除外した手（リストの下に畳む） */
-.excluded-box {
-  border-top: 1px solid var(--color-border);
-}
-
-.excluded-toggle {
-  min-height: var(--touch-min);
-  padding: 0;
-  border: none;
-  background: transparent;
-  color: var(--color-text-muted);
-  font: inherit;
-  font-size: var(--font-size-small);
-  cursor: pointer;
-}
-
-.excluded-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.excluded-item {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  color: var(--color-text-muted);
-}
-
-.excluded-item .candidate-move {
-  font-weight: normal;
-}
-
-.excluded-item .btn {
-  margin-left: auto;
-}
-
 .candidate-line {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   min-width: 0;
-}
-
-.candidate-sub {
-  font-size: var(--font-size-small);
-  line-height: 1.4;
-}
-
-.candidate-sub:empty {
-  display: none;
 }
 
 .candidate-move {
@@ -355,47 +271,10 @@
   font-weight: bold;
 }
 
-.candidate-score {
-  flex: 0 0 auto;
-  margin-left: auto;
-  min-width: 4.5em;
-  text-align: right;
-}
-
-.candidate-reply {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  min-width: 0;
-  white-space: nowrap;
-}
-
-.candidate-ahead {
-  margin-left: auto;
-  color: var(--color-text-muted);
-  white-space: nowrap;
-}
-
-.candidate-ahead.ahead-answer-only {
-  color: var(--chip-good-text);
-}
-
 .chip.chip-small {
   padding: 0 6px;
   font-size: 12px;
   line-height: 1.5;
-}
-
-.eval-good {
-  color: var(--color-eval-good);
-}
-
-.eval-bad {
-  color: var(--color-eval-bad);
-}
-
-.eval-even {
-  color: var(--color-eval-even);
 }
 
 /* ラベルのチップ */
@@ -431,15 +310,6 @@
   color: var(--color-unverified);
 }
 
-.chip-merge {
-  border: 1px solid var(--color-border);
-  color: var(--color-text-muted);
-}
-
-.home-links {
-  margin-top: var(--space-6);
-}
-
 .spacer {
   flex: 1;
 }
@@ -462,10 +332,6 @@
   font-size: var(--font-size-heading);
 }
 
-.home-import {
-  margin-top: var(--space-4);
-}
-
 /* 入力画面の作るボタン：画面の下に固定（いちばん左が「ふつう」） */
 .start-bar {
   position: sticky;
@@ -477,99 +343,15 @@
   background: var(--color-bg);
 }
 
-/* 段階6-3：用意済みのツリーを開く（作るボタンより目立たせる） */
-.bundled-offer {
-  margin-bottom: var(--space-2);
-}
-
-/* 小さい画面でも盤と手順の操作が隠れないよう、ボタンは 2 行でも低めに */
-
-.bundled-row {
-  display: flex;
-  gap: var(--space-2);
-}
-
-.bundled-open {
-  flex: 1 1 auto;
-  min-width: 0;
-  flex-direction: column;
-  align-items: center;
-  gap: 0;
-  min-height: var(--touch-min);
-  padding: 2px var(--space-2);
-  line-height: 1.3;
-}
-
-.bundled-open-title {
-  font-weight: bold;
-}
-
-.bundled-open-facts {
-  font-size: 12px;
-  opacity: 0.9;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 100%;
-}
-
-.bundled-copy {
-  flex: 0 0 auto;
-  min-height: var(--touch-min);
-  padding: 0 var(--space-2);
-  font-size: var(--font-size-small);
-  line-height: 1.3;
-}
-
-.bundled-new {
-  margin: 0 0 var(--space-1);
-  color: var(--color-mark-text);
-  font-size: var(--font-size-small);
-}
-
 /* 段階7-1：トップ画面の最近開いた・戦型ごとのグループ */
 .tree-group {
   margin-bottom: var(--space-2);
-}
-
-.tree-group-head {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  width: 100%;
-  min-height: var(--touch-min);
-  padding: 0 var(--space-1);
-  border: none;
-  background: transparent;
-  color: var(--color-text);
-  font: inherit;
-  font-weight: bold;
-  text-align: left;
-  cursor: pointer;
-}
-
-.tree-group-head:disabled {
-  cursor: default;
-  opacity: 1;
 }
 
 .tree-group-caret {
   width: 1.2em;
   color: var(--color-text-muted);
   font-size: var(--font-size-small);
-}
-
-.tree-group-label {
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.tree-group-count {
-  color: var(--color-text-muted);
-  font-weight: normal;
 }
 
 /* 一覧の「用意済み」の印 */
@@ -580,12 +362,6 @@
   gap: var(--space-1);
 }
 
-.chip-bundled {
-  background: var(--chip-good-bg);
-  color: var(--chip-good-text);
-  box-shadow: inset 0 0 0 1px var(--chip-good-line);
-}
-
 .start-bar-caption {
   margin: 0 0 var(--space-1);
   overflow: hidden;
@@ -593,41 +369,8 @@
   white-space: nowrap;
 }
 
-.preset-buttons {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
-  gap: var(--space-2);
-}
-
-.preset-buttons .btn {
-  padding: 0 var(--space-2);
-}
-
 /* iPad 横向きなど広い画面：左に盤、右に貼り付けと操作（作るボタンは右の列の下。盤に重ならない） */
 @media (min-width: 768px) and (orientation: landscape) {
-  .input-layout {
-    display: grid;
-    grid-template-columns: minmax(0, 55%) minmax(0, 1fr);
-    grid-template-rows: auto auto 1fr;
-    grid-template-areas:
-      'board paste'
-      'board controls'
-      'board start';
-    column-gap: var(--space-4);
-    align-items: start;
-  }
-
-  .input-paste {
-    grid-area: paste;
-  }
-
-  .input-board {
-    grid-area: board;
-  }
-
-  .input-controls {
-    grid-area: controls;
-  }
 
   .start-bar {
     grid-area: start;
@@ -637,53 +380,6 @@
     border-top: none;
     background: transparent;
   }
-}
-
-/* 閲覧画面の局面ごとの操作 */
-.node-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin: var(--space-2) 0;
-}
-
-.node-actions .btn {
-  flex: 1 1 auto;
-  padding: 0 var(--space-3);
-}
-
-.chip-verified {
-  border: 1px solid var(--color-ok);
-  color: var(--color-ok);
-}
-
-/* 利用者が選んで調べた自分の手（段階4-3 B）：木の茶の塗りに白い文字 */
-.chip-chosen {
-  background: var(--color-mark);
-  color: var(--color-primary-text);
-}
-
-/* 自分の手の、最善手との差 */
-.candidate-loss {
-  color: var(--color-text-muted);
-  white-space: nowrap;
-}
-
-.candidate-loss.loss-bad {
-  color: var(--color-eval-bad);
-}
-
-/* 「別の手を調べる」：盤をタップして手を選んでいる間の案内 */
-.pick-bar {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-bottom: var(--space-2);
-  border: 2px solid var(--color-mark);
-}
-
-.pick-bar span {
-  flex: 1;
 }
 
 /* 重ねて出す小窓 */
@@ -763,50 +459,6 @@
   width: 6.5em;
   text-align: right;
 }
-
-.preset-field {
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-button);
-  margin: 0 0 var(--space-3);
-  padding: var(--space-2) var(--space-3);
-}
-
-.footer-feedback {
-  font-size: var(--font-size-small);
-  min-height: var(--touch-min);
-}
-
-/* 復習モード */
-.review-opponent {
-  font-size: var(--font-size-heading);
-}
-
-/* 復習画面のいちばん下：何本目の手順か・記録を消す */
-.review-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2);
-  margin-top: var(--space-4);
-  padding-top: var(--space-2);
-  border-top: 1px solid var(--color-border);
-}
-
-.review-footer .btn {
-  flex: 0 0 auto;
-  margin-left: auto;
-  color: var(--color-danger);
-  white-space: nowrap;
-}
-
-.review-summary {
-  margin: 0 0 8px;
-  font-size: var(--font-size-small);
-}
-
-.review-footer .review-summary {
-  margin: 0;
-}
 .review-prompt {
   margin-bottom: 8px;
   min-height: 96px;
@@ -816,22 +468,6 @@
 }
 .review-prompt .btn-row {
   margin-top: 4px;
-}
-
-/* 段階5-1：入力画面の「棋譜を貼り付ける」「戦型から選ぶ」（横に並べる） */
-.input-sources {
-  display: flex;
-  gap: var(--space-2);
-  margin-bottom: var(--space-3);
-}
-
-.input-sources .btn {
-  flex: 1 1 0;
-  margin-bottom: 0;
-  justify-content: center;
-  /* 幅 360 でも「棋譜を貼り付ける」を 1 行に（段階7-1） */
-  padding: 0 var(--space-2);
-  white-space: nowrap;
 }
 
 /* 戦型の一覧（グループ・戦型） */
@@ -881,23 +517,6 @@
   font-size: var(--font-size-small);
   white-space: nowrap;
   text-overflow: ellipsis;
-}
-
-/* 選んだ戦型の名前とメモ（盤の下） */
-.card.template-note {
-  margin-top: var(--space-2);
-}
-
-.template-note p {
-  margin: 0;
-}
-
-.template-note .template-note-name {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-1);
-  margin-bottom: var(--space-1);
 }
 
 /* 段階5-2：自分で登録した戦型 */
@@ -960,16 +579,6 @@
   padding-left: var(--space-4);
 }
 
-/* 段階5の手直し：選んだ戦型の名前（盤の上の案内の行と入れ替える。高さを変えないよう 1 行で、はみ出たら …） */
-.template-current {
-  overflow: hidden;
-  color: var(--color-text);
-  font-size: var(--font-size-small);
-  font-weight: bold;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
 /* 登録画面の今あるグループ：「登録する」と紛らわしくないよう、枠線だけのチップ。入力欄と同じものは枠と文字をアクセント色に */
 .group-choice {
   min-height: var(--touch-min);
@@ -1013,13 +622,6 @@
   white-space: nowrap;
 }
 
-.candidates-note {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* 盤の幅を、盤の下の大事な所（閲覧画面は候補手、入力画面は手順の操作、復習画面は問題）が画面に収まる幅
    （--board-fit-w。boardFit.ts が測る）までにして、左右の真ん中に置く。
    --board-bleed はスマホ縦で盤を画面の端まで広げている分（board.css） */
@@ -1054,23 +656,6 @@
   margin-right: 2px;
 }
 
-/* 研究手順の終わりの局面：候補手の見出しの行に「★ 名前」（行の高さを変えずに、押せる範囲は上下に広げる） */
-.study-here {
-  min-width: 0;
-  margin: -8px -8px -8px 0;
-  padding: 8px 8px;
-  border: none;
-  background: transparent;
-  color: var(--color-mark-text);
-  font: inherit;
-  font-size: var(--font-size-small);
-  font-weight: bold;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  cursor: pointer;
-}
-
 .study-note {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
@@ -1085,36 +670,6 @@
   resize: vertical;
 }
 
-/* トップ画面の「ツリー｜研究手順」の切り替え（段階7-2） */
-.home-tabs {
-  display: flex;
-  margin: 0 0 var(--space-2);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-button);
-  overflow: hidden;
-}
-
-.home-tab {
-  flex: 1 1 0;
-  min-height: var(--touch-min);
-  border: none;
-  background: var(--color-surface);
-  color: var(--color-text);
-  font: inherit;
-  cursor: pointer;
-}
-
-.home-tab + .home-tab {
-  border-left: 1px solid var(--color-border);
-}
-
-/* 選んでいる切り替え：墨の塗りに白い文字。選んでいない方は白い地に墨の文字（段階16） */
-.home-tab.on {
-  background: var(--color-primary);
-  color: var(--color-primary-text);
-  font-weight: bold;
-}
-
 .study-item-note {
   max-width: 100%;
   overflow: hidden;
@@ -1122,49 +677,7 @@
   white-space: nowrap;
 }
 
-/* 復習画面の「全部／研究手順だけ」（トップ画面の切り替えと同じ見た目） */
-.review-modes {
-  display: flex;
-  margin: 0 0 var(--space-1);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-button);
-  overflow: hidden;
-}
-
-/* 研究手順を出し終わったときのメモ（長ければカードの中でスクロール） */
-.review-study-note {
-  max-height: 8em;
-  overflow-y: auto;
-  padding: var(--space-2);
-  border-left: 3px solid var(--color-mark);
-  background: var(--color-bg);
-}
-
 /* ---- 段階8-1：ツリーから独立した研究手順 ---- */
-/* トップ画面の研究手順のタブの上の「＋ 研究手順を登録」「書き出し」 */
-.study-tools {
-  margin-bottom: var(--space-2);
-}
-
-/* グループの見出しの右の ⋯（研究手順のグループ：このグループを復習・書き出す） */
-.tree-group-row {
-  display: flex;
-  align-items: center;
-}
-
-.tree-group-row .tree-group-head {
-  flex: 1 1 auto;
-  min-width: 0;
-}
-
-.tree-group-menu {
-  flex: 0 0 auto;
-  min-width: var(--touch-min);
-  border: none;
-  background: transparent;
-  box-shadow: none;
-  color: var(--color-mark-text);
-}
 
 /* 研究手順の画面：名前と、戦型・手数 */
 .study-head {
@@ -1297,15 +810,6 @@
   flex: 0 0 auto;
   width: 22px;
   height: 22px;
-}
-
-/* 研究手順を保存した・保存できなかったときの一言（保存したら「開く」） */
-.study-note-line {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-1);
-  margin: var(--space-1) 0;
 }
 
 /* ---- 段階8-2：変化付き KIF からまとめて取り込む ---- */
@@ -1467,53 +971,12 @@
 
 /* ---- 段階11-4：復習を小分けにする ---- */
 
-.review-result-score {
-  margin: var(--space-2) 0;
-  font-size: var(--font-size-heading);
-}
-
-.review-result-score strong {
-  margin-right: var(--space-1);
-}
-
-.review-result-head {
-  margin: var(--space-3) 0 var(--space-2);
-  font-size: var(--font-size-body);
-}
-
-.review-mistakes {
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-
-.review-mistakes li + li {
-  border-top: 1px solid var(--color-border);
-}
-
-/* まちがえた問題の 1 行：小さな盤＋正しい手・指した手（押すと大きな盤） */
-.review-mistake {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  width: 100%;
-  min-height: var(--touch-min);
-  padding: var(--space-2) 0;
-  border: none;
-  background: transparent;
-  color: var(--color-text);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
 .mini-board {
   flex: 0 0 auto;
   width: 120px;
 }
 
-.mini-board .board-wrap,
-.review-mistake-board .board-wrap {
+.mini-board .board-wrap {
   width: 100%;
   margin: 0;
 }
@@ -1550,16 +1013,6 @@
 
 .mini-board .hand-count {
   font-size: 10px;
-}
-
-.review-mistake-text {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.review-result-actions {
-  margin-top: var(--space-3);
 }
 
 /* 画面の下のタブ（段階11-1）：定跡帳／ツリー／復習／設定。一覧の画面にだけ出す。
@@ -1628,33 +1081,6 @@
 
 .tabbar-tab.on .tabbar-icon {
   stroke-width: 2.2;
-}
-
-/* 復習のタブ（段階11-1） */
-.reviews-heading {
-  margin-top: var(--space-4);
-}
-
-.review-entry {
-  flex-direction: row;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.review-entry-text {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  flex: 1;
-  min-width: 0;
-  text-align: left;
-}
-
-.review-entry-start {
-  flex: none;
-  color: var(--color-mark-text);
-  font-weight: 700;
-  white-space: nowrap;
 }
 
 /* 定跡帳・ツリーのタブの見出し：本数は見出しのすぐ横（広い画面で真ん中に離れないように） */
@@ -1792,8 +1218,7 @@
 }
 
 /* ---- 段階11-2：盤の下の固定バー（MoveBar）「|‹ ‹ [17手目 ▲3六飛 ▾] › ›|」 ----
-   前の ‹ › の行と手順の行（パンくず）の代わり。定跡帳・ツリー・復習では画面の下に固定（高さ 56px＋端末の下の余白）、
-   新しいツリーでは作るボタンのバーの中（スマホ縦）か右の列の上（広い画面） */
+   定跡帳・稽古・実戦で同じ形。盤のすぐ下に置く（段階14） */
 .move-bar-inner {
   display: flex;
   align-items: center;
@@ -1855,46 +1280,6 @@ button.move-bar-center.move-bar-action {
   cursor: pointer;
 }
 
-.move-bar-main {
-  font-weight: bold;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.move-bar-sub {
-  font-size: var(--font-size-small);
-  color: var(--color-text-muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* 画面の下に固定するバー（下のタブと同じ作り） */
-.move-bar-fixed {
-  position: fixed;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 30;
-  padding: 0 calc(var(--space-2) + env(safe-area-inset-right)) env(safe-area-inset-bottom) calc(var(--space-2) + env(safe-area-inset-left));
-  border-top: 1px solid var(--color-primary-line);
-  background: var(--color-primary);
-}
-
-.move-bar-fixed .move-bar-inner {
-  max-width: 600px;
-  margin: 0 auto;
-}
-
-/* 固定したバーの分だけ、画面の最後を空ける */
-.move-bar-space {
-  height: calc(var(--movebar-h) + env(safe-area-inset-bottom));
-}
-
-/* 定跡帳の「取り消す」の知らせは、固定したバーの上に */
-.move-bar-space ~ .toast {
-  bottom: calc(var(--movebar-h) + var(--space-2) + env(safe-area-inset-bottom, 0px));
-}
-
 /* 新しいツリー（スマホ縦）：作るボタンのバーのいちばん上 */
 .start-bar .move-bar-inner {
   height: auto;
@@ -1902,21 +1287,6 @@ button.move-bar-center.move-bar-action {
 }
 
 /* ---- 段階12-3：定跡帳（一覧と盤の画面） ---- */
-
-/* グループの見出し：明朝体の名前と本数（段階13：芽の紋はやめた。見出しの下の線はグループのカードの中の区切り） */
-.tree-group-head {
-  border-radius: 0;
-}
-
-.tree-group-label {
-  font-family: var(--font-serif);
-  font-weight: 600;
-  letter-spacing: 0.03em;
-}
-
-.tree-group-head .tree-group-count {
-  color: var(--color-mark-text);
-}
 
 /* 一覧の 1 行は 1 枚のカード（行と ⋯ を別々の箱にしない）。段階16：⋯ の前の縦線はやめた。
    グループの中（段階13）は、グループで 1 枚のカードにして行を細い線で区切る（下の .tree-group） */
@@ -2024,12 +1394,6 @@ button.move-bar-center.move-bar-action {
   gap: var(--space-2);
 }
 
-.book-summary-text {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-}
-
 .book-summary-label {
   font-size: 12px;
   color: var(--color-text-muted);
@@ -2092,36 +1456,6 @@ button.move-bar-center.move-bar-action {
   border-bottom: 1px solid var(--color-border);
 }
 
-/* 復習のタブ・ツリーの一覧の見出し：下に細い線 */
-.reviews-heading {
-  padding-bottom: var(--space-1);
-  border-bottom: 1px solid var(--color-border);
-}
-
-/* 復習の結果は生成りのカードに（藍の地にじかに並べない） */
-.review-result {
-  padding: var(--space-3) var(--space-4);
-  margin-bottom: var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-card);
-  background: var(--color-surface);
-  color: var(--color-text);
-  box-shadow: var(--shadow-card);
-}
-
-.review-result-score strong {
-  font-family: var(--font-serif);
-  font-size: 22px;
-  font-weight: 600;
-  color: var(--color-mark-text);
-}
-
-/* 復習の問題のカード：相手の手は明朝体 */
-.review-opponent strong {
-  font-family: var(--font-serif);
-  font-weight: 600;
-}
-
 /* ---- 段階13：C 案を洗練（藍の帯と生成りの地。飾りを減らす） ---- */
 
 /* 一覧の画面の見出し（段階16）：帯なし。大きい明朝の名前、右に文字のリンク */
@@ -2161,10 +1495,6 @@ button.move-bar-center.move-bar-action {
   margin-bottom: var(--space-4);
 }
 
-.tree-group-row {
-  padding: 0 0 0 var(--space-1);
-}
-
 .tree-group .tree-list {
   gap: 0;
   border: 1px solid var(--color-border);
@@ -2184,10 +1514,6 @@ button.move-bar-center.move-bar-action {
 
 .tree-group .tree-row:first-child {
   border-top: 0;
-}
-
-.tree-group-menu {
-  color: var(--color-text-muted);
 }
 
 /* 名前は手と手の間（空白）で折り返す（「△５二／玉」のように手の途中で切らない。src/components/Words.tsx）。
@@ -2223,8 +1549,7 @@ button.move-bar-center.move-bar-action {
 }
 
 /* 盤の画面の盤の下（一覧・問題のカード）：段階16 から画面全体が同じ地なので、塗り分けない */
-.app:not(.has-tabs) .tree-side,
-.input-controls {
+.app:not(.has-tabs) .tree-side {
   color: var(--color-text);
 }
 
@@ -2330,17 +1655,10 @@ button.move-bar-center.move-bar-action {
 }
 
 /* 横に並ぶボタンは同じ幅（取り消す｜まとめて復習、もう一度｜正解を見る、もう n 問｜終わる） */
-.node-actions .btn,
-.review-prompt .btn-row > .btn,
-.review-result-actions > .btn {
+.review-prompt .btn-row > .btn {
   flex: 1 1 0;
   min-width: 0;
   padding: 0 var(--space-3);
-}
-
-/* いちばん下までスクロールしたとき、最後のカードと操作バーの間を少しあける（盤の大きさには関係しない） */
-.move-bar-space {
-  height: calc(var(--movebar-h) + var(--space-3) + env(safe-area-inset-bottom));
 }
 
 /* 小さな盤（復習の結果）は縁と影を小さく。駒の字は v0.38.2 の大きさのまま（段階15 の 23px だと小さな盤ではつぶれるため。持ち主の了承 2026-11-22） */
@@ -2373,8 +1691,7 @@ button.move-bar-center.move-bar-action {
   padding-bottom: 0;
 }
 
-.board-screen > .tree-layout,
-.board-screen > .input-layout {
+.board-screen > .tree-layout {
   flex: 1;
   min-height: 0;
 }
@@ -2409,13 +1726,6 @@ button.move-bar-center.move-bar-action {
   margin-top: 0;
 }
 
-@media not ((min-width: 768px) and (orientation: landscape)) {
-  .board-screen > .input-layout {
-    display: flex;
-    flex-direction: column;
-  }
-}
-
 @media (min-width: 768px) and (orientation: landscape) {
   .board-screen > .tree-layout {
     align-items: stretch;
@@ -2429,21 +1739,10 @@ button.move-bar-center.move-bar-action {
   .board-screen .board-frame {
     height: 100%;
   }
-
-  .board-screen > .input-layout {
-    grid-template-rows: auto minmax(0, 1fr) auto;
-    align-items: stretch;
-  }
 }
 
 .board-screen .start-bar {
   margin-bottom: 0;
-}
-
-@media (min-width: 768px) and (orientation: landscape) {
-  .input-board-col {
-    grid-area: board;
-  }
 }
 
 /* 初めての 1 回だけの説明を、画面の下の知らせで出すとき（2 行まで折り返す） */
@@ -2459,21 +1758,6 @@ button.move-bar-center.move-bar-action {
 
 /* ---- 段階16：明るい対局室 ---- */
 
-/* 研究手順の行の輪の下に小さく「覚えた」 */
-.study-ring {
-  display: inline-flex;
-  flex: none;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-}
-
-.study-ring-label {
-  color: var(--color-text-muted);
-  font-size: 11px;
-  line-height: 1;
-}
-
 /* 盤の画面の見出し：小さい文字で画面の種類（定跡帳・ツリー）、その下に大きい明朝で名前 */
 .app:not(.has-tabs) .screen-header .book-kicker {
   display: block;
@@ -2483,12 +1767,6 @@ button.move-bar-center.move-bar-action {
   font-weight: normal;
   line-height: 1.3;
   letter-spacing: 0.04em;
-}
-
-/* 選んでいない切り替えは白い地に墨の文字（研究手順だけ・全部など） */
-.review-modes {
-  border-color: var(--color-border);
-  background: var(--color-surface);
 }
 
 /* ---- 段階17：データを守る（設定の「データ管理」の欄と、定跡帳の一覧の上のすすめ） ---- */
@@ -3037,14 +2315,6 @@ button.move-bar-center.move-bar-action {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.book-memo-empty {
-  flex: 0 0 auto;
-  border-style: dashed;
-  border-color: var(--color-border);
-  background: transparent;
-  color: var(--color-text-muted);
 }
 
 /* 食い違いの印（朱の縁） */

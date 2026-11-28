@@ -6,7 +6,7 @@ import type { Study } from '../src/tree/types';
 test.use({ viewport: { width: 360, height: 740 }, hasTouch: true });
 
 async function openHome(page: Page) {
-  await page.goto('./#/trees');
+  await page.goto('./');
   await expect(page.getByTestId('isolation')).toHaveAttribute('data-state', 'isolated', { timeout: 30_000 });
 }
 

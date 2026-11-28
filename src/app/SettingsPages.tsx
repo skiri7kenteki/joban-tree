@@ -1,18 +1,16 @@
 // 設定の下の画面の中身（設定の整理。目次と「‹ 設定」は SettingsScreen.tsx）。
-// 値を変える画面は、変えたらすぐ保存する（端末の中だけ）。エンジンの設定は、次に生成するときから使われる。
+// 値を変える画面は、変えたらすぐ保存する（端末の中だけ）。エンジンの設定は、次にエンジンに聞くときから使われる。
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { EVALS, isOfflineReady, prepareOffline, type EvalId } from '../engine/config';
 import { MAX_SEARCH_THREADS } from '../engine/config';
 import type { PcInfo } from '../engine/pcEngine';
-import type { PresetId } from '../tree/presets';
-import { availablePresets, defaultPcThreads, defaultThreads, pcEngine } from './engineService';
-import { isGenerating } from './generation';
+import { defaultPcThreads, defaultThreads, pcEngine } from './engineService';
 import { DataSection } from './DataSection';
 import { DriveSection } from './DriveSection';
 import { setWarsName, warsName } from './games';
-import { go, type SettingsPage } from './router';
-import { HASH_CHOICES, PC_HASH_CHOICES, REVIEW_BATCH_CHOICES, presetLabel, settings, updateSettings, type AppSettings, type PresetValues } from './settings';
+import type { SettingsPage } from './router';
+import { HASH_CHOICES, PC_HASH_CHOICES, settings, updateSettings, type AppSettings } from './settings';
 
 export const PAGES: Record<SettingsPage, { title: string; Body: () => preact.JSX.Element }> = {
   practice: { title: '稽古', Body: PracticePage },
@@ -20,7 +18,6 @@ export const PAGES: Record<SettingsPage, { title: string; Body: () => preact.JSX
   data: { title: 'データ管理', Body: DataSection },
   sync: { title: 'Google ドライブで同期', Body: SyncPage },
   engine: { title: 'エンジン', Body: EnginePage },
-  trees: { title: 'ツリー（以前の機能）', Body: TreesPage },
 };
 
 /** 今の設定と、その一部を変えて保存する関数 */
@@ -32,9 +29,6 @@ function useSettings() {
 
 /** 値を変える画面の上の一言 */
 const SavedNote = () => <p class="muted">変えるとすぐ保存されます（この端末の中だけ）。</p>;
-
-/** ツリーの生成中は、エンジンとツリーの画面に知らせる */
-const GeneratingNote = () => (isGenerating() ? <p class="notice">生成中です。エンジンの設定は、次の生成から使われます。</p> : null);
 
 function PracticePage() {
   const { s, set } = useSettings();
@@ -109,7 +103,6 @@ function EnginePage() {
   return (
     <>
       <SavedNote />
-      <GeneratingNote />
       <section class="card settings-section">
         <div class="form-field">
           <span>評価関数</span>
@@ -188,126 +181,6 @@ function EnginePage() {
           testId="good-max"
           onChange={(v) => set({ thresholds: { ...s.thresholds, goodMax: v } })}
         />
-      </section>
-
-      {/* 一覧画面から移した（段階4-2） */}
-      <section class="card settings-section">
-        <h2>エンジンの速度測定</h2>
-        <p class="muted">1 秒あたり何局面調べられるかを測ります。</p>
-        <a class="btn" href={`${import.meta.env.BASE_URL}bench.html`} data-testid="open-bench">
-          速度測定のページを開く
-        </a>
-      </section>
-    </>
-  );
-}
-
-/** ツリー（以前の機能）：一覧の入口と、ツリーだけで使う設定（段階18 でタブをなくした。データは消していない） */
-function TreesPage() {
-  const { s, set } = useSettings();
-  const setPreset = (id: PresetId, patch: Partial<PresetValues>) =>
-    updateSettings({ ...s, presets: { ...s.presets, [id]: { ...s.presets[id], ...patch } } });
-  return (
-    <>
-      <SavedNote />
-      <GeneratingNote />
-      <section class="card settings-section">
-        <p class="muted">エンジンで応手を調べたツリーの一覧です。</p>
-        <button type="button" class="btn" data-testid="open-trees" onClick={() => go('/trees')}>
-          ツリーの一覧を開く
-        </button>
-      </section>
-
-      <section class="card settings-section">
-        <h2>応手の選び方</h2>
-        <NumberField
-          label="採用する応手：最善手から何点以内（W）"
-          value={s.windowCp}
-          unit="点"
-          testId="window"
-          onChange={(v) => set({ windowCp: v })}
-        />
-        <NumberField label="1 回で増やす局面の数の上限" value={s.maxNodes} unit="局面" testId="max-nodes" onChange={(v) => set({ maxNodes: v })} />
-        <NumberField
-          label="「この手を検証」で調べる時間"
-          value={s.verifyMs / 1000}
-          unit="秒"
-          step={0.5}
-          testId="verify-sec"
-          onChange={(v) => set({ verifyMs: v * 1000 })}
-        />
-      </section>
-
-      <section class="card settings-section">
-        <h2>プリセットの中身</h2>
-        {availablePresets().map((id) => {
-          const p = s.presets[id];
-          return (
-            <fieldset key={id} class="preset-field" data-testid={`preset-${id}`}>
-              <legend>{presetLabel(id)}</legend>
-              <NumberField
-                label="全体の時間"
-                value={p.totalMs / 1000}
-                unit="秒"
-                testId={`${id}-total`}
-                onChange={(v) => setPreset(id, { totalMs: v * 1000 })}
-              />
-              <NumberField
-                label="相手の局面を調べる時間"
-                value={p.movetimeMs}
-                unit="ミリ秒"
-                step={100}
-                testId={`${id}-movetime`}
-                onChange={(v) => setPreset(id, { movetimeMs: v })}
-              />
-              <NumberField
-                label="自分の対応を調べる時間（0 なら調べず「未検証」のまま）"
-                value={p.replyMs}
-                unit="ミリ秒"
-                step={100}
-                testId={`${id}-reply`}
-                onChange={(v) => setPreset(id, { replyMs: v })}
-              />
-              <NumberField
-                label="候補手の数（N）"
-                value={p.multiPV}
-                unit="手"
-                testId={`${id}-multipv`}
-                onChange={(v) => setPreset(id, { multiPV: v })}
-              />
-              <NumberField
-                label="深さ（往復の数）"
-                value={p.maxRounds}
-                unit="往復"
-                testId={`${id}-rounds`}
-                onChange={(v) => setPreset(id, { maxRounds: v })}
-              />
-            </fieldset>
-          );
-        })}
-      </section>
-
-      {/* 段階11-4：復習は決まった数で 1 回が終わる（ツリーの復習だけで使う） */}
-      <section class="card settings-section">
-        <h2>復習</h2>
-        <div class="form-field">
-          <span>1 回の問題の数</span>
-          <div class="btn-row" role="radiogroup" aria-label="1 回の問題の数">
-            {REVIEW_BATCH_CHOICES.map((n) => (
-              <button
-                type="button"
-                key={n}
-                role="radio"
-                aria-checked={s.reviewBatch === n}
-                data-testid={`review-batch-${n}`}
-                class={s.reviewBatch === n ? 'btn btn-toggle on' : 'btn btn-toggle'}
-                onClick={() => set({ reviewBatch: n })}
-              >
-                {n} 問
-              </button>
-            ))}
-          </div>
-        </div>
       </section>
     </>
   );
@@ -415,13 +288,13 @@ function OfflineStatus({ evalId }: { evalId: EvalId }) {
 
   return (
     <div class="form-field" data-testid="offline-status" data-state={state}>
-      <span>オフライン（電波がなくても生成できるか）</span>
+      <span>オフライン（電波がなくてもエンジンに聞けるか）</span>
       {state === 'checking' && <span class="muted">確認中…</span>}
       {state === 'ready' && <span class="status-ok">準備できています（{EVALS[evalId].label}）</span>}
       {(state === 'missing' || state === 'error') && (
         <>
           <span class="muted">
-            {EVALS[evalId].label} はまだ端末に保存されていません（一度生成すると保存されます）。
+            {EVALS[evalId].label} はまだ端末に保存されていません（一度エンジンに聞くと保存されます）。
             {state === 'error' && `失敗しました：${detail}`}
           </span>
           <button type="button" class="btn" data-testid="offline-prepare" onClick={() => void prepare()}>

@@ -134,7 +134,6 @@ function GameView({ game }: { game: Game }) {
             <Board sfen={positions[index] ?? STARTPOS_SFEN} lastMove={index > 0 ? game.moves[index - 1] : undefined} />
           </div>
           <MoveBar
-            fixed={false}
             ids={{ bar: 'game-nav', first: 'game-first', prev: 'game-prev', center: 'game-position', next: 'game-next', last: 'game-last' }}
             firstLabel="初期局面へ"
             onFirst={() => setPly(0)}

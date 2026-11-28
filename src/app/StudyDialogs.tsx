@@ -1,6 +1,5 @@
 // 研究手順の小窓。
 // - StudyEditDialog：保存する（study が無い）・直す（study がある）。名前・メモ・自分の側
-// - StudyViewDialog：ツリーの閲覧画面で、研究手順の終わりの局面の「★ 名前」を押したとき（メモ・定跡帳で開く・直す・消す）
 // - StudyExportDialog：研究手順を選んで書き出す（JSON・KIF。段階8-1）
 // - shareStudies：研究手順を JSON・KIF のファイルで共有する（共有メニューは「押した直後」でないと出ないので、中身は待たずに作る）
 
@@ -106,58 +105,6 @@ export function StudyEditDialog({
   );
 }
 
-/** ツリーの研究手順の終わりの局面で「★ 名前」を押したとき：メモを見る・研究手順の画面で開く・直す・消す（確認あり） */
-export function StudyViewDialog({
-  study,
-  onOpen,
-  onEdit,
-  onDelete,
-  onClose,
-}: {
-  study: Study;
-  onOpen: () => void;
-  onEdit: () => void;
-  onDelete: () => void;
-  onClose: () => void;
-}) {
-  const [confirm, setConfirm] = useState(false);
-  return (
-    <Dialog title={`★ ${study.name}`} onClose={onClose} testId="study-view">
-      {study.note ? (
-        <p class="study-note" data-testid="study-view-note">
-          {study.note}
-        </p>
-      ) : (
-        <p class="muted">メモはありません。</p>
-      )}
-      <p class="muted num">{formatDate(study.updatedAt)} に保存</p>
-      {!confirm ? (
-        <div class="dialog-actions">
-          <button type="button" class="btn btn-primary" data-testid="study-view-open" onClick={onOpen}>
-            定跡帳で開く
-          </button>
-          <button type="button" class="btn" data-testid="study-edit" onClick={onEdit}>
-            直す
-          </button>
-          <button type="button" class="btn btn-danger" data-testid="study-delete" onClick={() => setConfirm(true)}>
-            消す…
-          </button>
-        </div>
-      ) : (
-        <div class="dialog-actions">
-          <span>この研究手順を消しますか？元に戻せません（ツリーの手や局面は消えません）。</span>
-          <button type="button" class="btn btn-danger" data-testid="study-delete-ok" onClick={onDelete}>
-            消す
-          </button>
-          <button type="button" class="btn" onClick={() => setConfirm(false)}>
-            やめる
-          </button>
-        </div>
-      )}
-    </Dialog>
-  );
-}
-
 /** 研究手順を JSON・KIF のファイルで共有する（中身は待たずに作る） */
 export function shareStudies(list: readonly Study[], kind: 'json' | 'kif'): Promise<ShareOutcome> {
   const base = list.length === 1 ? list[0].name : `研究手順-${dateStamp()}`;
@@ -236,10 +183,4 @@ export function StudyExportDialog({
       )}
     </Dialog>
   );
-}
-
-function formatDate(ms: number): string {
-  const d = new Date(ms);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }

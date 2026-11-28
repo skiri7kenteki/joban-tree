@@ -1,7 +1,5 @@
-// 段階8-1：ツリーから独立した研究手順（盤で指して登録・棋譜を貼って登録・研究手順の画面・この局面からツリーを作る・ツリーの★・
-// ツリーで見る・ツリーを使わない復習・書き出しと取り込み・端末の保存場所の移し替え・ツリーの JSON の取り込み）
+// 段階8-1：研究手順（棋譜を貼って登録・稽古・書き出しと取り込み・端末の保存場所の移し替え）。8-2：変化付き KIF からまとめて取り込む
 import { expect, test, type Page } from '@playwright/test';
-import { inTreeMenu, treeMenu } from './treeMenu';
 import { readFileSync } from 'node:fs';
 import { Position, Record as KifRecord, exportKIF } from 'tsshogi';
 import { STARTPOS_SFEN, applyUsiMove, sfenKey } from '../src/shogi/position';
@@ -20,15 +18,8 @@ async function closeDialog(page: Page) {
 test.use({ viewport: { width: 360, height: 740 }, hasTouch: true });
 
 async function openHome(page: Page) {
-  await page.goto('./#/trees');
+  await page.goto('./');
   await expect(page.getByTestId('isolation')).toHaveAttribute('data-state', 'isolated', { timeout: 30_000 });
-}
-
-async function importTrees(page: Page, trees: TreeData[]) {
-  for (const t of trees) {
-    await page.getByTestId('import-file').setInputFiles({ name: `${t.id}.json`, mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(t)) });
-    await expect(page.getByTestId('home-message')).toContainText(`「${t.name}」を取り込みました`);
-  }
 }
 
 /** 研究手順の JSON を取り込む（トップ画面の研究手順のタブから） */
@@ -207,64 +198,7 @@ test.describe('8-1 登録（エンジンを使わない）', () => {
   });
 });
 
-test.describe('8-1 ツリーとのつながり・復習', () => {
-  test('ツリーを開くと★が付く（独立して登録した研究手順でも）。終わりの局面で名前。ツリーから定跡帳に足す', async ({ page }) => {
-    await openHome(page);
-    await importTrees(page, [lineTree('line', '研究用ツリー')]);
-    await importStudies(page, [study('s-a', '研究A', ['7g7f', '3c3d', '2g2f'], { note: 'Aのメモ' }), study('s-b', '研究B', ['2g2f', '3c3d'])]);
-    await expect(page.getByTestId('home-message')).toContainText('研究手順 2 本を取り込みました');
-
-    await page.goto('./#/trees');
-    await page.getByTestId('tree-item').click();
-    const cand = page.getByTestId('candidate');
-    await expect(cand.filter({ hasText: '▲７六歩' }).getByTestId('study-star')).toHaveCount(1);
-    await expect(cand.filter({ hasText: '▲２六歩' }).getByTestId('study-star')).toHaveCount(1);
-    await cand.filter({ hasText: '▲７六歩' }).click();
-    await cand.filter({ hasText: '△３四歩' }).click();
-    await expect(cand.filter({ hasText: '▲２六歩' }).getByTestId('study-star')).toHaveCount(1);
-    await expect(cand.filter({ hasText: '▲６六歩' }).getByTestId('study-star')).toHaveCount(0);
-    await cand.filter({ hasText: '▲２六歩' }).click();
-    await expect(page.getByTestId('study-here')).toHaveText('★ 研究A');
-    await inTreeMenu(page, async (menu) => {
-      await expect(menu.getByTestId('study-open')).toHaveText('定跡帳で開く');
-    });
-    // 手順前後で同じ局面（▲2六歩 △8四歩）でも、研究B（▲2六歩 △3四歩）とは違う手順なので★は付かない
-    await page.getByTestId('nav-first').click();
-    await cand.filter({ hasText: '▲２六歩' }).click();
-    await expect(cand.filter({ hasText: '△８四歩' }).getByTestId('study-star')).toHaveCount(0);
-
-    // ツリーから定跡帳に足す（段階10-2。平手からの手順にして、自分の側だけ確かめる。名前は自動）
-    await page.getByTestId('nav-first').click();
-    await cand.filter({ hasText: '▲７六歩' }).click();
-    await cand.filter({ hasText: '△３四歩' }).click();
-    await cand.filter({ hasText: '▲６六歩' }).click();
-    await inTreeMenu(page, async (menu) => {
-      await expect(menu.getByTestId('study-open')).toHaveText('定跡帳に足す');
-    });
-    await treeMenu(page, 'study-open');
-    await expect(page.getByTestId('add-book-moves')).toHaveText('▲７六歩 △３四歩 ▲６六歩');
-    await expect(page.getByTestId('add-book-side-white')).toHaveAttribute('aria-checked', 'true');
-    await page.getByTestId('add-book-ok').click();
-    await expect(page.getByTestId('study-here')).toHaveText('★ ▲７六歩 △３四歩 ▲６六歩');
-    await expect(page.getByTestId('tree-note')).toContainText('定跡帳に足しました');
-    await inTreeMenu(page, async (menu) => {
-      await expect(menu.getByTestId('study-open')).toHaveText('定跡帳で開く');
-    });
-
-    // ★ の窓の「定跡帳で開く」（定跡帳の ⋯ の「ツリーで見る」は段階20-3 で外した）
-    await page.getByTestId('nav-back').click();
-    await cand.filter({ hasText: '▲２六歩' }).click();
-    await page.getByTestId('study-here').click();
-    await expect(page.getByTestId('study-view-note')).toHaveText('Aのメモ');
-    await page.getByTestId('study-view-open').click();
-    await expect(page).toHaveURL(/#\/book\/[^/]+\/s-a\/3$/);
-
-    // 古い研究手順の画面の URL は、その研究手順の定跡帳へ移る
-    await page.goto('./#/study/s-b');
-    await expect(page).toHaveURL(/#\/book\/[^/]+\/s-b\/2$/);
-    await expect(page.getByTestId('study-title')).toHaveText('研究B');
-  });
-
+test.describe('8-1 稽古', () => {
   test('研究手順の稽古（段階19 で復習から置きかえ）が、ツリーなしの研究手順で動く（1 本・グループ・定跡帳から）', async ({ page }) => {
     await openHome(page);
     await importStudies(page, [
@@ -290,16 +224,16 @@ test.describe('8-1 ツリーとのつながり・復習', () => {
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 
     // グループ（その他）の研究手順を稽古
-    await page.goto('./#/trees');
-    await page.getByTestId('tab-studies').click();
+    await page.goto('./#/');
     await page.getByTestId('book-group-open').click();
     await page.getByTestId('book-menu').click();
     await page.getByTestId('book-review').click();
     await expect(page).toHaveURL(/#\/practice\/group\//);
     await expect(page.getByTestId('practice-title')).toContainText('稽古 1／2本');
 
-    // 定跡帳の ⋯ から（古い研究手順の画面の URL は定跡帳へ移る）
-    await page.goto('./#/study/s-2');
+    // 定跡帳の ⋯ から
+    await page.goto('./#/');
+    await (await openStudyList(page)).getByTestId('study-item').filter({ hasText: '研究2' }).click();
     await expect(page.getByTestId('book-title')).toBeVisible();
     await page.getByTestId('book-menu').click();
     await page.getByTestId('book-study-review').click();
@@ -307,20 +241,6 @@ test.describe('8-1 ツリーとのつながり・復習', () => {
     await expect(page.getByTestId('practice-card')).toContainText('相手は ▲２六歩');
     await play(page, '83', '84');
     await expect(page.getByTestId('practice-end')).toContainText('全部正解');
-
-    // ツリーの復習画面の「研究手順だけ」：ツリーの開始局面を通る研究手順
-    await page.goto('./#/trees');
-    await importTrees(page, [lineTree('rv', '復習するツリー')]);
-    await page.goto('./#/trees');
-    await page.getByTestId('tree-item').click();
-    await page.getByTestId('review-open').click();
-    await expect(page.getByTestId('review-mode-all')).toHaveAttribute('aria-selected', 'true');
-    await page.getByTestId('review-mode-studies').click();
-    await expect(page).toHaveURL(/#\/review\/rv\/study$/);
-    await expect(page.getByTestId('review-summary')).toContainText('研究手順 2 本・問題 3');
-    await page.getByTestId('review-mode-all').click();
-    await expect(page).toHaveURL(/#\/review\/rv$/);
-    await expect(page.getByTestId('review-summary')).not.toContainText('研究手順');
   });
 });
 
@@ -444,33 +364,32 @@ test.describe('8-1 移し替え（段階7の研究手順 → 独立した研究�
     await page.getByTestId('book-head').click();
     await expect(page.getByTestId('study-note')).toHaveValue('新しいメモ\n――\n古いメモ');
     await page.locator('dialog[open]').last().getByRole('button', { name: '閉じる' }).click();
-    // 段階19：研究手順の 1 局面ずつの復習は稽古に置きかえたので、写した記録はツリーの復習の「研究手順だけ」で確かめる
-    await page.goto('./#/trees');
-    await page.getByTestId('tree-item').filter({ hasText: 'ツリーB' }).click();
-    await page.getByTestId('review-open').click();
-    await page.getByTestId('review-mode-studies').click();
-    await expect(page.getByTestId('review-summary')).toContainText('覚えた 1');
-
-    // ツリーには研究手順が無くなっても★は付く（手順が同じなので）
-    await page.goto('./#/trees');
-    await page.goto('./#/trees');
-    await page.getByTestId('tree-item').filter({ hasText: 'ツリーB' }).click();
-    await expect(page.getByTestId('candidate').filter({ hasText: '▲７六歩' }).getByTestId('study-star')).toHaveCount(1);
-  });
-
-  test('研究手順の入ったツリーの JSON（形式 6）を取り込むと、研究手順も取り込む（同じ手順がすでにあれば二重にしない）', async ({ page }) => {
-    await openHome(page);
-    await importStudies(page, [study('mine', '自分の研究', ['7g7f', '3c3d', '2g2f'], { updatedAt: 5 })]);
-    await page.goto('./#/trees');
-    const tree = lineTree('from-friend', '仲間のツリー', [
-      { id: 'f-1', name: '仲間の研究（同じ手順）', note: '', moves: ['7g7f', '3c3d', '2g2f'], createdAt: 1, updatedAt: 1 },
-      { id: 'f-2', name: '仲間の研究', note: '仲間のメモ', moves: ['7g7f', '3c3d', '6g6f'], createdAt: 1, updatedAt: 1 },
+    // 復習の記録は研究手順用の記録へ写っている（▲7六歩の後の △3四歩）。ツリーは消えず、研究手順を外して残る
+    const stored = await page.evaluate(
+      () =>
+        new Promise<{ trees: { id: string; studies?: unknown[] }[]; review: { treeId: string; nodes: Record<string, { lastOk: boolean }> }[] }>((resolve, reject) => {
+          const open = indexedDB.open('joban-tree');
+          open.onerror = () => reject(open.error);
+          open.onsuccess = () => {
+            const tx = open.result.transaction(['trees', 'review'], 'readonly');
+            const trees = tx.objectStore('trees').getAll();
+            const review = tx.objectStore('review').getAll();
+            tx.oncomplete = () => {
+              open.result.close();
+              resolve({ trees: trees.result, review: review.result });
+            };
+          };
+        }),
+    );
+    expect(stored.trees.map((t) => [t.id, t.studies?.length ?? 0])).toEqual([
+      ['tree-a', 0],
+      ['tree-b', 0],
+      ['tree-c', 1],
     ]);
-    await page.getByTestId('import-file').setInputFiles({ name: 't.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(tree)) });
-    await expect(page.getByTestId('home-message')).toContainText('「仲間のツリー」を取り込みました。研究手順 1 本も取り込みました（1 本はすでにありました）');
-    await page.getByTestId('tab-studies').click();
-    await expect((await openStudyList(page)).getByTestId('study-item')).toHaveText([/自分の研究/, /仲間の研究/]);
+    expect(stored.review.find((r) => r.treeId === 'studies')?.nodes[`${after76}>3c3d`]?.lastOk).toBe(true);
+    expect(stored.review.find((r) => r.treeId === 'tree-a')).toBeTruthy();
   });
+
 });
 
 // ---- 段階8-2：変化付き KIF からまとめて取り込む ----

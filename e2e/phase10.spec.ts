@@ -15,7 +15,7 @@ async function closeDialog(page: Page) {
 test.use({ viewport: { width: 360, height: 740 }, hasTouch: true });
 
 async function openHome(page: Page) {
-  await page.goto('./#/trees');
+  await page.goto('./');
   await expect(page.getByTestId('isolation')).toHaveAttribute('data-state', 'isolated', { timeout: 30_000 });
 }
 
@@ -249,54 +249,6 @@ test.describe('10-1 定跡帳で直接指して研究を足す', () => {
     await expect(page.getByTestId('book-head-empty')).toBeVisible();
     await undoFromMenu(page);
     await expect(page.getByTestId('study-title')).toHaveText('本線');
-  });
-});
-
-test.describe('10-2 使わなくなった画面と道筋の整理', () => {
-  test('古い URL：研究手順の画面・手数付き・編集は、その研究手順の定跡帳へ。登録の画面は「研究手順を登録」の窓。見つからない研究手順は知らせる', async ({ page }) => {
-    await openHome(page);
-    await importStudies(page, [A, C]);
-    await page.goto('./#/study/s-a');
-    await expect(page).toHaveURL(/#\/book\/[^/]+\/s-a\/19$/);
-    await expect(page.getByTestId('book-title')).toHaveText('定跡帳横歩取り（先手番）');
-    await expect(page.getByTestId('study-title')).toHaveText('研究A');
-    await page.goto('./#/study/s-a/18');
-    await expect(page).toHaveURL(/#\/book\/[^/]+\/s-a\/18$/);
-    await expect(page.getByTestId('study-position')).toContainText('18手目');
-    await page.goto('./#/study/s-c/edit');
-    await expect(page).toHaveURL(/#\/book\/[^/]+\/s-c\/18$/);
-    await expect(page.getByTestId('study-title')).toHaveText('研究C');
-    // 定跡帳ではそのまま指して足せる
-    await play(page, '36', '26'); // ▲2六飛
-    await expect(page.getByTestId('book-toast')).toContainText('▲２六飛 を足しました');
-    await expect(page.getByTestId('study-position')).toContainText('19手目');
-    await page.goto('./#/study/s-none');
-    await expect(page.getByTestId('study-missing')).toBeVisible();
-    await page.goto('./#/new/study');
-    await expect(page).toHaveURL(/#\/$/);
-    await expect(page.getByTestId('study-register-menu')).toBeVisible();
-    await expect(page.getByTestId('tab-studies')).toHaveAttribute('aria-current', 'page');
-  });
-
-  test('新しいツリーの画面の「この手順を定跡帳に足す」：初期局面では足せない。足すと「定跡帳で開く」', async ({ page }) => {
-    await openHome(page);
-    await page.getByTestId('new-tree').click();
-    await page.getByTestId('input-study-save').click();
-    await expect(page.getByTestId('study-note-line')).toContainText('1 手以上進めた局面');
-    await play(page, '77', '76');
-    await play(page, '33', '34');
-    await page.getByTestId('input-study-save').click();
-    await expect(page.getByTestId('add-book-moves')).toHaveText('▲７六歩 △３四歩');
-    await page.getByTestId('add-book-side-black').click();
-    await page.getByTestId('add-book-ok').click();
-    await expect(page.getByTestId('study-note-line')).toContainText('定跡帳に足しました：「▲７六歩 △３四歩」');
-    // もう一度押すと、足さずに「すでにあります」
-    await page.getByTestId('input-study-save').click();
-    await page.getByTestId('add-book-ok').click();
-    await expect(page.getByTestId('study-note-line')).toContainText('すでにあります');
-    await page.getByTestId('study-saved-open').click();
-    await expect(page.getByTestId('book-title')).toHaveText('定跡帳平手から（先手番）');
-    await expect(page.getByTestId('study-position')).toHaveText('2手目 △３四歩');
   });
 });
 

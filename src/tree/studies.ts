@@ -1,11 +1,9 @@
 // 研究手順：気になる手順に名前とメモを付けて保存する（しおり）。
 // 段階7-2 ではツリーの中に保存していたが、段階8-1（持ち主の判断 2026-11-18）から**ツリーとは独立したデータ**にした。
 //   - 手順は「平手の初期局面からの指し手（USI）の並び」。駒落ち・途中の局面から始まる手順は対象外
-//   - 登録にエンジンは使わない（盤で指す・棋譜を貼る・ツリーの中から）
-//   - ツリーとは「平手からの手順がまったく同じか」だけでつなぐ（★・終わりの局面の名前・「ツリーで見る」）。
-//     手順前後で同じ局面に合流した場合は対象外
+//   - 登録にエンジンは使わない（盤で指す・棋譜を貼る・KIF から取り込む）
 //   - 同じ手順の研究手順は 1 つだけ（保存を押すと、すでにあればそれを直す画面）
-// 形式 6 までのツリーの中の研究手順は、migrateTrees で独立した研究手順へ移す（端末の保存場所を新しい版にするとき・JSON を取り込むとき）。
+// 形式 6 までのツリーの中の研究手順は、migrateTrees で独立した研究手順へ移す（端末の保存場所を新しい版にするとき）。
 
 import { STARTPOS_SFEN, applyUsiMove, moveText, type Side } from '../shogi/position';
 import { closestTemplate, type OpeningTemplate } from './templates';
@@ -65,7 +63,7 @@ export function moveTexts(moves: readonly string[]): string[] {
  * 研究手順の戦型：記録した戦型が今もあればそれ、無ければ手順がいちばん長く一致する戦型（7-1 と同じ決まり）。
  * 段階10 の直し（持ち主の判断 2026-11-19）：自分の側（mySide）を渡すと、**自分の側が同じ戦型**を先に見る
  * （記録した戦型の側が違えば使わない。自分の側が同じ戦型が 1 つも当てはまらなければ、側を問わずいちばん長いもの）。
- * 研究手順だけの復習の出題は、この戦型の出発点の後から
+ * 稽古・実戦の照らし合わせもこの戦型を使う
  */
 export function studyTemplate(study: Pick<Study, 'moves' | 'templateId'> & { mySide?: Side }, templates: readonly OpeningTemplate[]): OpeningTemplate | null {
   const side = study.mySide;
@@ -81,11 +79,6 @@ export function studyTemplate(study: Pick<Study, 'moves' | 'templateId'> & { myS
     if (same) return same;
   }
   return closestTemplate(templates, study.moves);
-}
-
-/** 戦型の出発点が何手目か（手順がどの戦型にも当てはまらなければ 0＝初期局面） */
-export function studyStartIndex(study: Pick<Study, 'moves' | 'templateId'> & { mySide?: Side }, templates: readonly OpeningTemplate[]): number {
-  return studyTemplate(study, templates)?.moves.length ?? 0;
 }
 
 /** いちばん浅い（手数が短い）戦型 */
@@ -140,22 +133,11 @@ export function studyMovesText(study: Pick<Study, 'moves' | 'mySide'>, templates
 }
 
 // ---------------------------------------------------------------------------
-// ツリーとのつながり（平手からの手順がまったく同じときだけ）
+// 前の版のツリーの中の手順（移し替えで使う）
 
 /** ツリーの開始局面までの、平手からの手順（平手の初期局面から始まらないツリーは null） */
 export function treeBaseMoves(tree: Pick<TreeData, 'prefix'>): string[] | null {
   return tree.prefix.initialSfen === STARTPOS_SFEN ? tree.prefix.moves : null;
-}
-
-/** 開始局面からのキーの並び（閲覧画面の path）を、指し手の並びにする */
-export function movesOfPath(tree: TreeData, path: readonly string[]): string[] {
-  const moves: string[] = [];
-  for (let i = 1; i < path.length; i++) {
-    const edge = tree.nodes[path[i - 1]]?.edges.find((e) => e.to === path[i]);
-    if (!edge) break;
-    moves.push(edge.move);
-  }
-  return moves;
 }
 
 export interface StudyTrace {
@@ -177,34 +159,6 @@ export function traceStudy(tree: TreeData, moves: readonly string[]): StudyTrace
     keys.push(edge.to);
   }
   return { keys, reached: keys.length - 1, complete: keys.length - 1 === moves.length };
-}
-
-/**
- * 平手からの手順（の最初の ply 手）が、ツリーの中に最後まであれば、閲覧画面の path（開始局面からのキーの並び）。
- * ツリーの開始局面を通らない・途中でたどれなければ null（「ツリーで見る」の対象にしない）
- */
-export function pathInTree(tree: TreeData, moves: readonly string[]): string[] | null {
-  const base = treeBaseMoves(tree);
-  if (!base || !startsWith(moves, base)) return null;
-  const trace = traceStudy(tree, moves.slice(base.length));
-  return trace.complete ? trace.keys : null;
-}
-
-/**
- * 平手から今の局面までの手順が、研究手順の途中なら、その研究手順の次の手（★を付ける手）。
- * どこで作った研究手順か（ツリーの中・独立して登録）は関係ない。合流（別の手順から同じ局面に来た）では付けない
- */
-export function studyNextMoves(studies: readonly Pick<Study, 'moves'>[], movesHere: readonly string[]): Set<string> {
-  const out = new Set<string>();
-  for (const s of studies) {
-    if (s.moves.length > movesHere.length && startsWith(s.moves, movesHere)) out.add(s.moves[movesHere.length]);
-  }
-  return out;
-}
-
-/** 今の局面で終わる研究手順（同じ手順は 1 つだけなので、あれば 1 つ） */
-export function studyEndingAt<S extends Pick<Study, 'moves'>>(studies: readonly S[], movesHere: readonly string[]): S | null {
-  return findSameStudy(studies, movesHere);
 }
 
 // ---------------------------------------------------------------------------
@@ -266,7 +220,7 @@ export interface TreeMigration {
 
 /**
  * ツリーの中の研究手順を、独立した研究手順に移す見通しを作る（ツリーは複製して書き換えるので、元のデータは変えない）。
- * 端末の保存場所を版 4 にするときに 1 回だけ使う（src/storage/db.ts）。JSON を取り込むときも同じ
+ * 端末の保存場所を版 4 にするときに 1 回だけ使う（src/storage/db.ts）
  */
 export function migrateTrees(trees: readonly TreeData[]): TreeMigration {
   const lifted: Study[] = [];
@@ -284,16 +238,6 @@ export function migrateTrees(trees: readonly TreeData[]): TreeMigration {
     changed.push({ ...rest, version: Math.max(tree.version, 7) });
   }
   return { studies: mergeSameMoves(lifted), changed, leftover };
-}
-
-/**
- * 取り込んだ研究手順のうち、まだ無い手順のものだけ（同じ手順がすでにあれば足さない。ツリーの JSON の取り込み用）。
- * 取り込むものどうしで同じ手順なら、まとめてから比べる
- */
-export function missingStudies(existing: readonly Pick<Study, 'moves'>[], incoming: readonly Study[]): { added: Study[]; skipped: number } {
-  const merged = mergeSameMoves(incoming);
-  const added = merged.filter((s) => !findSameStudy(existing, s.moves));
-  return { added, skipped: incoming.length - added.length };
 }
 
 /** 自分の側の初期値（棋譜から登録するとき）：戦型が分かればその側、無ければ最後の手を指した側 */

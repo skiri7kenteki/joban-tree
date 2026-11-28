@@ -1,8 +1,6 @@
-// 段階8-1：ツリーから独立した研究手順（名前の初期値・同じ手順の判定・★の判定・戦型の振り分け・移し替え・ツリーの JSON の取り込み）
+// 段階8-1：ツリーから独立した研究手順（名前の初期値・同じ手順の判定・戦型の振り分け・前の版のツリーからの移し替え）
 import { describe, expect, it } from 'vitest';
 import { STARTPOS_SFEN, applyUsiMove } from '../../src/shogi/position';
-import { parseTreeJson, treeToJson } from '../../src/tree/backup';
-import { TreeGenerator, createTree } from '../../src/tree/generator';
 import { groupStudies } from '../../src/tree/organize';
 import {
   NOTE_JOIN,
@@ -14,19 +12,14 @@ import {
   liftTreeStudies,
   mergeSameMoves,
   migrateTrees,
-  missingStudies,
   moveTexts,
-  pathInTree,
   sameMoves,
-  studyEndingAt,
   studyMovesText,
-  studyNextMoves,
-  studyStartIndex,
   studyTemplate,
 } from '../../src/tree/studies';
 import type { OpeningTemplate } from '../../src/tree/templates';
-import { TREE_FORMAT_VERSION, type Study, type TreeData, type TreeStudy } from '../../src/tree/types';
-import { MockEngine, SETTINGS, newTree } from './mock-engine';
+import type { Study, TreeData, TreeStudy } from '../../src/tree/types';
+import { lineTree } from './tree-fixture';
 
 const YOKOFU = '7g7f 3c3d 2g2f 8c8d 2f2e 8d8e 6i7h 4a3b 2e2d 2c2d 2h2d 8e8f 8g8f 8b8f 2d3d'.split(' ');
 const tpl = (id: string, group: string, moves: string[], mySide: 'black' | 'white' = 'white', name = id): OpeningTemplate => ({
@@ -62,7 +55,7 @@ const study = (id: string, moves: string[], opts: Partial<Study> = {}): Study =>
 describe('名前の初期値（研究の分かれ目がわかるように）', () => {
   it('戦型の出発点より後が 4 手までなら全部', () => {
     const moves = [...KAKU.moves, ...AFTER_KAKU.slice(0, 4)];
-    expect(studyStartIndex({ moves }, TEMPLATES)).toBe(16);
+    expect(studyTemplate({ moves, mySide: 'white' }, [KAKU])?.moves.length).toBe(16);
     expect(defaultStudyName({ moves, mySide: 'white' }, TEMPLATES)).toBe('▲３六飛 △８四飛 ▲２六飛 △２二銀');
   });
 
@@ -152,60 +145,11 @@ describe('同じ手順の判定・名前とメモ', () => {
   });
 });
 
-describe('★の判定（平手からの手順がまったく同じときだけ）', () => {
-  const s1 = study('s1', ['7g7f', '3c3d', '2g2f', '8c8d']);
-  const s2 = study('s2', ['7g7f', '3c3d', '6g6f']);
-  const s3 = study('s3', ['2g2f', '3c3d', '7g7f']);
-
-  it('今の手順が研究手順の途中なら、その次の手。終わりの局面ならその研究手順', () => {
-    expect([...studyNextMoves([s1, s2, s3], [])].sort()).toEqual(['2g2f', '7g7f']);
-    expect([...studyNextMoves([s1, s2, s3], ['7g7f', '3c3d'])].sort()).toEqual(['2g2f', '6g6f']);
-    expect(studyNextMoves([s1], s1.moves).size).toBe(0);
-    expect(studyEndingAt([s1, s2], ['7g7f', '3c3d', '6g6f'])?.id).toBe('s2');
-    expect(studyEndingAt([s1, s2], ['7g7f', '3c3d'])).toBeNull();
-  });
-
-  it('手順前後で同じ局面に合流しても付けない', () => {
-    // ▲2六歩 △3四歩 ▲7六歩 と ▲7六歩 △3四歩 ▲2六歩 は同じ局面だが、手順が違う
-    expect(studyNextMoves([s1], ['2g2f', '3c3d', '7g7f']).size).toBe(0);
-    expect(studyEndingAt([s3], ['7g7f', '3c3d', '2g2f'])).toBeNull();
-  });
-
-  it('ツリーの中の局面：ツリーの開始局面までの手順＋たどった手順でたどる（pathInTree）', async () => {
-    const tree = newTree('white');
-    await new TreeGenerator(new MockEngine(), tree, { ...SETTINGS, maxRounds: 2 }).run();
-    const root = tree.nodes[tree.rootKey];
-    const a = root.edges[0];
-    const b = tree.nodes[a.to].edges[0];
-    expect(pathInTree(tree, [a.move, b.move])).toEqual([tree.rootKey, a.to, b.to]);
-    expect(pathInTree(tree, [])).toEqual([tree.rootKey]);
-    expect(pathInTree(tree, [a.move, 'zzzz'])).toBeNull();
-    // 開始局面までの手順があるツリー：研究手順がそこを通らなければ null
-    const later = createTree({
-      id: 't2',
-      name: 'x',
-      rootSfen: applyUsiMove(STARTPOS_SFEN, '7g7f')!.sfen,
-      mySide: 'white',
-      prefix: { initialSfen: STARTPOS_SFEN, moves: ['7g7f'] },
-      settings: SETTINGS,
-      now: 0,
-    });
-    expect(pathInTree(later, ['7g7f'])).toEqual([later.rootKey]);
-    expect(pathInTree(later, ['2g2f'])).toBeNull();
-    // 平手から始まらないツリーは対象外
-    const sfenTree = { ...later, prefix: { initialSfen: later.nodes[later.rootKey].sfen, moves: [] } };
-    expect(pathInTree(sfenTree, ['7g7f'])).toBeNull();
-  });
-});
-
 // ---- 移し替え ----
 
 /** 形式 6 のツリー（研究手順入り）。prefix：開始局面までの手順 */
 function v6Tree(id: string, prefix: string[], studies: TreeStudy[], opts: Partial<TreeData> = {}): TreeData {
-  let sfen = STARTPOS_SFEN;
-  for (const m of prefix) sfen = applyUsiMove(sfen, m)!.sfen;
-  const tree = createTree({ id, name: id, rootSfen: sfen, mySide: 'white', prefix: { initialSfen: STARTPOS_SFEN, moves: prefix }, settings: SETTINGS, now: 0 });
-  return { ...tree, version: 6, studies, ...opts };
+  return { ...lineTree(prefix, [], 'white', id), version: 6, studies, ...opts };
 }
 const ts = (id: string, moves: string[], note = '', updatedAt = 1, createdAt = 1): TreeStudy => ({ id, name: id, note, moves, createdAt, updatedAt });
 
@@ -262,33 +206,5 @@ describe('移し替え（ツリーの中の研究手順 → 独立した研究�
     expect(merged).toHaveLength(1);
     expect(merged[0].id).toBe('a');
     expect(merged[0].note).toBe('メモ');
-  });
-});
-
-describe('ツリーの JSON（形式 6）の取り込み', () => {
-  it('研究手順の入った JSON も読める。中の研究手順は、同じ手順がすでにあれば足さない', () => {
-    const tree = v6Tree('t', ['7g7f'], [ts('s-1', ['3c3d']), ts('s-2', ['8c8d'])]);
-    const parsed = parseTreeJson(treeToJson(tree));
-    expect(parsed.ok).toBe(true);
-    if (!parsed.ok) return;
-    const lifted = liftTreeStudies(parsed.tree)!;
-    expect(lifted.map((s) => s.moves)).toEqual([
-      ['7g7f', '3c3d'],
-      ['7g7f', '8c8d'],
-    ]);
-    const existing = [study('mine', ['7g7f', '3c3d'])];
-    const r = missingStudies(existing, lifted);
-    expect(r.added.map((s) => s.id)).toEqual(['s-2']);
-    expect(r.skipped).toBe(1);
-    // 取り込むものどうしで同じ手順なら 1 本
-    expect(missingStudies([], [...lifted, { ...lifted[0], id: 'x' }]).added).toHaveLength(2);
-  });
-
-  it('形式 7（研究手順なし）を書き出して読める。アプリより新しい形式は読まない', () => {
-    const tree = v6Tree('t', [], []);
-    const { studies: _s, ...v7 } = { ...tree, version: TREE_FORMAT_VERSION };
-    expect(TREE_FORMAT_VERSION).toBe(7);
-    expect(parseTreeJson(JSON.stringify(v7)).ok).toBe(true);
-    expect(parseTreeJson(JSON.stringify({ ...v7, version: TREE_FORMAT_VERSION + 1 })).ok).toBe(false);
   });
 });

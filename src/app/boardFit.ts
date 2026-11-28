@@ -1,9 +1,9 @@
 // 盤の画面で、盤の幅の上限を決める（v0.12.2〜。段階14（v0.38.0〜）で決め方を変えた）。
-// 段階14：盤の画面（定跡帳の盤・ツリー・新しいツリー・復習）は 1 画面に収め、ページ全体はスクロールしない。
+// 段階14：盤の画面（定跡帳の盤・稽古・実戦）は 1 画面に収め、ページ全体はスクロールしない。
 //   上から 見出し → 盤 → 操作バー → 一覧の枠（.board-frame）。一覧の枠は残りの高さいっぱいで、入りきらない分は枠の中だけスクロールする。
 //   盤は「枠の中で見せたいところ」が見える大きさまで縮める（measureFitFrame）：
-//     ツリー・定跡帳：候補手・研究候補の 3 行目まで（threeRowsNeed。4 行目からは枠の中でスクロール）
-//     新しいツリー：「自分は」の行まで。復習：問題のカードまで（いちばん下の数・記録を消すは枠の中でスクロール）
+//     定跡帳：研究候補の 3 行目まで（threeRowsNeed。4 行目からは枠の中でスクロール）
+//     稽古：札まで
 //   盤は MIN_BOARD_W より小さくしない（360×640 の定跡帳は 2 行＋スクロールになる。持ち主の判断 2026-11-22）。
 //   iPad 横（盤と一覧を左右に並べる配置）は、盤と操作バーの列が画面の高さに収まる大きさ。
 // 引く分は決め打ちにせず、実際の高さを測る（端末の文字を大きくしていても、その分だけ盤が縮む）。
@@ -12,7 +12,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 
 type ElementRef = { readonly current: HTMLElement | null };
 
-/** 盤と候補手を左右に並べる配置（app.css の .tree-layout と同じ条件） */
+/** 盤と一覧を左右に並べる配置（app.css の .tree-layout と同じ条件） */
 const SIDE_BY_SIDE = '(min-width: 768px) and (orientation: landscape)';
 /** 候補手が 3 行に満たないときの 1 行の高さの見込み（px） */
 const ROW_GUESS = 51;
@@ -98,7 +98,7 @@ export function useBoardFit(boardRef: ElementRef, measure: (board: HTMLElement) 
     const again = () => setTick((n) => n + 1);
     window.addEventListener('resize', again);
     window.visualViewport?.addEventListener('resize', again);
-    // 生成中の表示が出入りするなど、画面の中身の高さが変わったときも測り直す
+    // 知らせの表示が出入りするなど、画面の中身の高さが変わったときも測り直す
     const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(again) : null;
     const main = boardRef.current?.closest('.main');
     if (observer && main) observer.observe(main);

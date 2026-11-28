@@ -153,28 +153,10 @@ textarea {
   color: var(--color-text);
 }
 
-label.field {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  margin-right: var(--space-4);
-}
-
 .status-ok {
   color: var(--color-ok);
 }
 
 .status-ng {
   color: var(--color-danger);
-}
-
-/* いちばん下：左にバージョン */
-.footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: var(--space-2) var(--space-4);
-  border-top: 1px solid var(--color-border);
-  color: var(--color-text-muted);
-  font-size: var(--font-size-small);
 }

@@ -2,7 +2,6 @@
 paths:
   - "src/engine/**"
   - "engine/**"
-  - "src/bench/**"
   - "src/isolation.ts"
 ---
 
@@ -30,4 +29,4 @@ paths:
   - **`setoption` は USI_Hash を Threads より先に送る**。Threads を変えるとその時点の USI_Hash（初期値 1024MB）で置換表を作り直し、
     メモリ上限 1GB の WASM 版では確保に失敗してエンジンが終了する
 - ビルド時の `ENGINE_OPTIONS "FV_SCALE=24"` は `usi` の応答の default には反映されない（default 16 と出る）。必ず `setoption` で 24 を送る
-- iOS Safari は画面が消える・裏に回ると計算が止まる。生成中は Wake Lock で画面を点けたままにし、止まっても途中までのツリーを失わない
+- iOS Safari は画面が消える・裏に回ると計算が止まる

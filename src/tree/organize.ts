@@ -1,4 +1,4 @@
-// トップ画面の整理（段階7-1）：ツリーを「戦型のグループ × 自分の側」でまとめる・最近開いたもの。（名前で絞り込む欄は v0.29.0 でやめた）
+// 一覧のまとめ方（段階7-1）：「戦型のグループ × 自分の側」。研究手順のグループもこの決まりを使う。
 // 画面から切り離した関数だけにして、テストで確かめる。
 //
 // どの戦型のツリーか（templateOf）：
@@ -12,7 +12,7 @@ import { STARTPOS_SFEN, type Side } from '../shogi/position';
 import { closestTemplate, type OpeningTemplate } from './templates';
 import type { TreeData } from './types';
 
-/** グループ分けに使う、ツリーの要約（TreeSummary もこの形を持つ） */
+/** グループ分けに使う要約 */
 export interface OrganizeItem {
   id: string;
   name: string;
@@ -20,7 +20,6 @@ export interface OrganizeItem {
   mySide: Side;
   templateId?: string;
   prefix: TreeData['prefix'];
-  source?: TreeData['source'];
 }
 
 /** そのツリーの戦型（無ければ null＝「その他」） */
@@ -52,13 +51,8 @@ export function groupLabel(group: string, side: Side): string {
   return `${group}（${SIDE_GROUP_TEXT[side]}）`;
 }
 
-/** グループの中の並び：用意済みのツリーがいちばん上、あとは更新日の新しい順 */
-function compareInGroup(a: OrganizeItem, b: OrganizeItem): number {
-  const ab = a.source?.kind === 'bundled' ? 0 : 1;
-  const bb = b.source?.kind === 'bundled' ? 0 : 1;
-  if (ab !== bb) return ab - bb;
-  return b.updatedAt - a.updatedAt;
-}
+/** グループの中の並び：更新日の新しい順 */
+const compareInGroup = (a: OrganizeItem, b: OrganizeItem): number => b.updatedAt - a.updatedAt;
 
 /**
  * ツリーをグループに分ける。グループの順は固定（持ち主の判断 2026-11-17）：
@@ -195,30 +189,3 @@ export function fitsBook(key: string, study: Pick<StudyItem, 'moves' | 'mySide' 
 }
 
 const startsWithMoves = (moves: readonly string[], head: readonly string[]) => moves.length >= head.length && head.every((m, i) => moves[i] === m);
-
-/** 最近開いた記録（端末にだけ保存する。src/app/recent.ts） */
-export interface RecentEntry {
-  id: string;
-  /** 最後に開いた日時（ミリ秒） */
-  at: number;
-}
-
-/** 最近開いたツリー（新しい順、limit 件まで。消したツリーは出さない） */
-export function recentItems<T extends Pick<OrganizeItem, 'id'>>(items: readonly T[], recent: readonly RecentEntry[], limit = 3): (T & { openedAt: number })[] {
-  const byId = new Map(items.map((t) => [t.id, t]));
-  return [...recent]
-    .sort((a, b) => b.at - a.at)
-    .flatMap((r) => {
-      const t = byId.get(r.id);
-      return t ? [{ ...t, openedAt: r.at }] : [];
-    })
-    .slice(0, limit);
-}
-
-/** 「最近開いた」を出すのは、ツリーが 4 つ以上あるときだけ（少ないときは一覧を見れば足りる） */
-export const RECENT_MIN_TREES = 4;
-
-/** 記録に 1 件足す（同じツリーは新しい日時で 1 件にまとめ、古いものは max 件を超えたら捨てる） */
-export function addRecent(recent: readonly RecentEntry[], id: string, at: number, max = 20): RecentEntry[] {
-  return [{ id, at }, ...recent.filter((r) => r.id !== id)].slice(0, max);
-}

@@ -2,9 +2,7 @@
 // 12-1 色・文字・部品の土台：明るい地・白いカード・墨の主なボタン・明朝体の見出し。全画面で文字と地の色の差と、藍・金が残っていないことを確かめる
 import { openSettings } from './settings';
 import { expect, test, type Page } from '@playwright/test';
-import { STARTPOS_SFEN, applyUsiMove, sfenKey } from '../src/shogi/position';
-import { TREE_APP, TREE_FORMAT_VERSION, type Study, type TreeData, type TreeNode } from '../src/tree/types';
-import { openStudyReview } from './studyTree';
+import type { Study } from '../src/tree/types';
 import { openStudyList } from './study-list';
 
 test.use({ viewport: { width: 360, height: 740 }, hasTouch: true });
@@ -39,40 +37,6 @@ const STUDIES: Study[] = [
     updatedAt: 2,
   },
 ];
-
-/** 開始局面（▲7六歩の後）で相手の応手 4 つ（本線・有力・疑問手）、それぞれに自分の対応 1 つ */
-function sampleTree(): TreeData {
-  const sfen = applyUsiMove(STARTPOS_SFEN, '7g7f')!.sfen;
-  const nodes: Record<string, TreeNode> = {};
-  const add = (s: string) => (nodes[sfenKey(s)] ??= ({ key: sfenKey(s), sfen: s, round: 0, edges: [] }) as TreeNode);
-  const root = add(sfen);
-  const link = (from: TreeNode, m: string, cp: number, diff?: number) => {
-    const to = add(applyUsiMove(from.sfen, m)!.sfen);
-    from.edges.push({ move: m, to: to.key, score: { kind: 'cp', value: cp }, ...(diff !== undefined ? { diff } : {}) } as never);
-    return to;
-  };
-  for (const [m, cp, diff] of [
-    ['3c3d', 40, 0],
-    ['8c8d', 60, 20],
-    ['4c4d', 90, 60],
-    ['5c5d', 160, 170],
-  ] as [string, number, number][]) {
-    link(link(root, m, cp, diff), '2g2f', cp);
-  }
-  return {
-    app: TREE_APP,
-    version: TREE_FORMAT_VERSION,
-    id: 'c-tree',
-    name: '▲7六歩からの対策',
-    createdAt: 1,
-    updatedAt: 1,
-    mySide: 'black',
-    rootKey: root.key,
-    prefix: { initialSfen: STARTPOS_SFEN, moves: ['7g7f'] },
-    nodes,
-    settings: { totalMs: 120_000, movetimeMs: 1500, multiPV: 4, maxRounds: 4, maxNodes: 3000, windowCp: 300, replyMs: 1000, dubiousCp: 150 },
-  } as TreeData;
-}
 
 /**
  * 画面の文字のうち、地との色の差が足りないもの（「比 "文字" タグ.クラス」）。
@@ -206,18 +170,7 @@ test.describe('12-1 色・文字・部品の土台（段階16 で明るい対局
     expect(await style('.move-bar', 'background-color')).toBe('rgb(45, 45, 45)');
     expect(await style('.move-bar-btn', 'color')).toBe('rgb(255, 255, 255)');
     expect(await oldColors(page)).toEqual([]);
-    // 復習の切り替え（全部／研究手順だけ）：選んでいる方は墨に白い文字、選んでいない方は白い地に墨の文字（前は白い地に白に近い文字で読めなかった）
-    await page.goto('./#/trees');
-    await page.getByTestId('import-file').setInputFiles({ name: 't.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(sampleTree())) });
-    await page.getByTestId('tree-item').click();
-    await page.getByTestId('review-open').click();
-    await expect(page.getByTestId('review-prompt')).toBeVisible();
-    const modes = page.locator('.review-modes .home-tab');
-    await expect(modes).toHaveCount(2);
-    expect(await modes.nth(0).evaluate((e) => [getComputedStyle(e).backgroundColor, getComputedStyle(e).color])).toEqual(['rgb(45, 45, 45)', 'rgb(255, 255, 255)']);
-    expect(await modes.nth(1).evaluate((e) => [getComputedStyle(e).backgroundColor, getComputedStyle(e).color])).toEqual(['rgb(255, 255, 255)', 'rgb(45, 45, 45)']);
     expect(await lowContrast(page)).toEqual([]);
-    expect(await oldColors(page)).toEqual([]);
   });
 
   test('全画面で、文字と地の色の差が足りる（本文 4.5:1、大きな文字 3:1）', async ({ page }) => {
@@ -253,33 +206,7 @@ test.describe('12-1 色・文字・部品の土台（段階16 で明るい対局
     await check('定跡帳の ⋯');
     await closeDialog(page);
 
-    // 研究手順の復習（まちがえた後のカードも。段階19 からツリーの「研究手順だけ」で）
-    await openStudyReview(page);
-    await expect(page.getByTestId('review-progress')).toBeVisible();
-    await check('復習');
-    await page.locator('[data-square="17"]').click();
-    await page.locator('[data-square="16"]').click();
-    await expect(page.getByTestId('review-wrong')).toBeVisible();
-    await check('復習（まちがえた後）');
-
-    // ツリー
-    await page.goto('./#/trees');
-    await page.getByTestId('import-file').setInputFiles({ name: 't.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(sampleTree())) });
-    // 復習を開くのに使った初期局面からのツリーもある
-    await expect(page.getByTestId('tree-item')).toHaveCount(2);
-    await check('ツリーのタブ');
-    await page.getByTestId('tree-item').filter({ hasNotText: '初期局面からのツリー' }).click();
-    await expect(page.getByTestId('candidate')).toHaveCount(4);
-    await check('ツリー');
-    await page.getByTestId('tree-menu').click();
-    await check('ツリーの ⋯');
-    await closeDialog(page);
-
-    // 新しいツリー・復習のタブ・設定
-    await page.goto('./#/trees');
-    await page.getByTestId('new-tree').click();
-    await expect(page.getByRole('heading', { name: '新しいツリー' })).toBeVisible();
-    await check('新しいツリー');
+    // 実戦・稽古・設定
     // 段階19：稽古のタブと稽古の画面、段階18：実戦のタブ
     await page.goto('./#/practice');
     await expect(page.getByTestId('practice-start')).toBeVisible();
@@ -295,7 +222,7 @@ test.describe('12-1 色・文字・部品の土台（段階16 で明るい対局
     await expect(page.getByTestId('games-empty')).toBeVisible();
     await check('実戦のタブ');
     // 段階16：藍と金がどの画面にも残っていない（設定のタブと下の画面）
-    for (const sub of [undefined, 'practice', 'games', 'data', 'sync', 'engine', 'trees'] as const) {
+    for (const sub of [undefined, 'practice', 'games', 'data', 'sync', 'engine'] as const) {
       await openSettings(page, sub);
       await check(`設定 ${sub ?? ''}`);
       expect(await oldColors(page)).toEqual([]);
@@ -306,10 +233,9 @@ test.describe('12-1 色・文字・部品の土台（段階16 で明るい対局
 });
 
 test.describe('12-2 盤と駒', () => {
-  test('盤は木目と木の茶の縁、駒は明朝体で影付き。駒台も盤と同じ木目。選んだマスは墨の線。新しいツリーの盤は段階14 の大きさ', async ({ page }) => {
+  test('盤は木目と木の茶の縁、駒は明朝体で影付き。駒台も盤と同じ木目。選んだマスは墨の線', async ({ page }) => {
     await openHome(page);
-    await page.goto('./#/trees');
-    await page.getByTestId('new-tree').click();
+    await page.goto(`./#/book/${encodeURIComponent('study:hirate|black')}`);
     const board = page.getByTestId('board');
     await expect(board).toBeVisible();
     const css = (sel: string, prop: string) => page.locator(sel).first().evaluate((e, p) => getComputedStyle(e).getPropertyValue(p), prop);
@@ -334,7 +260,6 @@ test.describe('12-2 盤と駒', () => {
     await expect(page.locator('svg.board [filter]')).toHaveCount(0);
     expect(await css('.piece-body', 'filter')).toBe('none');
     expect(await css('g.piece', 'filter')).toBe('none');
-    // 360×740 の新しいツリーの盤の幅は v0.29.0 で 352px。段階14 で 1 画面に収めるため「自分は」の行を見せる分だけ小さく（持ち主の了承 2026-11-22）
     expect(Math.round((await board.boundingBox())!.width)).toBeGreaterThanOrEqual(290);
 
     await page.locator('[data-square="77"]').click();
@@ -418,38 +343,17 @@ test.describe('12-3 定跡帳', () => {
 });
 
 test.describe('12-4 残りの画面', () => {
-  test('ツリーのラベルは本線＝墨の塗り・有力＝白い地に線・疑問手＝朱、評価値は良い＝緑・悪い＝朱。文字と地の差も足りる', async ({ page }) => {
+  test('稽古で 1 回目に正解すると、指したマスに木の茶の光が一瞬出る。まちがえたとき・その指し直しでは出ない', async ({ page }) => {
     await openHome(page);
-    await page.goto('./#/trees');
-    await page.getByTestId('import-file').setInputFiles({ name: 't.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(sampleTree())) });
-    await page.getByTestId('tree-item').click();
-    await expect(page.getByTestId('candidate')).toHaveCount(4);
-    const color = (sel: string) => page.locator(sel).first().evaluate((e) => getComputedStyle(e).color);
-    const bg = (sel: string) => page.locator(sel).first().evaluate((e) => getComputedStyle(e).backgroundColor);
-    // 本線は墨の塗り（持ち主の判断 2026-11-22）、有力は白い地に線と灰の文字、疑問手は淡い朱の地に朱の文字
-    expect([await bg('.chip-main'), await color('.chip-main')]).toEqual(['rgb(45, 45, 45)', 'rgb(255, 255, 255)']);
-    expect([await bg('.chip-good'), await color('.chip-good')]).toEqual(['rgb(255, 255, 255)', 'rgb(102, 99, 94)']);
-    expect(await color('.chip-dubious')).toBe('rgb(179, 49, 31)');
-    expect(await color('.eval-good')).toBe('rgb(46, 125, 50)');
-    expect(await lowContrast(page)).toEqual([]);
-    expect(await oldColors(page)).toEqual([]);
-  });
-
-  test('復習で正解すると、指したマスに木の茶の光が一瞬出る。結果は白いカード（文字と地の差も足りる）', async ({ page }) => {
-    await openHome(page);
-    await openSettings(page, 'trees');
-    await page.getByTestId('review-batch-5').click();
-    await page.goto('./');
     await page.getByTestId('study-import-file').setInputFiles({
       name: 's.json',
       mimeType: 'application/json',
       buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies: [STUDIES[0]] })),
     });
-    // 取り込みの保存が終わってから復習を開く（終わる前に開くと問題が 0 になることがあった）
     await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${1} 本`);
-    await openStudyReview(page);
-    const progress = page.getByTestId('review-progress');
-    await expect(progress).toHaveText('今日 1／5問');
+    await page.goto('./#/practice/play/s-line');
+    const card = page.getByTestId('practice-card');
+    await expect(card).toHaveAttribute('data-phase', 'ask');
     const play = async (from: string, to: string) => {
       await page.locator(`[data-square="${from}"]`).click();
       await page.locator(`[data-square="${to}"]`).click();
@@ -460,25 +364,15 @@ test.describe('12-4 残りの画面', () => {
     await expect(flash).toHaveCount(1);
     const [sq, fl] = await Promise.all([page.locator('[data-square="76"] rect').boundingBox(), flash.boundingBox()]);
     expect(Math.abs(sq!.x + sq!.width / 2 - (fl!.x + fl!.width / 2))).toBeLessThan(3);
-    await expect(progress).toHaveText('今日 2／5問');
     await expect(flash).toHaveCount(0);
-    // まちがえたときは出ない
+    await expect(card).toContainText('相手は △３四歩');
+    // まちがえたときは出ない。指し直しの正解でも出ない
     await play('17', '16');
-    await expect(page.getByTestId('review-wrong')).toBeVisible();
+    await expect(page.getByTestId('practice-wrong')).toBeVisible();
     await expect(flash).toHaveCount(0);
-    await page.getByTestId('review-show').click();
+    await play('27', '26');
+    await expect(card).toContainText('相手は △８四歩');
     await expect(flash).toHaveCount(0);
-    await page.getByTestId('review-continue').click();
-    await expect(progress).toHaveText('今日 3／5問');
-    await play('26', '25');
-    await expect(progress).toHaveText('今日 4／5問');
-    await play('69', '78');
-    await expect(progress).toHaveText('今日 5／5問');
-    await play('25', '24');
-    await expect(page.getByTestId('review-result-score')).toBeVisible();
-    expect(await page.getByTestId('review-result').evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgb(255, 255, 255)');
-    expect(await lowContrast(page)).toEqual([]);
-    expect(await oldColors(page)).toEqual([]);
   });
 
   test('動きを減らす設定の端末では、正解の光を出さない', async ({ page }) => {
@@ -490,8 +384,8 @@ test.describe('12-4 残りの画面', () => {
       buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies: [STUDIES[0]] })),
     });
     await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${1} 本`);
-    await openStudyReview(page);
-    await expect(page.getByTestId('review-progress')).toBeVisible();
+    await page.goto('./#/practice/play/s-line');
+    await expect(page.getByTestId('practice-card')).toHaveAttribute('data-phase', 'ask');
     await page.locator('[data-square="77"]').click();
     await page.locator('[data-square="76"]').click();
     await expect(page.getByTestId('answer-flash')).toHaveCount(1);
@@ -583,43 +477,4 @@ test.describe('段階12 の追加：駒と駒台（v0.34.0）', () => {
     expect(await kaku.evaluate((e) => getComputedStyle(e).boxShadow)).toContain('rgb(45, 45, 45)');
   });
 
-  test('閲覧の盤（ツリー）の駒台は高さ 24px のまま。小さな盤（復習の結果）の駒台は 1 行で、札は ☗☖ だけ', async ({ page }) => {
-    await openHome(page);
-    await page.goto('./#/trees');
-    await page.getByTestId('import-file').setInputFiles({ name: 't.json', mimeType: 'application/json', buffer: Buffer.from(JSON.stringify(sampleTree())) });
-    await page.getByTestId('tree-item').click();
-    await expect(page.getByTestId('candidate')).toHaveCount(4);
-    for (const side of ['black', 'white']) {
-      expect(Math.round((await page.getByTestId(`hand-${side}`).boundingBox())!.height)).toBe(24);
-    }
-
-    // 復習の結果のまちがえた問題（1 回 5 問、全部まちがえる）
-    await page.goto('./');
-    await page.getByTestId('study-import-file').setInputFiles({
-      name: 's.json',
-      mimeType: 'application/json',
-      buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies: [MID] })),
-    });
-    await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${1} 本`);
-    await openSettings(page, 'trees');
-    await page.getByTestId('review-batch-5').click();
-    await openStudyReview(page);
-    const progress = page.getByTestId('review-progress');
-    for (let i = 1; i <= 5; i++) {
-      await expect(progress).toContainText(`今日 ${i}／5問`);
-      await page.locator('[data-square="17"]').click();
-      await page.locator('[data-square="16"]').click();
-      await expect(page.getByTestId('review-wrong')).toBeVisible();
-      await page.getByTestId('review-show').click();
-      // 5 問目の後は「結果を見る」（同じボタン）
-      await page.getByTestId('review-continue').click();
-    }
-    await expect(page.getByTestId('review-result-score')).toBeVisible();
-    const mini = page.locator('.mini-board').first();
-    for (const side of ['black', 'white']) {
-      const hand = mini.getByTestId(`hand-${side}`);
-      expect((await hand.boundingBox())!.height).toBeLessThanOrEqual(20);
-      expect(await hand.locator('.hand-side').evaluate((e) => getComputedStyle(e).display)).toBe('none');
-    }
-  });
 });

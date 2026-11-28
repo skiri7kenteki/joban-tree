@@ -189,7 +189,7 @@ for (const size of SIZES) {
       // 設定のタブと下の画面
       await openSettings(page);
       await shot(page, size.name, 'settings');
-      for (const sub of ['practice', 'games', 'engine', 'trees', 'sync', 'data'] as const) {
+      for (const sub of ['practice', 'games', 'engine', 'sync', 'data'] as const) {
         await openSettings(page, sub);
         await shot(page, size.name, `settings-${sub}`);
       }

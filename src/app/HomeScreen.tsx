@@ -1,69 +1,33 @@
-// トップ画面：新しいツリーを作るボタン、保存してあるツリーの一覧（名前の変更・共有・削除）、ファイルからの取り込み。
-// 段階7-1：ツリーを「戦型のグループ × 自分の側」でまとめる（開閉でき、状態は端末に覚える）。最近開いた 3 件。
-// 段階7-2：「ツリー｜研究手順」の切り替え。
-// 段階8-1：研究手順はツリーから独立したデータ（src/tree/studies.ts）。研究手順のタブ：
-//   - 「＋ 研究手順を登録」（盤で指す・棋譜を貼る／変化付き KIF からまとめて取り込む（段階8-2）／JSON を取り込む）、「書き出し」（選んで JSON・KIF）
-//     段階10-1：「＋ 研究手順を登録」は［平手から］［戦型から選ぶ］→ 自分の側 → 定跡帳が開いて、そのまま指せる。棋譜・KIF・JSON は下に小さく
-//   - 研究手順も戦型のグループ × 自分の側でまとめる。グループの ⋯ から「定跡帳として見る」（段階9-2）「このグループの研究手順を復習」「このグループを書き出す」
-//   - 行をタップで研究手順の画面（#/study/<id>）。段階10-1 から、その研究手順の終わりの局面で定跡帳を開く。行の ⋯：この研究手順を復習・名前・メモを直す・書き出す・消す（確認あり）
-//   - ツリーの JSON（形式 6 まで）を取り込むと、中の研究手順も研究手順として取り込む（同じ手順がすでにあれば足さない）
+// 定跡帳のタブ（#/。アプリを開くといつもここ）：定跡帳（戦型のグループ × 自分の側）ごとに 1 行と、研究手順の登録。
+//   - 「＋ 研究手順を登録」は［平手から］［戦型から選ぶ］→ 自分の側 → 定跡帳が開いて、そのまま指せる（段階10-1）。
+//     下に、棋譜を貼って 1 本・変化付き KIF からまとめて
+//   - いちばん上に稽古の集計（今日の稽古・身についた・前回まちがい）。1 本ずつの一覧は定跡帳の ⋯「研究手順の一覧」（src/app/StudyList.tsx）
 //   - 端末の保存場所を新しい版にしたときの移し替えの結果を、一度だけ知らせる
-// 段階20-3：「＋ 研究手順を登録」に「基本の研究を入れる」（BasicStudiesDialog）。「書き出し」（タブの右上・グループの ⋯）と 1 本ずつの JSON・KIF で渡すは外した
-//   （書き出しは設定の「データ管理」へ。DataSection）
-// 段階11-1：画面の下のタブに分けた。list='studies' が定跡帳のタブ（#/。いちばん目立つのは「＋ 研究手順を登録」）、
-//   list='trees' がツリーのタブ（#/trees。「＋ 新しいツリーを作る」・最近開いた・ツリーの取り込み）。画面の上の「ツリー｜研究手順」の切り替えはやめた
-// v0.29.0：名前・メモで絞り込む欄はやめた（持ち主の依頼 2026-11-21。使わなかったため）
-// 段階12-3：定跡帳のタブのいちばん上に集計（研究手順の数・覚えた問題の輪・前回まちがい）、研究手順の行の右に覚えた割合の輪、
-//   グループの見出しの左に「芽」の紋。数えるのは今の復習の記録から（読むだけ。データの形は変えない）
-// 段階19：集計は稽古の数（今日の稽古・身についた・前回まちがい）、行の右は次の稽古の日（今日・明日・あと n 日・はじめて）。
-//   行・グループの ⋯ の「復習」は「稽古」に（#/practice/play/<id>・#/practice/group/<key>）
 
-// 段階22-4：定跡帳のタブは、定跡帳（戦型のグループ × 自分の側）ごとに 1 行（研究 n本・覚えた割合の輪・次の稽古の日）。押すと定跡帳。
-//   1 本ずつの一覧は定跡帳の ⋯「研究手順の一覧」（src/app/StudyList.tsx）
-
-import { signal } from '@preact/signals';
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { Dialog } from '../components/Dialog';
 import { takeMigrationNote } from '../storage/migrate';
-import { deleteTree, listTrees, loadTree, newTreeId, saveTree, type TreeSummary } from '../storage/trees';
-import { fileNameOf, parseTreeJson, treeToJson } from '../tree/backup';
-import { latestBundled } from '../tree/bundledCatalog';
-import {
-  RECENT_MIN_TREES,
-  groupStudies,
-  groupTrees,
-  hirateBookKey,
-  recentItems,
-  type TreeGroup,
-} from '../tree/organize';
+import { groupStudies, hirateBookKey, type TreeGroup } from '../tree/organize';
 import type { Side } from '../shogi/position';
 import { listName, type OpeningTemplate } from '../tree/templates';
-import { liftTreeStudies } from '../tree/studies';
 import { summarizePractice, type PracticeSummary } from '../practice/practice';
 import { LearnRing } from '../components/Marks';
-import { DueText, formatShortDate, useStudyDue } from './StudyList';
+import { DueText, useStudyDue } from './StudyList';
 import { parseStudiesJson, planStudyImport, resolveStudyImport, type StudyConflictChoice, type StudyImportPlan } from '../tree/studyFile';
-import type { Study, TreeData } from '../tree/types';
-import { generation, isGenerating, openTree, treeVersion } from './generation';
-import { collapsedGroups, forgetOpened, recentOpened, toggleGroup } from './recent';
-import { backTo, bookPath, bookTemplatePath, go } from './router';
-import { OUTCOME_TEXT, shareFile } from './share';
+import type { Study } from '../tree/types';
+import { bookPath, bookTemplatePath, go } from './router';
 import { TemplatePicker, allTemplates, myTemplates, refreshMyTemplates } from './TemplateDialogs';
 import { KifPasteDialog } from './addToBook';
 import { fixStoredStudies } from './studyFix';
-
-/** 次にトップ画面を開いたとき「研究手順を登録」の窓を開く（古い登録の画面の URL #/new/study から来たとき。段階10-2） */
-export const registerRequest = signal(false);
 import { BasicStudiesDialog } from './BasicStudiesDialog';
-import { ensureStudies, homeNotice, importLiftedStudies, importUndo, library, saveStudies } from './studies';
+import { ensureStudies, homeNotice, importUndo, library, saveStudies } from './studies';
 import { ImportUndoButton } from './ImportUndo';
 import { Words } from '../components/Words';
 import { BackupNudge } from './DataSection';
 import { SyncNudge } from './DriveSection';
 import { ConflictNotice } from './ConflictNotice';
 
-export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'trees'; isolationMessage: string | null }) {
-  const [trees, setTrees] = useState<TreeSummary[] | null>(null);
+export function HomeScreen({ isolationMessage }: { isolationMessage: string | null }) {
   const [error, setError] = useState('');
   // KIF から取り込んだ後などの一言（一度だけ）
   const [message, setMessage] = useState(() => {
@@ -84,111 +48,37 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
     setMessage(lateNotice);
     homeNotice.value = null;
   }, [lateNotice]);
-  /** 一覧を読み直す合図 */
-  const [reload, setReload] = useState(0);
-  /** ⋯ を押したツリー（メニューを出す） */
-  const [menuTree, setMenuTree] = useState<TreeData | null>(null);
-  /** 「＋ 研究手順を登録」のメニュー（古い登録の画面の URL から来たときは開いておく。段階10-2） */
-  const [registerMenu, setRegisterMenu] = useState(() => {
-    const asked = registerRequest.value;
-    registerRequest.value = false;
-    return asked;
-  });
+  /** 「＋ 研究手順を登録」のメニュー */
+  const [registerMenu, setRegisterMenu] = useState(false);
   /** 棋譜を貼って 1 本登録の窓 */
   const [pasting, setPasting] = useState(false);
   /** 新しい研究：戦型を選ぶ窓（picking）・自分の側を選ぶ窓（start。template が null なら平手から） */
   const [newStudy, setNewStudy] = useState<{ kind: 'picking' } | { kind: 'start'; template: OpeningTemplate | null } | null>(null);
   /** 基本の研究を入れる窓（段階20-3） */
   const [basic, setBasic] = useState(false);
-  /** 取り込もうとしたツリーが既にあるとき */
-  const [conflict, setConflict] = useState<TreeData | null>(null);
   /** 取り込もうとした研究手順に、同じ手順で中身の違うものがあるとき */
   const [studyConflict, setStudyConflict] = useState<StudyImportPlan | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
   const studyFileRef = useRef<HTMLInputElement>(null);
-  // 生成が進んだら一覧（局面の数）も新しくする
-  const version = treeVersion.value;
   // 自分で登録した戦型も、グループ分けに使う（読み込んだら描き直す）
   void myTemplates.value;
   const studies = library.value;
   useEffect(() => {
     if (!myTemplates.value) void refreshMyTemplates().catch(() => undefined);
-    ensureStudies().catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
-  }, []);
-  useEffect(() => {
-    listTrees()
-      .then((list) => {
-        setTrees(list);
-        // 端末の保存場所を新しい版にしたときの、研究手順の移し替えの結果（一度だけ）
+    ensureStudies()
+      .then(() => {
+        // 端末の保存場所を新しい版にしたときの、研究手順の移し替えの結果（一度だけ。保存場所を開いた後で読む）
         const note = takeMigrationNote();
         if (note) setMessage(migrationText(note));
       })
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)));
-  }, [version, reload]);
+  }, []);
 
-  const running = isGenerating() ? generation.value!.treeId : null;
-  const tab = list;
   const templates = allTemplates();
-  const groups = trees ? groupTrees(trees, templates) : [];
   const studyGroups = studies ? groupStudies(studies, templates) : [];
   const studyCount = studies?.length ?? 0;
   /** 段階19：稽古の集計（稽古のタブと同じ数え方。記録は読むだけ） */
   const { records, plan, dueOfAll } = useStudyDue(studies ?? []);
   const practiceSummary = plan && studies && records ? summarizePractice(studies, records, plan.today.length, templates) : null;
-  // 最近開いた：ツリーが 4 つ以上あるときだけ
-  const recent = trees && trees.length >= RECENT_MIN_TREES ? recentItems(trees, recentOpened.value) : [];
-  const collapsed = collapsedGroups.value;
-  const rowProps = (t: TreeSummary) => ({ tree: t, running: running === t.id, onMenu: () => void openMenu(t.id) });
-
-  async function openMenu(id: string) {
-    setMessage('');
-    // 共有ボタンを押した直後に共有メニューを出せるよう、先に読み込んでおく（iPad の Safari 対策）
-    const tree = openTree.value?.id === id ? openTree.value : await loadTree(id);
-    if (tree) setMenuTree(tree);
-  }
-
-  async function onFile(e: Event) {
-    const input = e.target as HTMLInputElement;
-    const file = input.files?.[0];
-    input.value = '';
-    if (!file) return;
-    setMessage('');
-    const result = parseTreeJson(await file.text());
-    if (!result.ok) {
-      setMessage(result.message);
-      return;
-    }
-    if (await loadTree(result.tree.id)) {
-      setConflict(result.tree);
-      return;
-    }
-    await importTree(result.tree);
-  }
-
-  async function importTree(tree: TreeData) {
-    try {
-      // 形式 6 までのツリーの中の研究手順は、独立した研究手順として取り込む（平手から始まらないツリーは、ツリーの中に残す）
-      let studyText = '';
-      const lifted = tree.studies && tree.studies.length > 0 ? liftTreeStudies(tree) : null;
-      if (lifted) {
-        const r = await importLiftedStudies(lifted);
-        delete tree.studies;
-        studyText = `。研究手順 ${r.added} 本も取り込みました${r.skipped > 0 ? `（${r.skipped} 本はすでにありました）` : ''}`;
-      } else if (tree.studies && tree.studies.length > 0) {
-        studyText = `。途中の局面から始まるツリーなので、研究手順 ${tree.studies.length} 本は研究手順の一覧に移せませんでした（ツリーの中に残してあります）`;
-      }
-      // 段階22-2：前より古いファイルで置き換えたら、戻した日時を付ける（ほかの端末と合わせて、元に戻らないように）
-      const existing = await loadTree(tree.id);
-      if (existing && tree.updatedAt <= Math.max(existing.updatedAt, existing.restoredAt ?? 0)) tree.restoredAt = Date.now();
-      if (existing?.renamedAt !== undefined) tree.renamedAt = Date.now();
-      await saveTree(tree);
-      if (openTree.value?.id === tree.id) openTree.value = tree;
-      setMessage(`「${tree.name}」を取り込みました${studyText}`);
-    } catch (e) {
-      setMessage(`取り込めませんでした（${e instanceof Error ? e.message : String(e)}）`);
-    }
-    setReload((n) => n + 1);
-  }
 
   async function onStudyFile(e: Event) {
     const input = e.target as HTMLInputElement;
@@ -231,39 +121,23 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
   return (
     <>
       <div class="screen-header list-header">
-        {tab === 'trees' && (
-          <button type="button" class="btn btn-ghost btn-back btn-back-labeled" aria-label="‹ 設定" data-testid="trees-back" onClick={() => backTo('/settings/trees')}>
-            ‹<span class="back-text"> 設定</span>
-          </button>
-        )}
-        <h1 class={tab === 'studies' ? 'page-title' : undefined}>{tab === 'studies' ? '定跡帳' : 'ツリー'}</h1>
-        {tab === 'studies' && studies && (
+        <h1 class="page-title">定跡帳</h1>
+        {studies && (
           <span class="muted num" data-testid="study-count">
             研究手順 {studyCount} 本
-          </span>
-        )}
-        {tab === 'trees' && trees && (
-          <span class="muted num" data-testid="tree-count">
-            {trees.length} 本
           </span>
         )}
         <span class="spacer" />
       </div>
       {isolationMessage && <p class="notice notice-danger">{isolationMessage}</p>}
-      {tab === 'studies' && studies && <SyncNudge />}
-      {tab === 'studies' && studies && <BackupNudge studies={studies} />}
-      {tab === 'studies' && studies && studyCount > 0 && <StudySummary summary={practiceSummary} />}
-      {tab === 'studies' && studies && studyCount > 1 && <ConflictNotice studies={studies} />}
+      {studies && <SyncNudge />}
+      {studies && <BackupNudge studies={studies} />}
+      {studies && studyCount > 0 && <StudySummary summary={practiceSummary} />}
+      {studies && studyCount > 1 && <ConflictNotice studies={studies} />}
       <div class="btn-row">
-        {tab === 'studies' ? (
-          <button type="button" class="btn btn-primary btn-wide" data-testid="study-register" onClick={() => setRegisterMenu(true)}>
-            ＋ 研究手順を登録
-          </button>
-        ) : (
-          <button type="button" class="btn btn-primary btn-wide" data-testid="new-tree" onClick={() => go('/new')}>
-            ＋ 新しいツリーを作る
-          </button>
-        )}
+        <button type="button" class="btn btn-primary btn-wide" data-testid="study-register" onClick={() => setRegisterMenu(true)}>
+          ＋ 研究手順を登録
+        </button>
       </div>
 
       {error && <p class="status-ng">{error}</p>}
@@ -272,7 +146,7 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
           {message}
         </p>
       )}
-      {tab === 'studies' && undo && message === undo.message && (
+      {undo && message === undo.message && (
         <ImportUndoButton
           undo={undo}
           onDone={(text) => {
@@ -281,62 +155,22 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
           }}
         />
       )}
-      {trees === null && !error && <p class="muted">読み込み中…</p>}
+      {studies === null && !error && <p class="muted">読み込み中…</p>}
 
-      {trees && tab === 'trees' && (
-        <>
-          {trees.length === 0 && <p class="muted">まだありません。「新しいツリーを作る」から始めてください。</p>}
-          {recent.length > 0 && (
-            <section class="home-recent" data-testid="recent">
-              <h2>最近開いた</h2>
-              <ul class="tree-list">
-                {recent.map((t) => (
-                  <TreeRow key={t.id} {...rowProps(t)} testId="recent-item" dateText={`開いた ${formatShortDate(t.openedAt)}`} />
-                ))}
-              </ul>
-            </section>
-          )}
-
-          {trees.length > 0 && <h2>保存したツリー</h2>}
-          {groups.map((g) => (
-            <GroupSection key={g.key} group={g} open={!collapsed.includes(g.key)}>
-              {g.items.map((t) => (
-                <TreeRow key={t.id} {...rowProps(t)} testId="tree-item" />
-              ))}
-            </GroupSection>
-          ))}
-        </>
+      {studies && studyCount === 0 && (
+        <p class="muted" data-testid="studies-empty">
+          研究手順はまだありません。「＋ 研究手順を登録」で平手か戦型を選び、盤で指すと研究手順になります。
+        </p>
       )}
-
-      {trees && tab === 'studies' && (
-        <>
-          {studies && studyCount === 0 && (
-            <p class="muted" data-testid="studies-empty">
-              研究手順はまだありません。「＋ 研究手順を登録」で平手か戦型を選び、盤で指すと研究手順になります。
-            </p>
-          )}
-          {studyGroups.length > 0 && (
-            <section class="tree-group" data-testid="book-groups">
-              <ul class="tree-list">
-                {studyGroups.map((g) => {
-                  const s = records ? summarizePractice(g.items, records, 0, templates) : null;
-                  return <BookRow key={g.key} group={g} learned={s?.learned ?? 0} total={s?.total ?? 0} due={dueOfAll(g.items)} />;
-                })}
-              </ul>
-            </section>
-          )}
-        </>
-      )}
-
-      {tab === 'trees' && (
-        <>
-          <div class="btn-row home-import">
-            <button type="button" class="btn" data-testid="import-json" onClick={() => fileRef.current?.click()}>
-              ツリーを取り込む（JSON）
-            </button>
-            <input ref={fileRef} type="file" accept=".json,application/json" hidden data-testid="import-file" onChange={(e) => void onFile(e)} />
-          </div>
-        </>
+      {studyGroups.length > 0 && (
+        <section class="tree-group" data-testid="book-groups">
+          <ul class="tree-list">
+            {studyGroups.map((g) => {
+              const s = records ? summarizePractice(g.items, records, 0, templates) : null;
+              return <BookRow key={g.key} group={g} learned={s?.learned ?? 0} total={s?.total ?? 0} due={dueOfAll(g.items)} />;
+            })}
+          </ul>
+        </section>
       )}
       <input ref={studyFileRef} type="file" accept=".json,application/json" hidden data-testid="study-import-file" onChange={(e) => void onStudyFile(e)} />
 
@@ -411,19 +245,6 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
 
       {newStudy?.kind === 'start' && <NewStudyDialog template={newStudy.template} onClose={() => setNewStudy(null)} />}
 
-      {menuTree && (
-        <TreeMenu
-          tree={menuTree}
-          generating={running === menuTree.id}
-          onClose={() => setMenuTree(null)}
-          onDone={(text) => {
-            setMenuTree(null);
-            setMessage(text);
-            setReload((n) => n + 1);
-          }}
-        />
-      )}
-
       {studyConflict && (
         <Dialog title="同じ手順の研究手順があります" onClose={() => setStudyConflict(null)} testId="study-import-conflict">
           <p>
@@ -450,45 +271,6 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
           </div>
         </Dialog>
       )}
-
-      {conflict && (
-        <Dialog title="同じツリーがあります" onClose={() => setConflict(null)} testId="import-conflict">
-          <p>
-            「{conflict.name}」は、もうこの端末にあります。どうしますか？
-          </p>
-          <div class="dialog-actions">
-            <button
-              type="button"
-              class="btn btn-danger"
-              data-testid="import-overwrite"
-              disabled={running === conflict.id}
-              onClick={() => {
-                const tree = conflict;
-                setConflict(null);
-                void importTree(tree);
-              }}
-            >
-              上書きする
-            </button>
-            <button
-              type="button"
-              class="btn btn-primary"
-              data-testid="import-copy"
-              onClick={() => {
-                const tree = { ...conflict, id: newTreeId(), name: `${conflict.name}（取り込み）` };
-                setConflict(null);
-                void importTree(tree);
-              }}
-            >
-              別のツリーとして追加
-            </button>
-            <button type="button" class="btn" onClick={() => setConflict(null)}>
-              やめる
-            </button>
-          </div>
-          {running === conflict.id && <p class="muted">このツリーは生成中なので、上書きできません。</p>}
-        </Dialog>
-      )}
     </>
   );
 }
@@ -496,37 +278,11 @@ export function HomeScreen({ list, isolationMessage }: { list: 'studies' | 'tree
 /** 移し替えの結果の一言 */
 function migrationText(note: { moved: number; leftover: number; failed?: boolean }): string {
   if (note.failed) {
-    return `研究手順を、ツリーの外の置き場所に移せませんでした（研究手順 ${note.leftover} 本はツリーの中に残っていて、消えていません）。「気づきを送る」で知らせてください。`;
+    return `研究手順を、ツリーの外の置き場所に移せませんでした（研究手順 ${note.leftover} 本はツリーの中に残っていて、消えていません）。設定の「データ管理」でバックアップを保存しておいてください。`;
   }
   const parts = [`アプリの更新に合わせて、研究手順 ${note.moved} 本を「研究手順」の一覧に移しました`];
   if (note.leftover > 0) parts.push(`途中の局面から始まるツリーの研究手順 ${note.leftover} 本は移せませんでした（ツリーの中に残してあります）`);
   return `${parts.join('。')}。`;
-}
-
-/** ツリーの一覧のグループ（見出しの ▼／▶・名前・件数と、開いていれば中身） */
-function GroupSection<T>({ group: g, open, children }: { group: TreeGroup<T>; open: boolean; children: preact.ComponentChildren }) {
-  return (
-    <section class="tree-group" data-testid="tree-group" data-key={g.key}>
-      <div class="tree-group-row">
-        <button
-          type="button"
-          class="tree-group-head"
-          aria-expanded={open}
-          data-testid="tree-group-head"
-          onClick={() => toggleGroup(g.key)}
-        >
-          <span class="tree-group-caret" aria-hidden="true">
-            {open ? '▼' : '▶'}
-          </span>
-          <span class="tree-group-label">{g.label}</span>
-          <span class="tree-group-count num" data-testid="tree-group-count">
-            {g.items.length}
-          </span>
-        </button>
-      </div>
-      {open && <ul class="tree-list">{children}</ul>}
-    </section>
-  );
 }
 
 /**
@@ -581,147 +337,6 @@ function BookRow({ group, learned, total, due }: { group: TreeGroup<Study>; lear
       </button>
     </li>
   );
-}
-
-/** ツリーの 1 行（名前・印・自分の側と手順・日付と局面の数・⋯） */
-function TreeRow({
-  tree: t,
-  running,
-  onMenu,
-  testId,
-  dateText,
-}: {
-  tree: TreeSummary;
-  running: boolean;
-  onMenu: () => void;
-  testId: string;
-  /** 日付の欄（初期値は更新日） */
-  dateText?: string;
-}) {
-  return (
-    <li class="tree-row">
-      <button type="button" class="tree-item" data-testid={testId} onClick={() => go(`/tree/${t.id}`)}>
-        <span class="tree-item-title">
-          <span class="tree-item-name">
-            <Words text={t.name} />
-          </span>
-          {t.source?.kind === 'bundled' && (
-            <span class="chip chip-small chip-bundled" data-testid="bundled-chip">
-              用意済み
-            </span>
-          )}
-          {t.source?.kind === 'bundled' && (latestBundled(t.source.id)?.version ?? 0) > t.source.version && (
-            <span class="chip chip-small chip-unverified" data-testid="bundled-newer-chip">
-              新しい版あり
-            </span>
-          )}
-        </span>
-        <span class="tree-item-meta" data-testid="tree-item-position">
-          自分：{t.mySide === 'black' ? '☗先手' : '☖後手'}・{t.prefixText}
-        </span>
-        <span class="tree-item-meta num">
-          {dateText ?? formatDate(t.updatedAt)}・{t.nodeCount} 局面{running ? '・生成中' : ''}
-        </span>
-      </button>
-      <button type="button" class="btn tree-menu-btn" aria-label={`「${t.name}」の操作`} data-testid="tree-menu" onClick={onMenu}>
-        ⋯
-      </button>
-    </li>
-  );
-}
-
-/** 一覧の ⋯ のメニュー：名前の変更・JSON で共有・削除 */
-function TreeMenu({
-  tree,
-  generating,
-  onClose,
-  onDone,
-}: {
-  tree: TreeData;
-  generating: boolean;
-  onClose: () => void;
-  onDone: (message: string) => void;
-}) {
-  const [name, setName] = useState(tree.name);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [note, setNote] = useState('');
-
-  async function rename() {
-    const trimmed = name.trim();
-    if (!trimmed) {
-      setNote('名前を入力してください');
-      return;
-    }
-    // 開いている（生成中かもしれない）ツリーなら、そのものを書き換える（自動保存で元に戻らないように）
-    const target = openTree.value?.id === tree.id ? openTree.value : tree;
-    target.name = trimmed;
-    // 段階22-2：並び順（updatedAt）は変えずに、名前を直した日時を覚える（ほかの端末と合わせて、前の名前に戻らないように）
-    target.renamedAt = Date.now();
-    await saveTree(target);
-    if (openTree.value?.id === tree.id) openTree.value = target;
-    treeVersion.value++;
-    onDone('名前を変えました');
-  }
-
-  async function share() {
-    const outcome = await shareFile(fileNameOf(tree.name, 'json'), treeToJson(tree), 'application/json');
-    if (outcome !== 'cancelled') setNote(OUTCOME_TEXT[outcome]);
-  }
-
-  async function remove() {
-    await deleteTree(tree.id);
-    forgetOpened(tree.id);
-    if (openTree.value?.id === tree.id) openTree.value = null;
-    onDone(`「${tree.name}」を削除しました`);
-  }
-
-  return (
-    <Dialog title="ツリーの操作" onClose={onClose} testId="tree-menu-dialog" sheet>
-      <label class="form-field">
-        <span>名前</span>
-        <input type="text" value={name} maxLength={80} data-testid="rename-input" onInput={(e) => setName((e.target as HTMLInputElement).value)} />
-      </label>
-      <div class="dialog-actions">
-        <button type="button" class="btn btn-primary" data-testid="rename-save" onClick={() => void rename()}>
-          名前を保存
-        </button>
-      </div>
-      <div class="dialog-actions">
-        <button type="button" class="btn" data-testid="share-json" onClick={() => void share()}>
-          JSONで渡す
-        </button>
-      </div>
-      <div class="dialog-actions">
-        {!confirmDelete ? (
-          <button type="button" class="btn btn-danger" data-testid="delete-tree" disabled={generating} onClick={() => setConfirmDelete(true)}>
-            削除…
-          </button>
-        ) : (
-          <>
-            <span>本当に削除しますか？元に戻せません。</span>
-            <button type="button" class="btn btn-danger" data-testid="delete-confirm" onClick={() => void remove()}>
-              削除する
-            </button>
-            <button type="button" class="btn" onClick={() => setConfirmDelete(false)}>
-              やめる
-            </button>
-          </>
-        )}
-      </div>
-      {generating && <p class="muted">生成中のツリーは削除できません。止めてから削除してください。</p>}
-      {note && (
-        <p class="muted" role="status">
-          {note}
-        </p>
-      )}
-    </Dialog>
-  );
-}
-
-function formatDate(ms: number): string {
-  const d = new Date(ms);
-  const pad = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 const SIDE_CHOICE_TEXT: Record<Side, string> = { black: '☗先手', white: '☖後手' };

@@ -390,7 +390,6 @@ function StudyPlay({
             <PromotionBox input={input} />
           </div>
           <MoveBar
-            fixed={false}
             ids={{ bar: 'practice-nav', prev: 'practice-prev', center: 'practice-position', next: 'practice-next-move' }}
             onPrev={() => setView(Math.max(start, shown - 1))}
             onNext={() => setView(shown + 1 >= ply ? null : shown + 1)}

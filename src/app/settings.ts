@@ -1,21 +1,10 @@
-// 設定（評価関数・スレッド数・ハッシュ・W・ラベルのしきい値・プリセットの中身など）。
+// 設定（評価関数・スレッド数・ハッシュ・ラベルのしきい値・稽古の早送りなど）。
 // 端末の中（localStorage）にだけ保存する。読み込むときは、壊れた値や古い形でも使える値に直す。
 
 import { signal } from '@preact/signals';
 import { MAX_SEARCH_THREADS, type EvalId } from '../engine/config';
 import { DEFAULT_THRESHOLDS, type LabelThresholds } from '../tree/labels';
-import { DEFAULT_MAX_NODES, DEFAULT_WINDOW_CP, PRESETS, type PresetId } from '../tree/presets';
-import type { GenerationSettings } from '../tree/types';
-
-/** プリセットのうち、設定で変えられる部分 */
-export interface PresetValues {
-  totalMs: number;
-  movetimeMs: number;
-  multiPV: number;
-  maxRounds: number;
-  /** 自分の対応を調べる時間（ミリ秒）。0 なら調べず、読み筋の 2 手目を使う（未検証） */
-  replyMs: number;
-}
+import { DEFAULT_MAX_NODES, DEFAULT_WINDOW_CP, PRESET_DEFAULTS, type PresetId, type PresetValues } from '../tree/presets';
 
 export interface AppSettings {
   version: 1;
@@ -27,6 +16,7 @@ export interface AppSettings {
   pcThreads: number;
   /** PC 版のハッシュ（MB） */
   pcHashMB: number;
+  // windowCp・maxNodes・verifyMs・presets・reviewBatch は前の版のツリーの設定。画面は無いが、読んで持ち運ぶ（tree/presets.ts）
   /** 最善手から何点以内の応手を採用するか（W） */
   windowCp: number;
   /** 局面の数の上限 */
@@ -53,11 +43,7 @@ export const PC_MAX_THREADS = 256;
 const STORAGE_KEY = 'joban-tree.settings';
 
 export function defaultSettings(): AppSettings {
-  const presets = {} as Record<PresetId, PresetValues>;
-  for (const id of Object.keys(PRESETS) as PresetId[]) {
-    const { totalMs, movetimeMs, multiPV, maxRounds, replyMs = 0 } = PRESETS[id].settings;
-    presets[id] = { totalMs, movetimeMs, multiPV, maxRounds, replyMs };
-  }
+  const presets = structuredClone(PRESET_DEFAULTS);
   return {
     version: 1,
     evalId: 'micro',
@@ -148,25 +134,4 @@ export function updateSettings(next: AppSettings): void {
 /** 設定を初期値に戻す */
 export function resetSettings(): void {
   updateSettings(defaultSettings());
-}
-
-/** プリセットと設定から、生成の条件を作る */
-export function generationSettingsFor(id: PresetId, s: AppSettings = settings.value): GenerationSettings {
-  // 疑問手（「有力」のしきい値を超える応手）の先は、咎める手までで止める（持ち主の判断 2026-11-14）
-  return { ...s.presets[id], windowCp: s.windowCp, maxNodes: s.maxNodes, dubiousCp: s.thresholds.goodMax };
-}
-
-/** プリセットのボタンに出す名前（例：「ふつう（2分）」） */
-export function presetLabel(id: PresetId, s: AppSettings = settings.value): string {
-  const name = { normal: 'ふつう', deep: 'じっくり', precise: '精密' }[id];
-  return `${name}（${formatDuration(s.presets[id].totalMs)}）`;
-}
-
-/** 30000 → 「30秒」、120000 → 「2分」、90000 → 「1分30秒」 */
-export function formatDuration(ms: number): string {
-  const sec = Math.round(ms / 1000);
-  const m = Math.floor(sec / 60);
-  const s = sec % 60;
-  if (m === 0) return `${s}秒`;
-  return s === 0 ? `${m}分` : `${m}分${s}秒`;
 }

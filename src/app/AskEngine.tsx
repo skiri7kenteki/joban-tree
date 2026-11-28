@@ -5,7 +5,7 @@
 // - 自分の手番：自分の候補 3 つ（最善・最善から −n）。研究にある手は［進む］、無い手は［足す］（その 1 手）
 // - 研究の手が候補に入っていなければ、その手だけをもう一度調べて並べる（2 秒まで）。候補の表の手も同じ（もう一度残すとき、同じ条件の点にする）
 // - 盤で指して調べる手（picked）が候補に無ければ、その手だけを調べる（読み筋を長くするため、1 手で）
-// - 窓を閉じたら探索を止める。ツリーの生成中は使えない（同じエンジンを使うため）
+// - 窓を閉じたら探索を止める
 
 import { useEffect, useRef, useState } from 'preact/hooks';
 import { Dialog } from '../components/Dialog';
@@ -18,7 +18,6 @@ import { LABEL_TEXT, labelOf } from '../tree/labels';
 import { MARK_TEXT, hardMove, isUsiMove, mergeResults, type Candidate, type Shallow } from '../tree/candidates';
 import { HardNote, HardTag, MarkTag } from './CandidateDialogs';
 import { getEngine, pcEngine } from './engineService';
-import { isGenerating } from './generation';
 import { settings } from './settings';
 
 /** 探索の進み具合 */
@@ -72,8 +71,7 @@ export function AskEngine({
   onClose: () => void;
 }) {
   const mine = sideToMove(sfen) === mySide;
-  const generating = isGenerating();
-  const [phase, setPhase] = useState<Phase>(generating ? { kind: 'error', text: 'ツリーを生成中なので、エンジンを使えません。生成が終わるか止めてから聞いてください。' } : { kind: 'load' });
+  const [phase, setPhase] = useState<Phase>({ kind: 'load' });
   /** 何回目の探索か（窓を閉じた・調べ直したら、前の探索の結果は使わない） */
   const runId = useRef(0);
   const engineRef = useRef<UsiEngine | null>(null);
@@ -131,7 +129,7 @@ export function AskEngine({
 
   // 開いたらすぐ 3 秒。閉じたら探索を止める
   useEffect(() => {
-    if (!generating) void run(ASK_MS);
+    void run(ASK_MS);
     return () => {
       const searching = runId.current > 0;
       runId.current++;
@@ -221,17 +219,15 @@ export function AskEngine({
           </div>
         </div>
       )}
-      {mine && !generating && (
+      {mine && (
         <button type="button" class="btn btn-wide" data-testid="ask-pick" onClick={onPick}>
           ほかの手を盤で指して調べる
         </button>
       )}
       <div class="dialog-actions">
-        {!generating && (
-          <button type="button" class="btn" data-testid="ask-more" disabled={running} onClick={() => void run(ASK_MORE_MS)}>
-            もっと調べる（{ASK_MORE_MS / 1000}秒）
-          </button>
-        )}
+        <button type="button" class="btn" data-testid="ask-more" disabled={running} onClick={() => void run(ASK_MORE_MS)}>
+          もっと調べる（{ASK_MORE_MS / 1000}秒）
+        </button>
         <button type="button" class="btn dialog-action-end" data-testid="ask-close" onClick={onClose}>
           閉じる
         </button>

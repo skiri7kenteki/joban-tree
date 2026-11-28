@@ -1,8 +1,6 @@
 // 盤の下のバー（段階11-2）：「|‹  ‹  [17手目 ▲3六飛 ▾]  ›  ›|」。
-// 定跡帳・ツリー・新しいツリー・復習の画面で同じ部品を使う。前の版の ‹ › の行と、手順のボタンの並び（パンくず）の代わり。
-//   - 段階14（v0.38.0〜）：どの画面も盤のすぐ下に置く（fixed={false}）。画面の下に固定する置き方（fixed）は今は使っていない
+// 定跡帳・稽古・実戦の画面で同じ部品を使い、どの画面も盤のすぐ下に置く（段階14）。
 //   - 真ん中を押すと手順の一覧（棋譜欄）が開く（onCenter があるとき。広い画面では棋譜欄が盤の横に出ているので押しても何もしない）
-//   - 段階11-2〜13 の新しいツリーは、作るボタンのバーの中に置いていた
 
 import type { ComponentChildren, Ref } from 'preact';
 
@@ -23,15 +21,12 @@ export interface MoveBarProps {
   ids: { bar: string; first?: string; prev: string; center: string; next: string; last?: string };
   /** 「|‹」の読み上げの名前（「出発点（基本図）へ」など） */
   firstLabel?: string;
-  /** false：画面の下に固定しない（作るボタンのバーの中に置くとき） */
-  fixed?: boolean;
   barRef?: Ref<HTMLDivElement>;
 }
 
 export function MoveBar(p: MoveBarProps) {
-  const fixed = p.fixed !== false;
-  const bar = (
-    <div class={fixed ? 'move-bar move-bar-fixed' : 'move-bar'} ref={p.barRef} data-testid={p.ids.bar}>
+  return (
+    <div class="move-bar" ref={p.barRef} data-testid={p.ids.bar}>
       <div class="move-bar-inner">
         {p.onFirst && (
           <button type="button" class="move-bar-btn" aria-label={p.firstLabel ?? '最初へ'} data-testid={p.ids.first} onClick={p.onFirst} disabled={!p.canPrev}>
@@ -60,13 +55,5 @@ export function MoveBar(p: MoveBarProps) {
         )}
       </div>
     </div>
-  );
-  if (!fixed) return bar;
-  return (
-    <>
-      {/* 固定したバーの分だけ、画面の最後を空ける（最後の行がバーに隠れないように） */}
-      <div class="move-bar-space" aria-hidden="true" />
-      {bar}
-    </>
   );
 }

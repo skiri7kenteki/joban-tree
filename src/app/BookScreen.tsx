@@ -815,7 +815,6 @@ function BookViewScreen({
           </div>
           {/* 盤のすぐ下の操作バー（段階14。前は画面の下に固定）：|‹（出発点へ） ‹ [n手目 ▲X ▾] › ›|（今の研究手順の終わりへ） */}
           <MoveBar
-            fixed={false}
             ids={{ bar: 'study-nav', first: 'study-first', prev: 'study-prev', center: 'study-position', next: 'study-next', last: 'study-last' }}
             firstLabel={`出発点（${startName}）へ`}
             onFirst={() => (refuteLine ? showStep(0) : moveTo(minIndex))}

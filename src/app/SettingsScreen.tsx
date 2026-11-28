@@ -1,8 +1,7 @@
 // 設定のタブ：グループの小見出し＋行の目次（設定の整理）。行を押すと下の画面（#/settings/<名前>。中身は SettingsPages.tsx）へ進む。
-// 「気づきを送る」と「設定を初期値に戻す」は窓を開く。バージョン情報は版を出すだけ。
+// 「設定を初期値に戻す」は窓を開く。バージョン情報は版を出すだけ。
 
 import { useEffect, useState } from 'preact/hooks';
-import { APP_VERSION, FeedbackDialog, screenBeforeSettings } from '../components/Footer';
 import { Dialog } from '../components/Dialog';
 import { TABS } from '../components/TabBar';
 import { lastSyncAt } from '../drive/state';
@@ -10,6 +9,7 @@ import { lastBackupAt } from '../storage/backup';
 import { warsName } from './games';
 import { backTo, go, type SettingsPage } from './router';
 import { resetSettings, settings } from './settings';
+import { APP_VERSION } from './version';
 import { driveChanged } from './syncing';
 import { PAGES } from './SettingsPages';
 import { evalSummary, lastBackupSummary, lastSyncSummary, skipSameSummary, warsNameSummary } from './settingsSummary';
@@ -62,22 +62,6 @@ const ICONS = {
       <rect x="6" y="6" width="12" height="12" rx="2" />
       <rect x="9.5" y="9.5" width="5" height="5" />
       <path d="M9 3v3M15 3v3M9 18v3M15 18v3M3 9h3M3 15h3M18 9h3M18 15h3" />
-    </>
-  ),
-  // 枝分かれ
-  trees: (
-    <>
-      <circle cx="6" cy="12" r="2.2" />
-      <circle cx="18" cy="6" r="2.2" />
-      <circle cx="18" cy="18" r="2.2" />
-      <path d="M8.2 12H12V6h3.8M12 12v6h3.8" />
-    </>
-  ),
-  // 封筒
-  feedback: (
-    <>
-      <rect x="3.5" y="5.5" width="17" height="13" rx="2" />
-      <path d="M4 7l8 6 8-6" />
     </>
   ),
   // i
@@ -138,7 +122,6 @@ function SettingsTop() {
   // 同期中に目次へ戻った場合も、終わったら「最後の同期」の表示を新しくする
   void driveChanged.value;
   const s = settings.value;
-  const [feedback, setFeedback] = useState(false);
   const [confirmReset, setConfirmReset] = useState(false);
 
   return (
@@ -156,12 +139,6 @@ function SettingsTop() {
       </Group>
       <Group title="くわしい設定">
         <PageRow page="engine" name="エンジン" value={evalSummary(s.evalId)} />
-        <PageRow page="trees" name="ツリー（以前の機能）" />
-      </Group>
-      <Group title="サポート">
-        <button type="button" class="settings-row" data-testid="feedback-open" onClick={() => setFeedback(true)}>
-          <RowContent icon="feedback" name="気づきを送る" arrow />
-        </button>
       </Group>
       <Group title="その他">
         <div class="settings-row">
@@ -172,10 +149,9 @@ function SettingsTop() {
         </button>
       </Group>
 
-      {feedback && <FeedbackDialog screen={screenBeforeSettings()} onClose={() => setFeedback(false)} />}
       {confirmReset && (
         <Dialog title="設定を初期値に戻す" onClose={() => setConfirmReset(false)} testId="reset-dialog">
-          <p>すべての設定を初期値に戻しますか？（ツリーとウォーズの名前は消えません）</p>
+          <p>すべての設定を初期値に戻しますか？（ウォーズの名前は消えません）</p>
           <div class="btn-row">
             <button
               type="button"

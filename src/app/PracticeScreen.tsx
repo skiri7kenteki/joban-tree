@@ -146,7 +146,7 @@ function SectionTitle({ title, count }: { title: string; count: number }) {
 
 /** 定跡帳 1 つ分：見出し（押すと開閉。右に［まとめて稽古］）と、開いていれば細い行の一覧 */
 function GroupBlock<T>({ group: g, openKey, openAtFirst = false, meta, children }: { group: PracticeGroup<T>; openKey: string; openAtFirst?: boolean; meta: string; children: ComponentChildren }) {
-  // 覚えるのは「初めの形から変えた」見出しの key（定跡帳のタブ・ツリーの一覧と同じ置き場所）
+  // 覚えるのは「初めの形から変えた」見出しの key（定跡帳のタブと同じ置き場所）
   const open = collapsedGroups.value.includes(openKey) !== openAtFirst;
   return (
     <section class="practice-group" data-testid="practice-group" data-key={g.key}>

@@ -1,8 +1,8 @@
 {
   "name": "joban-tree",
   "private": true,
-  "version": "0.59.1",
-  "description": "将棋の序盤対策ツリーをスマホ・iPad で作る PWA",
+  "version": "0.60.0",
+  "description": "将棋の研究手順を定跡帳にまとめて稽古する PWA",
   "license": "GPL-3.0-or-later",
   "type": "module",
   "scripts": {
@@ -11,8 +11,7 @@
     "preview": "vite preview --host",
     "typecheck": "tsc -p tsconfig.json && tsc -p tsconfig.sw.json",
     "test": "vitest run",
-    "test:e2e": "playwright test",
-    "bake": "vite build --config pc/bake/vite.config.ts --logLevel warn && node pc/bake/dist/bake.mjs"
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@preact/signals": "^2.11.4",

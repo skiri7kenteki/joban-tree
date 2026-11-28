@@ -8,7 +8,6 @@ import { signal } from '@preact/signals';
 import { MAX_SEARCH_THREADS } from '../engine/config';
 import { createYaneuraOu, type UsiEngine } from '../engine/engine';
 import { createPcEngine, detectPcEngine, type PcInfo } from '../engine/pcEngine';
-import { PC_PRESET_IDS, PRESET_IDS, type PresetId } from '../tree/presets';
 import { settings, type AppSettings } from './settings';
 
 /** 読み込みの進み具合（画面表示用） */
@@ -25,11 +24,6 @@ const pcDetection: Promise<PcInfo | null> =
         pcEngine.value = info;
         return info;
       });
-
-/** 画面に出すプリセット（PC 版だけ「精密」がある） */
-export function availablePresets(): PresetId[] {
-  return pcEngine.value ? PC_PRESET_IDS : PRESET_IDS;
-}
 
 /**
  * 「おまかせ」のときのスレッド数（端末のコア数と上限 7 の小さい方）。

@@ -1,7 +1,7 @@
-// 設定の読み込み（壊れた値の補正）と、プリセットからの生成条件
+// 設定の読み込み（壊れた値の補正）と、前の版のツリーの設定を持ち運ぶこと
 import { describe, expect, it } from 'vitest';
-import { defaultSettings, formatDuration, generationSettingsFor, normalizeSettings, presetLabel } from '../../src/app/settings';
-import { PRESETS } from '../../src/tree/presets';
+import { defaultSettings, normalizeSettings } from '../../src/app/settings';
+import { PRESET_DEFAULTS } from '../../src/tree/presets';
 
 describe('設定', () => {
   it('何も保存されていなければ初期値（プリセットは確定した値）', () => {
@@ -11,9 +11,7 @@ describe('設定', () => {
     expect(s.hashMB).toBe(32);
     expect(s.windowCp).toBe(300);
     expect(s.thresholds).toEqual({ mainMax: 50, goodMax: 150 });
-    expect(generationSettingsFor('normal', s)).toEqual(PRESETS.normal.settings);
-    expect(generationSettingsFor('deep', s)).toEqual(PRESETS.deep.settings);
-    expect(s.presets.normal.replyMs).toBeGreaterThan(0);
+    expect(s.presets).toEqual(PRESET_DEFAULTS);
   });
 
   it('おかしな値は、使える値に直す', () => {
@@ -51,16 +49,14 @@ describe('設定', () => {
     expect(s.windowCp).toBe(200);
   });
 
-  it('プリセットの名前に全体の時間を出す', () => {
-    const s = defaultSettings();
-    expect(presetLabel('normal', s)).toBe('ふつう（2分）');
-    expect(presetLabel('deep', s)).toBe('じっくり（5分）');
-    expect(formatDuration(90_000)).toBe('1分30秒');
+  it('画面から消したツリーの設定も、読んで書き戻すと同じ値のまま（バックアップで運ぶものを変えない）', () => {
+    const d = defaultSettings();
+    const saved = { ...d, windowCp: 250, maxNodes: 800, verifyMs: 3000, reviewBatch: 20 as const, presets: { ...d.presets, precise: { ...d.presets.precise, totalMs: 900_000 } } };
+    expect(normalizeSettings(JSON.parse(JSON.stringify(saved)))).toEqual(saved);
   });
 
-  it('PC 版：精密プリセットがあり、PC のスレッド数・ハッシュを範囲内に直す。v0.5 の保存分には精密の初期値を足す', () => {
+  it('PC 版：PC のスレッド数・ハッシュを範囲内に直す。v0.5 の保存分には精密の初期値を足す', () => {
     const d = defaultSettings();
-    expect(presetLabel('precise', d)).toBe('精密（10分）');
     expect(d.pcThreads).toBe(0);
     expect(d.pcHashMB).toBe(1024);
     const s = normalizeSettings({ pcThreads: -3, pcHashMB: 999 });
