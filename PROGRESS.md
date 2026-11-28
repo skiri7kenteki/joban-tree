@@ -2,9 +2,9 @@
 
 ## 現在の状況
 **CLAUDE.md の仕上げ（番号なし。2026-11-28。依頼は `docs/claude/claude-md-finish.md`）**：その1（CLAUDE.md の直し。アプリは変えない。`rules.test.ts` 合格）ができた。
-- **その2：できた（v0.61.1）。持ち主の確認待ち**：`theme_color`（manifest と `index.html`）を紺 `#1c2740` から地の色 `#f7f5f1` に。iPhone の上の帯の設定（`black-translucent`）は変えていない
+- **その2：できた（v0.61.1）。持ち主が実機で確かめて締めた（2026-11-28「実機で確かめて大丈夫だった」）**：`theme_color`（manifest と `index.html`）を紺 `#1c2740` から地の色 `#f7f5f1` に。iPhone の上の帯の設定（`black-translucent`）は変えていない
 - テスト（2026-11-28 手元 Windows。依頼で絞った分だけ）：ビルド合格、`rules.test.ts` 4 項目合格、`e2e/one-screen.spec.ts` 5 項目合格
-- 実機で未確認：Android のホーム画面から開いて上の帯が明るい色か。iPhone のホーム画面から開いて上の時刻・電池が見えるか
+- 実機：持ち主が「大丈夫だった」（どの端末で試したかは聞いていない。頼んだ項目は、Android の上の帯の色と、iPhone の上の時刻・電池の見え方）
 - `package-lock.json` は読み書きが許可されないので、中の版の番号は確かめていない
 
 **CLAUDE.md と設定ファイルの整理（番号なし。2026-11-28。依頼と決まったことは `docs/claude/instructions-cleanup.md`）**：できた（アプリは変えない。型チェックと `rules.test.ts` 合格）。残っていた紺の `theme_color` は、上の「CLAUDE.md の仕上げ」で直した。
