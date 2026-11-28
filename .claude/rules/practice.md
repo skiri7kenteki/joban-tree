@@ -15,8 +15,8 @@ paths:
 
 稽古の札の下の局面メモ・悪手の理由と、終わりの研究手順のメモは、整理-2 で隠している（`src/app/hidden.ts` の `SHOW.comments`）。
 
-- **稽古（段階19、v0.43.0〜、持ち主の判断 2026-11-24「おすすめの通りで」。依頼書は無く、CLAUDE.md の「これからの方針」から設計案を出した。`src/practice/practice.ts`・`src/storage/practice.ts`・`src/app/practice.ts`・`src/app/PracticeScreen.tsx`・`src/app/PracticePlayScreen.tsx`）**：
-  - **研究手順の 1 局面ずつの復習（`#/study-review`、1 回 10 問）を置きかえた**。下のタブは **定跡帳／稽古／実戦／設定**（`#/practice`。前の `#/reviews` と `#/study-review/...` はここ・稽古へ移す）。
+- **稽古（段階19、v0.43.0〜、持ち主の判断 2026-11-24「おすすめの通りで」。依頼書は無く、当時の方針（`docs/claude/history.md`）から設計案を出した。`src/practice/practice.ts`・`src/storage/practice.ts`・`src/app/practice.ts`・`src/app/PracticeScreen.tsx`・`src/app/PracticePlayScreen.tsx`）**：
+  - **研究手順の 1 局面ずつの復習（`#/study-review`、1 回 10 問）を置きかえた**。下のタブは **定跡帳／稽古／実戦／設定**（稽古は `#/practice`。`#/reviews` も稽古のタブ。`#/study-review/...` は定跡帳のタブ）。
     前の復習の記録（IndexedDB の `review`）は消さない（バックアップ・同期で持ち運ぶ）。
   - 1 回の稽古＝研究手順 1 本を、**戦型の出発点**（自分の側が同じ、いちばん浅い戦型。`startTemplate`。横歩取りの後手番は 16 手目 △3三角）から終わりまで通して指す。出発点の後に自分の手番が無ければ初期局面から（`practiceStart`）。
     相手の手は研究手順の通りにアプリが指す（0.45 秒の間）。段階26-2 から、続けて稽古するときは同じ出だしを早送りする（下）。自分の手番の手が無い研究手順は稽古に出さない

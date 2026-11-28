@@ -5,7 +5,7 @@
 ```
 index.html                  画面の入口
 src/main.tsx                アプリ本体の入口（画面の切り替え）
-src/app/                    画面（定跡帳・稽古・実戦・設定）、エンジンの用意、設定、共有
+src/app/                    画面（定跡帳・稽古・実戦・設定）、エンジンの用意、設定、共有。画面に出すかどうかを決める所は hidden.ts
 src/components/Board.tsx    将棋盤（SVG）と持ち駒
 src/components/Dialog.tsx   重ねて出す小窓（確認・メニュー）
 src/components/TabBar.tsx   画面の下のタブ（段階11-1）
@@ -30,6 +30,7 @@ src/tree/studyBook.ts       研究手順どうしをつないで見る（段階9
 src/tree/bookEdit.ts        定跡帳で直接指して研究を足す・消す・取り消す（段階10-1。画面は src/app/BookScreen.tsx）。1 本の手順を足す checkNewMoves・studyFromMoves（段階10-2）
 src/app/addToBook.tsx       1 本の手順を定跡帳に足す窓（棋譜を貼る）と studyBookUrl（段階10-2）
 src/app/studyFix.ts         ずれた研究手順（戦型の側・名前）をアプリを開いたときに直す（段階10 の直し）
+src/drive/                  Google ドライブで同期（段階22-3。ログイン auth.ts・通信 api.ts・流れ sync.ts。くわしくは .claude/rules/drive.md）
 src/engine/usi.ts           USI の行を読み取る関数（テスト対象）
 src/engine/engine.ts        エンジンを包むモジュール（コマンドの順番待ち）
 src/engine/yaneuraou.worker.ts  エンジンを動かす Web Worker
@@ -39,7 +40,7 @@ pc/                         PC 版（start.bat・server.mjs・engine-files.mjs�
 src/isolation.ts            service worker の登録と cross-origin isolated の確保
 src/sw.ts                   service worker
 src/styles/                 CSS（tokens.css に色などの変数・明朝体の読み込み。base.css に画面全体の基本と「墨の上」の色の入れ替え）
-src/assets/fonts/           見出しの明朝体（段階12-1。scripts/make-font.py で作る）・駒の文字の字体（v0.34.0。scripts/make-koma-font.py で作る）
+src/assets/fonts/           見出しの明朝体（Noto Serif JP の太さ 600、JIS 第 1 水準までに削る。scripts/make-font.py で作る）・駒の文字の字体（同じく太さ 900＝Black、駒に書く 17 字だけで約 5KB。scripts/make-koma-font.py で作る）。ライセンスはどちらも SIL OFL 1.1（public/fonts/OFL-NotoSerifJP.txt）
 src/assets/board/           盤の地・駒の面の素材（段階15。駒の面は scripts/make-board-assets.py で docs/design/stage15-sheet.png から、盤の地は v0.39.1 から scripts/make-board-options.py の C_shinkaya。段階16 から駒台も盤の地）
 docs/design/                見た目の見本（段階12 の C 案、段階15 の素材を当てた案と素材シート、段階16 の明るい対局室）
 public/manifest.webmanifest ホーム画面用の設定（アイコンは public/*.png。scripts/make-icons.mjs で icon.svg から作る）
