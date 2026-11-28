@@ -106,7 +106,7 @@
 ## アイコン（v0.12.5〜）
 - クリーム色 `#f6f1e6` の地に、土（`#8a6a33`）から伸びる芽と二枚の葉（`#2e7d4f`）、先端にオレンジのつぼみ（`#e0661b`）。文字は使わない。元データは `public/icon.svg`
 - PNG は `node scripts/make-icons.mjs` で作る（背景色は `#f6f1e6`。maskable 版は周りに 12% の余白）
-- manifest の `background_color`（Android の起動画面の地）はアイコンの背景と同じ `#f6f1e6`。`theme_color`（manifest と `index.html`）は今は紺の `#1c2740` のまま（「藍は使わない」と合っていない。直すのは別の作業）
+- manifest の `background_color`（Android の起動画面の地）はアイコンの背景と同じ `#f6f1e6`。`theme_color`（manifest と `index.html` の `theme-color`。Android などの上の帯の色）は `--color-bg` と同じ値 `#f7f5f1`。CSS 変数が使えないので直に書く。地の色を変えたらここも直す
 
 ## 将棋盤と駒
 今のアプリの値（`src/components/Board.tsx`・`board.css`・`tokens.css`）。前の版の見た目と経緯は `docs/claude/history.md`。

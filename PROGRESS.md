@@ -1,9 +1,13 @@
 # 進捗メモ
 
 ## 現在の状況
-**CLAUDE.md の仕上げ（番号なし。2026-11-28。依頼は `docs/claude/claude-md-finish.md`）**：その1（CLAUDE.md の直し。アプリは変えない。`rules.test.ts` 合格）ができた。次は、持ち主の了承のあと その2（`theme_color` を `#f7f5f1` に）。
+**CLAUDE.md の仕上げ（番号なし。2026-11-28。依頼は `docs/claude/claude-md-finish.md`）**：その1（CLAUDE.md の直し。アプリは変えない。`rules.test.ts` 合格）ができた。
+- **その2：できた（v0.61.1）。持ち主の確認待ち**：`theme_color`（manifest と `index.html`）を紺 `#1c2740` から地の色 `#f7f5f1` に。iPhone の上の帯の設定（`black-translucent`）は変えていない
+- テスト（2026-11-28 手元 Windows。依頼で絞った分だけ）：ビルド合格、`rules.test.ts` 4 項目合格、`e2e/one-screen.spec.ts` 5 項目合格
+- 実機で未確認：Android のホーム画面から開いて上の帯が明るい色か。iPhone のホーム画面から開いて上の時刻・電池が見えるか
+- `package-lock.json` は読み書きが許可されないので、中の版の番号は確かめていない
 
-**CLAUDE.md と設定ファイルの整理（番号なし。2026-11-28。依頼と決まったことは `docs/claude/instructions-cleanup.md`）**：できた（アプリは変えない。型チェックと `rules.test.ts` 合格）。残り：`theme_color` が紺のまま（別の作業）。
+**CLAUDE.md と設定ファイルの整理（番号なし。2026-11-28。依頼と決まったことは `docs/claude/instructions-cleanup.md`）**：できた（アプリは変えない。型チェックと `rules.test.ts` 合格）。残っていた紺の `theme_color` は、上の「CLAUDE.md の仕上げ」で直した。
 
 **これからの方針（2026-11-23、持ち主と機能を見直して決めた。CLAUDE.md の「これからの方針」）**：定跡帳を中心に「作る → 覚える → 実戦で確かめる」を回すアプリにする。
 下のタブは 定跡帳／稽古／実戦／設定（ツリーのタブはなくす・データは消さない）。予定：段階17 データを守る → 段階18 実戦の照らし合わせ → 段階19 稽古（通し稽古と間隔反復）→
