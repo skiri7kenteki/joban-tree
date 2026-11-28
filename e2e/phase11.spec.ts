@@ -221,7 +221,7 @@ test.describe('11-3 ⋯ のメニューと説明文', () => {
     // 一覧の行の ⋯ も画面の下から。文字は短く
     await (await openStudyList(page)).getByTestId('study-menu').click();
     await expectSheet(page, 'study-menu-dialog', 740);
-    await expect(page.getByTestId('study-menu-edit')).toHaveText('名前・メモ');
+    await expect(page.getByTestId('study-menu-edit')).toHaveText('名前を直す');
     await expect(page.getByTestId('study-menu-json')).toHaveCount(0);
     await page.locator('dialog[open]').last().getByRole('button', { name: '閉じる' }).click();
     await closeDialog(page);

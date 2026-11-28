@@ -18,6 +18,7 @@ import { LABEL_TEXT, labelOf } from '../tree/labels';
 import { MARK_TEXT, hardMove, isUsiMove, mergeResults, type Candidate, type Shallow } from '../tree/candidates';
 import { HardNote, HardTag, MarkTag } from './CandidateDialogs';
 import { getEngine, pcEngine } from './engineService';
+import { SHOW } from './hidden';
 import { settings } from './settings';
 
 /** 探索の進み具合 */
@@ -208,7 +209,7 @@ export function AskEngine({
       )}
       {preview && confirming && (
         <div class="ask-confirm" data-testid="ask-save-confirm">
-          <p>この局面の表を、新しい結果で書きかえます。手・印・理由は残し、点と読み筋を新しくします。</p>
+          <p>この局面の表を、新しい結果で書きかえます。手・印{SHOW.comments ? '・理由' : ''}は残し、点と読み筋を新しくします。</p>
           <div class="dialog-actions">
             <button type="button" class="btn btn-primary" data-testid="ask-save-ok" onClick={() => onSave(preview.table, preview.dropped)}>
               書きかえる

@@ -27,6 +27,7 @@ import {
   type BackupFile,
 } from '../tree/backupFile';
 import type { Study } from '../tree/types';
+import { SHOW } from './hidden';
 import { settings } from './settings';
 import { go } from './router';
 import { shareFile } from './share';
@@ -246,10 +247,14 @@ export function DataSection() {
         <button type="button" class="btn btn-primary btn-wide" data-testid="backup-save" disabled={!prepared} onClick={save}>
           {prepared ? `バックアップを保存（${sizeText(prepared.bytes)}）` : 'バックアップを準備中…'}
         </button>
-        <button type="button" class="btn btn-wide" data-testid="backup-merge" onClick={() => mergeFileRef.current?.click()}>
-          ほかの端末のバックアップを合わせる
-        </button>
-        <p class="muted data-hint">2 台をそろえるには、合わせた端末で保存して、もう 1 台でも合わせます。</p>
+        {SHOW.mergeFile && (
+          <>
+            <button type="button" class="btn btn-wide" data-testid="backup-merge" onClick={() => mergeFileRef.current?.click()}>
+              ほかの端末のバックアップを合わせる
+            </button>
+            <p class="muted data-hint">2 台をそろえるには、合わせた端末で保存して、もう 1 台でも合わせます。</p>
+          </>
+        )}
         <button type="button" class="btn btn-wide" data-testid="backup-restore" onClick={() => fileRef.current?.click()}>
           バックアップから戻す
         </button>
@@ -277,7 +282,7 @@ export function DataSection() {
       {studies.length > 0 && (
         <div class="data-buttons">
           <button type="button" class="btn btn-wide" data-testid="study-export-open" onClick={() => setExporting(true)}>
-            研究手順を書き出す（JSON・KIF）
+            研究手順を書き出す（{SHOW.studyJson ? 'JSON・KIF' : 'KIF'}）
           </button>
         </div>
       )}
@@ -339,7 +344,7 @@ function RestoreSummary({ pending }: { pending: Pending }) {
         {pending.fromSnapshot ? '今のデータは、また［戻す前のデータに戻す］で元に戻せます。' : '戻す前のデータは端末の中に取っておき、［戻す前のデータに戻す］で元に戻せます。'}
       </p>
       <p class="muted">
-        このあと同期やほかの端末と合わせると、相手にあるものはまた入り、名前やメモは後で直した方になります。消したものや短くした手順を戻した分は残ります。
+        このあと{SHOW.mergeFile ? '同期やほかの端末と合わせる' : '同期する'}と、相手にあるものはまた入り、{SHOW.comments ? '名前やメモ' : '名前'}は後で直した方になります。消したものや短くした手順を戻した分は残ります。
       </p>
     </div>
   );

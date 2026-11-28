@@ -212,7 +212,7 @@ for (const size of SIZES) {
       await expect(page.getByTestId('backup-merge-summary')).toBeVisible();
       await shot(page, size.name, 'merge');
       await page.getByTestId('backup-merge-dialog').getByRole('button', { name: 'やめる' }).click();
-      await page.getByTestId('backup-merge').scrollIntoViewIfNeeded();
+      await page.getByTestId('backup-restore').scrollIntoViewIfNeeded();
       await shot(page, size.name, 'settings-data-bottom');
       // 前の同期から 1 日以上の一言（定跡帳のタブ）
       await page.evaluate(() => localStorage.setItem('joban-tree.last-sync', String(Date.now() - 2 * 24 * 60 * 60 * 1000)));

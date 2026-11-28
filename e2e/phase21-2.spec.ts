@@ -88,7 +88,6 @@ for (const [w, h] of [
     });
     expect(closeHit).toBeGreaterThanOrEqual(43);
     await expect(page.getByTestId('refute-card')).toContainText('咎め方を見ています');
-    await expect(page.getByTestId('refute-card')).toContainText('端が間に合わない');
     await expect(page.getByTestId('study-position')).toHaveText('咎め方 0／3手');
     await expect(page.getByTestId('study-prev')).toBeDisabled();
     // 悪手を指した局面：1四に後手の歩がある
@@ -209,26 +208,6 @@ for (const [w, h] of [
     expect((await page.getByTestId('board').boundingBox())!.width).toBeCloseTo(board, 0);
   });
 }
-
-test('局面メモの書きかけは、窓のほかのボタンや閉じるで保存する。全部消した書きかけは保存しない', async ({ page }) => {
-  await setup(page, [A]);
-  await putTable(page, keyAt(A.moves, 17), TABLE);
-  await page.goto(`./#/book/${KEY}/s-a/17`);
-  await page.reload();
-  await page.getByTestId('book-table').click();
-  await page.getByTestId('book-memo-text').fill('書きかけのメモ');
-  // 手の ⋯ へ（窓が切り替わる）
-  await page.getByTestId('cand-item-menu').first().click();
-  await expect(page.getByTestId('book-cut-dialog')).toBeVisible();
-  await page.getByTestId('book-cut-dialog').getByRole('button', { name: '閉じる' }).click();
-  await page.getByTestId('book-table').click();
-  await expect(page.getByTestId('book-memo-text')).toHaveValue('書きかけのメモ');
-
-  await page.getByTestId('book-memo-text').fill('');
-  await page.getByTestId('book-cand-dialog').getByRole('button', { name: '閉じる' }).click();
-  await page.getByTestId('book-table').click();
-  await expect(page.getByTestId('book-memo-text')).toHaveValue('書きかけのメモ');
-});
 
 test('食い違いの一覧で本命を選んだあと、取り消せる（窓の中・窓を閉じた後）', async ({ page }) => {
   const B: Study = { ...A, id: 's-b', name: '△5二玉', moves: [...G1, '5i5h', '5a5b', '3g3f'], createdAt: 1, updatedAt: 1 };

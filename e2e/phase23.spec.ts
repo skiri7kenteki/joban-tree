@@ -1,7 +1,7 @@
 // 段階23（v0.53.0）：研究候補の一覧の表示。持ち主の判断 2026-11-26「すべておすすめの通りで」
 // - 行は 2 段：指し手（大きく太く）と札／研究手順名（小さく）。点の差・割合の棒・本数・▶ は出さない
 // - 行の高さは 44px のまま。選んでいる行は木の茶の線と淡い茶の地
-// - 見出しの行は中身を出さず［候補・メモ］（相手の手番は［メモ］）
+// - 見出しの行は、候補の表があれば［候補］（局面メモは整理-2 で画面から隠した）
 // - 詳しい情報は行の ⋯ の窓の上。⋯ を押しても行は選ばれない
 import { expect, test, type Page } from '@playwright/test';
 import { STARTPOS_SFEN, applyUsiMove, sfenKey } from '../src/shogi/position';
@@ -107,20 +107,17 @@ for (const [w, h] of [
   });
 }
 
-test('見出しの行は中身を出さず［候補・メモ］。相手の手番は［メモ］、何も無ければ出さない', async ({ page }) => {
+test('見出しの行：候補の表があれば［候補］。局面メモの中身も印も出さない', async ({ page }) => {
   await setup(page, { note: MEMO, candidates: TABLE });
   await openAt17(page);
-  await expect(page.getByTestId('book-table')).toHaveText('✎ 候補・メモ');
+  await expect(page.getByTestId('book-table')).toHaveText('候補');
   await expect(page.getByTestId('study-book-list')).not.toContainText(MEMO);
-  await page.getByTestId('book-table').click();
-  await expect(page.getByTestId('book-memo-text')).toHaveValue(MEMO);
 });
 
-test('メモだけのとき：自分の手番は［候補・メモ］。表もメモも無ければ何も出さない', async ({ page }) => {
+test('局面メモだけの局面には、ボタンを出さない', async ({ page }) => {
   await setup(page, { note: MEMO });
   await openAt17(page);
-  await expect(page.getByTestId('book-memo')).toHaveText('✎ 候補・メモ');
-  await page.getByTestId('study-prev').click();
+  await expect(page.getByTestId('study-book-branch').first()).toBeVisible();
   await expect(page.getByTestId('book-memo')).toHaveCount(0);
   await expect(page.getByTestId('book-table')).toHaveCount(0);
 });
@@ -135,9 +132,9 @@ test('行の ⋯ の窓の上に詳しい情報。⋯ を押しても行は選�
   await expect(detail).toContainText('次善 −80');
   await expect(detail).toContainText('−35');
   await expect(detail).toContainText('▲３六歩');
-  await expect(detail).toContainText('飛車に当たりやすい');
+  await expect(detail).not.toContainText('飛車に当たりやすい');
   await expect(detail.getByTestId('row-detail-study')).toHaveText(['青野流 △5二玉']);
-  await expect(detail).toContainText(MEMO);
+  await expect(detail).not.toContainText(MEMO);
   await dialog.getByRole('button', { name: '閉じる' }).click();
   await expect(page.getByTestId('study-position')).toContainText('17手目');
   await expect(page.getByTestId('study-title')).toHaveText('青野流 △6二玉型');

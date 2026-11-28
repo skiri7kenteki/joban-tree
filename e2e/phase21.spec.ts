@@ -1,5 +1,5 @@
 // 段階21-1（v0.47.0）：自分の手の候補表（本命・次善・悪手）。持ち主の判断 2026-11-25「すべておすすめの通りで」
-// - 定跡帳の行に印（本命・次善・悪手。段階23 から点の差は ⋯ の窓と候補の窓）、研究手順の無い手は薄い行、見出しの行は［候補・メモ］。候補の窓
+// - 定跡帳の行に印（本命・次善・悪手。段階23 から点の差は ⋯ の窓と候補の窓）、研究手順の無い手は薄い行、見出しの行は［候補］。候補の窓
 // - 行の ⋯ で付け替え → 取り消し。研究手順が通っている手を悪手にするときは、消してから。悪手の印のある手は盤で指しても足さない
 // - エンジンに聞くの［表に残す］・もう一度残す（確認）・盤で指して調べる（ENGINE_AVAILABLE=1 のときだけ）
 // - 表があっても盤の大きさは変わらず、1 画面に収まる
@@ -69,7 +69,7 @@ test('行の印と見出しの行のボタン → 候補の窓 → 行の ⋯ �
   await putTable(page, TABLE);
   await openAt17(page);
 
-  await expect(page.getByTestId('book-table')).toHaveText('候補・メモ');
+  await expect(page.getByTestId('book-table')).toHaveText('候補');
   await expect(page.getByTestId('book-mark-tag')).toHaveText(['本命', '次善', '悪手']);
   // 段階21-2：読み筋のある悪手の行は「咎め方を見る」
   await expect(page.getByTestId('book-cand-row')).toContainText('咎め方を見る');
@@ -81,36 +81,29 @@ test('行の印と見出しの行のボタン → 候補の窓 → 行の ⋯ �
   await expect(page.getByTestId('book-mark-tag')).toHaveCount(0);
   await page.getByTestId('study-next').click();
 
-  // 候補の窓：評価値と読み筋、いちばん下に局面メモ
+  // 候補の窓：評価値と読み筋
   await page.getByTestId('book-table').click();
   const dialog = page.getByTestId('book-cand-dialog');
   await expect(dialog.getByTestId('cand-item')).toHaveCount(3);
   await expect(dialog.getByTestId('cand-item').first()).toContainText('+45 ▲３六歩 △７二銀');
   await expect(dialog.getByTestId('cand-item').last()).toContainText('咎め方：');
   await expect(dialog).toContainText('3秒・テスト');
-  await expect(dialog.getByTestId('book-memo-text')).toBeVisible();
   await dialog.getByRole('button', { name: '閉じる' }).click();
 
   // △5二玉 を本命に（前の本命は次善）→ 取り消し
   await page.getByTestId('book-branch-menu').nth(1).click();
   await page.getByTestId('mark-main').click();
   await expect(page.getByTestId('book-toast')).toContainText('△５二玉 を本命にしました');
-  await expect(page.getByTestId('book-table')).toHaveText('候補・メモ');
+  await expect(page.getByTestId('book-table')).toHaveText('候補');
   await page.getByTestId('book-toast-undo').click();
-  await expect(page.getByTestId('book-table')).toHaveText('候補・メモ');
+  await expect(page.getByTestId('book-table')).toHaveText('候補');
   await expect(page.getByTestId('book-mark-tag')).toHaveText(['本命', '次善', '悪手']);
 
-  // 薄い行の ⋯：理由を書く → 表から外す → 取り消し
-  await page.getByTestId('book-cand-menu').click();
-  await page.getByTestId('mark-reason').fill('端が間に合わない');
-  await page.getByTestId('mark-reason-save').click();
-  await page.getByTestId('book-table').click();
-  await expect(dialog).toContainText('端が間に合わない');
-  await dialog.getByRole('button', { name: '閉じる' }).click();
+  // 薄い行の ⋯：表から外す → 取り消し
   await page.getByTestId('book-cand-menu').click();
   await page.getByTestId('mark-remove').click();
   await expect(page.getByTestId('book-cand-row')).toHaveCount(0);
-  await expect(page.getByTestId('book-table')).toHaveText('候補・メモ');
+  await expect(page.getByTestId('book-table')).toHaveText('候補');
   await page.getByTestId('book-toast-undo').click();
   await expect(page.getByTestId('book-cand-row')).toHaveCount(1);
 });
@@ -180,7 +173,7 @@ test.describe('エンジンを使う', () => {
     await ask.getByTestId('ask-save').click();
     await expect(ask).toBeHidden();
     await expect(page.getByTestId('book-toast')).toContainText('候補の表に残しました');
-    await expect(page.getByTestId('book-table')).toHaveText('候補・メモ');
+    await expect(page.getByTestId('book-table')).toHaveText('候補');
     // 研究の手 2 つには印が付き、悪手にはならない
     await expect(page.getByTestId('study-book-branch').getByTestId('book-mark-tag')).toHaveCount(2);
     await expect(page.getByTestId('study-book-branch').locator('[data-mark="bad"]')).toHaveCount(0);
@@ -189,7 +182,7 @@ test.describe('エンジンを使う', () => {
     await page.getByTestId('book-ask').click();
     await expect(ask.getByTestId('ask-list')).toBeVisible({ timeout: 60_000 });
     await ask.getByTestId('ask-save').click();
-    await expect(ask.getByTestId('ask-save-confirm')).toContainText('手・印・理由は残し');
+    await expect(ask.getByTestId('ask-save-confirm')).toContainText('手・印は残し');
     await ask.getByTestId('ask-save-ok').click();
     await expect(ask).toBeHidden();
 

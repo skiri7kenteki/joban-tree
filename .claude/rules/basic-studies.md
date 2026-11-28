@@ -10,6 +10,9 @@ paths:
 
 > この機能の仕様を変えたら、このファイルを直す。下のパスのファイルを読んだときだけ読み込まれる。
 
+**整理-2（2026-11-28、持ち主の判断）：画面から隠している（`src/app/hidden.ts` の `SHOW`）。データ・扱うコード・単体テストは残る。**
+- 「＋ 研究手順を登録」の［基本の研究を入れる］を出さない（`SHOW.basicStudies`）。下の「入口」は true にしたときのもの
+
 - **基本の研究（段階20-3、v0.46.0〜、持ち主の判断 2026-11-24「全ておすすめの通りで」。計算は `src/tree/basicStudies.ts`、窓は `src/app/BasicStudiesDialog.tsx`）**：
   - 戦型ごとの「基本の研究手順」の組。データは `src/data/basic-studies.json`（`{ sets: [{ id, templateId, name, mySide, reviewed, lines: [{ moves, note, source }] }] }`。
     moves は戦型の出発点からの手（USI）を空白でつないだ文字、note はどんな変化か、source は出典（解説記事の URL など。画面には出さない））

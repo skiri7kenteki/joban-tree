@@ -131,12 +131,12 @@ test('一覧で直した・消した後は、前の書き込みの取り消し�
   const list = page.getByTestId('study-list-dialog');
   await list.getByTestId('study-menu').click();
   await page.getByTestId('study-menu-edit').click();
-  await page.getByTestId('study-note').fill('一覧で書いたメモ');
+  await page.getByTestId('study-name').fill('一覧で直した名前');
   await page.getByTestId('study-save').click();
   // 一言は窓の中に出る
   await expect(list.getByTestId('study-list-message')).toContainText('直しました');
   await list.getByRole('button', { name: '閉じる' }).click();
-  await expect(page.getByTestId('study-meta')).toContainText('一覧で書いたメモ');
+  await expect(page.getByTestId('study-title')).toHaveText('一覧で直した名前');
   await page.getByTestId('book-menu').click();
   await expect(page.getByTestId('book-undo')).toBeDisabled();
 });

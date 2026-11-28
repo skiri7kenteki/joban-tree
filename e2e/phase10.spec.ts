@@ -205,7 +205,6 @@ test.describe('10-1 定跡帳で直接指して研究を足す', () => {
     await expect(rows).toHaveCount(0);
     await expect(page.getByTestId('study-book-ending')).toContainText('研究A');
     await expect(page.getByTestId('study-title')).toHaveText('研究A');
-    await expect(page.getByTestId('study-meta')).toContainText('Aのメモ');
 
     // 取り消すと、研究A の ▲2六飛 が戻る
     await undoFromMenu(page);
@@ -217,11 +216,11 @@ test.describe('10-1 定跡帳で直接指して研究を足す', () => {
     await expect((await openStudyList(page)).getByTestId('study-item').filter({ hasText: '研究A' })).toContainText('19 手');
   });
 
-  test('ここで終わりにする・この研究手順を消す・名前とメモを直す（⋯ と ★ の行から）', async ({ page }) => {
+  test('ここで終わりにする・この研究手順を消す・名前を直す（⋯ と ★ の行から）', async ({ page }) => {
     await openHome(page);
     await importStudies(page, [A, B]);
     await (await openStudyList(page)).getByTestId('study-item').filter({ hasText: '研究A' }).click();
-    // ★ の行を押すと名前・メモ（自分の側は出さない）
+    // ★ の行を押すと名前を直す窓（自分の側は出さない）
     await page.getByTestId('book-head').click();
     await expect(page.getByTestId('study-side-black')).toHaveCount(0);
     await page.getByTestId('study-name').fill('本線');

@@ -17,6 +17,7 @@ import { parseStudiesJson, planStudyImport, resolveStudyImport, type StudyConfli
 import type { Study } from '../tree/types';
 import { bookPath, bookTemplatePath, go } from './router';
 import { TemplatePicker, allTemplates, myTemplates, refreshMyTemplates } from './TemplateDialogs';
+import { SHOW } from './hidden';
 import { KifPasteDialog } from './addToBook';
 import { fixStoredStudies } from './studyFix';
 import { BasicStudiesDialog } from './BasicStudiesDialog';
@@ -200,17 +201,19 @@ export function HomeScreen({ isolationMessage }: { isolationMessage: string | nu
             >
               戦型から選ぶ
             </button>
-            <button
-              type="button"
-              class="btn"
-              data-testid="study-register-basic"
-              onClick={() => {
-                setRegisterMenu(false);
-                setBasic(true);
-              }}
-            >
-              基本の研究を入れる
-            </button>
+            {SHOW.basicStudies && (
+              <button
+                type="button"
+                class="btn"
+                data-testid="study-register-basic"
+                onClick={() => {
+                  setRegisterMenu(false);
+                  setBasic(true);
+                }}
+              >
+                基本の研究を入れる
+              </button>
+            )}
           </div>
           <p class="menu-section-title">棋譜・ファイルから</p>
           <div class="dialog-actions dialog-actions-column">
@@ -228,9 +231,11 @@ export function HomeScreen({ isolationMessage }: { isolationMessage: string | nu
             <button type="button" class="btn" data-testid="study-register-kif" onClick={() => go('/study-import')}>
               変化付きKIFからまとめて
             </button>
-            <button type="button" class="btn" data-testid="study-register-json" onClick={() => studyFileRef.current?.click()}>
-              JSONを取り込む
-            </button>
+            {SHOW.studyJson && (
+              <button type="button" class="btn" data-testid="study-register-json" onClick={() => studyFileRef.current?.click()}>
+                JSONを取り込む
+              </button>
+            )}
           </div>
         </Dialog>
       )}

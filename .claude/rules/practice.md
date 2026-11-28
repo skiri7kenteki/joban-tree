@@ -13,6 +13,8 @@ paths:
 > CLAUDE.md から移した仕様（2026-11-24）。この機能の仕様を変えたら、このファイルを直す。
 > 下のパスのファイルを読んだときだけ読み込まれる。
 
+稽古の札の下の局面メモ・悪手の理由と、終わりの研究手順のメモは、整理-2 で隠している（`src/app/hidden.ts` の `SHOW.comments`）。
+
 - **稽古（段階19、v0.43.0〜、持ち主の判断 2026-11-24「おすすめの通りで」。依頼書は無く、CLAUDE.md の「これからの方針」から設計案を出した。`src/practice/practice.ts`・`src/storage/practice.ts`・`src/app/practice.ts`・`src/app/PracticeScreen.tsx`・`src/app/PracticePlayScreen.tsx`）**：
   - **研究手順の 1 局面ずつの復習（`#/study-review`、1 回 10 問）を置きかえた**。下のタブは **定跡帳／稽古／実戦／設定**（`#/practice`。前の `#/reviews` と `#/study-review/...` はここ・稽古へ移す）。
     前の復習の記録（IndexedDB の `review`）は消さない（バックアップ・同期で持ち運ぶ）。

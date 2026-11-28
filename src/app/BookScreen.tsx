@@ -70,6 +70,7 @@ import { StudyEditDialog } from './StudyDialogs';
 import { StudyListDialog } from './StudyList';
 import { applyStudyChange, ensureStudies, library, studiesNow } from './studies';
 import { KifuPanel, KifuSheet, useWideLayout, type KifuRow } from '../components/KifuList';
+import { SHOW } from './hidden';
 import { MoveBar } from '../components/MoveBar';
 import { AskEngine } from './AskEngine';
 import { RegisterTemplateDialog, allTemplates, myTemplates, refreshMyTemplates } from './TemplateDialogs';
@@ -665,8 +666,8 @@ function BookViewScreen({
   async function saveFields(f: { name: string; note: string }) {
     if (!current) return;
     setDialog(null);
-    const next: Study = { ...current, name: f.name.trim(), note: f.note.trimEnd(), updatedAt: Date.now() };
-    await commit({ put: [next], remove: [] }, () => ({ id: next.id, line: [...next.moves], index }), '名前・メモを直しました');
+    const next: Study = { ...current, name: f.name.trim(), note: f.note === current.note ? current.note : f.note.trimEnd(), updatedAt: Date.now() };
+    await commit({ put: [next], remove: [] }, () => ({ id: next.id, line: [...next.moves], index }), SHOW.comments ? '名前・メモを直しました' : '名前を直しました');
   }
 
   // ---- ⋯ の中のほかの操作 ----
@@ -785,9 +786,11 @@ function BookViewScreen({
                 ★
               </span>
               <strong data-testid="study-title">{current.name}</strong>
-              <span class="muted study-meta-inline" data-testid="study-meta">
-                {firstLine(current.note) || 'メモなし'}
-              </span>
+              {SHOW.comments && (
+                <span class="muted study-meta-inline" data-testid="study-meta">
+                  {firstLine(current.note) || 'メモなし'}
+                </span>
+              )}
             </button>
             <button type="button" class="btn btn-primary study-head-review" data-testid="book-head-review" onClick={() => go(`/practice/play/${current.id}`)}>
               稽古
@@ -840,7 +843,7 @@ function BookViewScreen({
               listRef={branchesRef}
               text={moveText(sfen, refuteEntry.move, prevMove)}
               tag={markText(table, refuteEntry)}
-              reason={refuteEntry.reason}
+              reason={SHOW.comments ? refuteEntry.reason : undefined}
               moves={refuteLine.texts}
               step={refuteStep}
               onClose={() => setRefute(null)}
@@ -915,7 +918,7 @@ function BookViewScreen({
               <p class="menu-section-title">この研究手順（★ {current.name}）</p>
               <div class="dialog-actions dialog-actions-column">
                 <button type="button" class="btn" data-testid="book-edit-fields" onClick={() => setDialog({ kind: 'fields' })}>
-                  名前・メモ
+                  {SHOW.comments ? '名前・メモ' : '名前を直す'}
                 </button>
                 <button type="button" class="btn" data-testid="book-study-review" onClick={() => go(`/practice/play/${current.id}`)}>
                   稽古
@@ -934,9 +937,12 @@ function BookViewScreen({
           )}
           <p class="menu-section-title">この局面</p>
           <div class="dialog-actions dialog-actions-column">
-            <button type="button" class="btn" data-testid="book-open-cand" onClick={openPositionWindow}>
-              {mine ? '候補・局面メモ' : '局面メモ'}
-            </button>
+            {/* 局面メモを隠している間、相手の手番には開く窓が無い */}
+            {(mine || SHOW.comments) && (
+              <button type="button" class="btn" data-testid="book-open-cand" onClick={openPositionWindow}>
+                {!SHOW.comments ? '候補の表' : mine ? '候補・局面メモ' : '局面メモ'}
+              </button>
+            )}
             {/* 段階25-1：定跡帳から新しい戦型を作る道（グループは戦型から決まる） */}
             <button type="button" class="btn" data-testid="book-register-template" disabled={index === 0} onClick={() => setDialog({ kind: 'register' })}>
               この局面を戦型として登録
@@ -1090,7 +1096,7 @@ function BookViewScreen({
               <CutText count={cutPlan.count} kept={cutPlan.put} />
               {/* 手順前後で来る研究手順も消えるときは、消える名前を出す（盤でたどっていない研究手順なので） */}
               {cutPlan.remove.some((s) => !startsWith(s.moves, here)) && (
-                <p data-testid="book-cut-names">消える研究手順（メモも）：{cutPlan.remove.map((s) => `「${s.name}」`).join('')}</p>
+                <p data-testid="book-cut-names">消える研究手順{SHOW.comments ? '（メモも）' : ''}：{cutPlan.remove.map((s) => `「${s.name}」`).join('')}</p>
               )}
               <div class="dialog-actions">
                 <button type="button" class="btn btn-danger" data-testid="book-cut-ok" disabled={busy} onClick={() => void doCut(dialog.move)}>
@@ -1138,7 +1144,7 @@ function BookViewScreen({
 
       {dialog?.kind === 'delete' && current && (
         <Dialog title="この研究手順を消しますか？" onClose={() => setDialog(null)} testId="book-delete-dialog">
-          <p>研究手順「{current.name}」を消します（メモも消えます）。取り消せます。</p>
+          <p>研究手順「{current.name}」を消します{SHOW.comments ? '（メモも消えます）' : ''}。取り消せます。</p>
           <div class="dialog-actions">
             <button type="button" class="btn btn-danger" data-testid="book-delete-ok" disabled={busy} onClick={() => void doDelete()}>
               消す
@@ -1207,7 +1213,7 @@ function BadText({ plan }: { plan: ReturnType<typeof cutMoveAt> }) {
   return (
     <div data-testid="book-bad-text">
       <p>この手を通る研究手順 {plan.count} 本を、この手から先で消して、悪手にします（稽古で悪手が正解にならないように）。</p>
-      {plan.remove.length > 0 && <p>消える研究手順（メモも）：{names(plan.remove)}</p>}
+      {plan.remove.length > 0 && <p>消える研究手順{SHOW.comments ? '（メモも）' : ''}：{names(plan.remove)}</p>}
       {plan.put.length > 0 && <p>この局面で終わる形で残す研究手順：{names(plan.put)}</p>}
     </div>
   );
@@ -1276,7 +1282,7 @@ function CutText({ count, kept }: { count: number; kept: readonly Study[] }) {
     <>
       <p data-testid="book-cut-text">
         研究手順 {count} 本を消します
-        {kept.length > 0 ? `。${kept.map((s) => `「${s.name}」`).join('')}は、この局面で終わる研究手順として残します（メモもそのまま）` : ''}。
+        {kept.length > 0 ? `。${kept.map((s) => `「${s.name}」`).join('')}は、この局面で終わる研究手順として残します${SHOW.comments ? '（メモもそのまま）' : ''}` : ''}。
       </p>
       <p class="muted">取り消せます。</p>
     </>
@@ -1374,7 +1380,7 @@ function BookBranches({
     </span>
   );
   /** 見出しの行の小さなボタン（中身は出さない。✎ はメモがある印） */
-  const summary = `${memo ? '✎ ' : ''}${mine ? '候補・メモ' : 'メモ'}`;
+  const summary = !SHOW.comments ? '候補' : `${memo ? '✎ ' : ''}${mine ? '候補・メモ' : 'メモ'}`;
   return (
     <div class="card candidates book-list" ref={listRef} data-testid="study-book-list">
       <div class="candidates-head book-list-head">
@@ -1389,7 +1395,7 @@ function BookBranches({
           <>
             <strong data-testid="study-book-head">研究 {count}本</strong>
             {/* 段階23：候補の表か局面メモがあるときだけ。押すと候補の窓（相手の手番は局面メモの窓） */}
-            {(table.length > 0 || memo) && (
+            {(table.length > 0 || (SHOW.comments && memo)) && (
               <button type="button" class="book-memo" data-testid={table.length > 0 ? 'book-table' : 'book-memo'} onClick={onSummary}>
                 <span class="book-memo-text">{summary}</span>
               </button>

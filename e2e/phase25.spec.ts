@@ -173,10 +173,10 @@ test('研究手順の一覧で 3 本選んで消す', async ({ page }) => {
   await expect(page.getByTestId('study-count')).toHaveText('研究手順 4 本');
 
   await page.getByTestId('book-group-open').click();
-  // 盤の取り消しの記録を先に 1 つ作る（メモを書く）
+  // 盤の取り消しの記録を先に 1 つ作る（名前を直す）
   await page.getByTestId('book-menu').click();
   await page.getByTestId('book-edit-fields').click();
-  await page.getByTestId('study-note').fill('消す前のメモ');
+  await page.getByTestId('study-name').fill('消す前に直した名前');
   await page.getByRole('button', { name: '保存' }).click();
   await page.getByTestId('book-menu').click();
   await expect(page.getByTestId('book-undo')).toBeEnabled();

@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from 'preact/hooks';
 import { Dialog } from '../components/Dialog';
+import { SHOW } from './hidden';
 import { Words } from '../components/Words';
 import { dueText } from '../practice/practice';
 import { firstLine, studyMovesText } from '../tree/studies';
@@ -185,7 +186,7 @@ export function StudyListDialog({
 
 /** 研究手順の行の中身（★名前・メモの最初の 1 行・手数・日付） */
 function StudyRowText({ study }: { study: Study }) {
-  const note = firstLine(study.note);
+  const note = SHOW.comments ? firstLine(study.note) : '';
   return (
     <span class="study-row-text">
       <span class="tree-item-title">
@@ -258,7 +259,7 @@ function StudyMenu({ study, onClose, onDone }: { study: Study; onClose: () => vo
           稽古
         </button>
         <button type="button" class="btn" data-testid="study-menu-edit" onClick={() => setEditing(true)}>
-          名前・メモ
+          {SHOW.comments ? '名前・メモ' : '名前を直す'}
         </button>
       </div>
       <div class="dialog-actions">

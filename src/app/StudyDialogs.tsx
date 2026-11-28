@@ -10,6 +10,7 @@ import { dateStamp, fileNameOf } from '../tree/backup';
 import { checkStudyFields, type Study } from '../tree/studies';
 import { studiesToJson, studiesToKif } from '../tree/studyFile';
 import type { TreeGroup } from '../tree/organize';
+import { SHOW } from './hidden';
 import { OUTCOME_TEXT, shareFile, type ShareOutcome } from './share';
 
 const SIDE_TEXT: Record<Side, string> = { black: '☗先手', white: '☖後手' };
@@ -41,7 +42,8 @@ export function StudyEditDialog({
   const [error, setError] = useState('');
 
   function save() {
-    const problem = checkStudyFields({ name, note });
+    // メモの欄を隠している間は名前だけを確かめる（取り込みや合流で長くなったメモがあっても、名前を直せるように）
+    const problem = checkStudyFields({ name, note: SHOW.comments ? note : '' });
     if (problem) {
       setError(problem);
       return;
@@ -58,6 +60,7 @@ export function StudyEditDialog({
         <span>名前</span>
         <input type="text" value={name} maxLength={100} data-testid="study-name" onInput={(e) => setName((e.target as HTMLInputElement).value)} />
       </label>
+      {SHOW.comments && (
       <label class="form-field">
         <span>メモ</span>
         <textarea
@@ -70,6 +73,7 @@ export function StudyEditDialog({
           onInput={(e) => setNote((e.target as HTMLTextAreaElement).value)}
         />
       </label>
+      )}
       {!hideSide && (
         <div class="side-choice" role="radiogroup" aria-label="自分は">
           <span>自分は</span>
@@ -169,10 +173,12 @@ export function StudyExportDialog({
         {chosen.length} 本を選んでいます。
       </p>
       <div class="dialog-actions">
-        <button type="button" class="btn btn-primary" data-testid="study-export-json" disabled={chosen.length === 0} onClick={() => void exportAs('json')}>
-          JSONで渡す
-        </button>
-        <button type="button" class="btn" data-testid="study-export-kif" disabled={chosen.length === 0} onClick={() => void exportAs('kif')}>
+        {SHOW.studyJson && (
+          <button type="button" class="btn btn-primary" data-testid="study-export-json" disabled={chosen.length === 0} onClick={() => void exportAs('json')}>
+            JSONで渡す
+          </button>
+        )}
+        <button type="button" class={SHOW.studyJson ? 'btn' : 'btn btn-primary'} data-testid="study-export-kif" disabled={chosen.length === 0} onClick={() => void exportAs('kif')}>
           KIFで渡す
         </button>
       </div>

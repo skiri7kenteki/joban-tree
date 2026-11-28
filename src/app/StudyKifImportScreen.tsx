@@ -11,6 +11,7 @@ import { deleteMyTemplate } from '../storage/templates';
 import { autoTemplate, destinations, lacksOwnAfter, passesAll } from '../tree/importTemplate';
 import { buildCandidates, candidateName, candidatesToStudies, decodeKifFile, kifSide, readKif, type KifCandidate } from '../tree/kifImport';
 import type { OpeningTemplate } from '../tree/templates';
+import { SHOW } from './hidden';
 import { CreateTemplateDialog, NO_OWN_TEXT, PickTemplateDialog } from './ImportTemplate';
 import { back, go } from './router';
 import { ensureStudies, homeNotice, importUndo, saveStudies, studiesNow } from './studies';
@@ -281,8 +282,8 @@ export function StudyKifImportScreen() {
                   <span class="kif-bulk-text">
                     <span class="kif-bulk-name">{candidateName(c, side, templates)}</span>
                     <span class="muted kif-bulk-meta">
-                      {c.moves.length} 手{c.note ? '・メモあり' : ''}
-                      {c.noteCut ? '（長いので途中まで）' : ''}
+                      {c.moves.length} 手{SHOW.comments && c.note ? '・メモあり' : ''}
+                      {SHOW.comments && c.noteCut ? '（長いので途中まで）' : ''}
                       {c.existing && (
                         <span class="chip chip-small chip-unverified" data-testid="kif-bulk-exists">
                           すでにあり

@@ -3,7 +3,6 @@
 //   （段階21-1 から、自分の手番は候補の窓のいちばん下。メモも表も無ければ ⋯ の「候補・局面メモ」から）
 // - 食い違い：自分の手番の同じ局面で研究手順によって自分の手が違う → 行に印・定跡帳のタブに知らせ・本命を選ぶと消える（段階21-1 で「このままでよい」から変えた）。手順前後の手は「手順前後」の行
 // - 稽古：ほかの研究手順の手はまちがいにしない。まちがえたとき・ほかの研究の手のとき、その局面の局面メモ
-import { openSettings } from './settings';
 import { expect, test, type Page } from '@playwright/test';
 import type { Study } from '../src/tree/types';
 
@@ -13,7 +12,6 @@ const G1 = '7g7f 3c3d 2g2f 8c8d 2f2e 8d8e 6i7h 4a3b 2e2d 2c2d 2h2d 8e8f 8g8f 8b8
 /** 後手番。17手目 ▲5八玉 の後に △6二玉（A）と △5二玉（B）＝食い違い */
 const A: Study = { id: 's-a', name: '青野流 △6二玉型', note: '', moves: [...G1, '5i5h', '5a6b', '3g3f', '7a7b'], mySide: 'white', createdAt: 2, updatedAt: 2 };
 const B: Study = { id: 's-b', name: '青野流 △5二玉', note: '', moves: [...G1, '5i5h', '5a5b', '3g3f'], mySide: 'white', createdAt: 1, updatedAt: 1 };
-const KEY = encodeURIComponent('study:横歩取り|white');
 
 async function setup(page: Page, studies: Study[]) {
   await page.goto('./');
@@ -25,52 +23,6 @@ async function setup(page: Page, studies: Study[]) {
   });
   await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${studies.length} 本`);
 }
-
-/** ⋯ から候補の窓（自分の手番）を開いて、いちばん下の局面メモに書く */
-async function writeMemo(page: Page, text: string) {
-  await page.getByTestId('book-menu').click();
-  await page.getByTestId('book-open-cand').click();
-  await expect(page.getByTestId('book-cand-dialog')).toBeVisible();
-  await page.getByTestId('book-memo-text').fill(text);
-  await page.getByTestId('book-memo-save').click();
-  await expect(page.getByTestId('book-cand-dialog')).toBeHidden();
-}
-
-test('局面メモ：書く → 見出しの行にボタン（段階23 から中身は出さない）→ ほかの局面には出ない → 同じ局面ならほかの研究手順でも出る → 消す', async ({ page }) => {
-  await setup(page, [A, B]);
-  await page.goto(`./#/book/${KEY}/s-a/17`);
-  await expect(page.getByTestId('study-book-head')).toBeVisible();
-  await expect(page.getByTestId('book-memo')).toHaveCount(0);
-  await writeMemo(page, '▲5八玉には△6二玉が本筋\n▲3六歩なら△8四飛');
-  await expect(page.getByTestId('book-memo')).toHaveText('✎ 候補・メモ');
-
-  // 1 手戻ると別の局面（メモ無し）
-  await page.getByTestId('study-prev').click();
-  await expect(page.getByTestId('book-memo')).toHaveCount(0);
-
-  // 研究手順 B の同じ局面（読み込み直しても残る）
-  await page.goto(`./#/book/${KEY}/s-b/17`);
-  await page.reload();
-  await expect(page.getByTestId('book-memo')).toHaveText('✎ 候補・メモ');
-
-  // 窓で全文を読む・消す
-  await page.getByTestId('book-memo').click();
-  await expect(page.getByTestId('book-memo-text')).toHaveValue('▲5八玉には△6二玉が本筋\n▲3六歩なら△8四飛');
-  await page.getByTestId('book-memo-delete').click();
-  await expect(page.getByTestId('book-cand-dialog')).toBeHidden();
-  await expect(page.getByTestId('book-memo')).toHaveCount(0);
-
-  // 相手の手番の局面にも、⋯ の「局面メモ」から書ける
-  await page.getByTestId('study-prev').click();
-  await page.getByTestId('book-menu').click();
-  await page.getByTestId('book-open-cand').click();
-  await page.getByTestId('book-memo-text').fill('相手の手番のメモ');
-  await page.getByTestId('book-memo-save').click();
-  await expect(page.getByTestId('book-memo-dialog')).toBeHidden();
-  await expect(page.getByTestId('book-memo')).toHaveText('✎ メモ');
-  await page.getByTestId('book-memo').click();
-  await expect(page.getByTestId('book-memo-text')).toHaveValue('相手の手番のメモ');
-});
 
 test('食い違い：行に印 → 定跡帳のタブに知らせ → 見るでその局面 → 本命を選ぶと消える → 取り消し', async ({ page }) => {
   await setup(page, [A, B]);
@@ -90,7 +42,7 @@ test('食い違い：行に印 → 定跡帳のタブに知らせ → 見るで�
   await expect(page.getByTestId('book-conflict-box')).toContainText('食い違い');
   await page.locator('[data-testid="conflict-main"][data-move="5a5b"]').click();
   await expect(page.getByTestId('book-conflict-tag')).toHaveCount(0);
-  await expect(page.getByTestId('book-table')).toHaveText('候補・メモ');
+  await expect(page.getByTestId('book-table')).toHaveText('候補');
   await expect(page.getByTestId('book-mark-tag')).toHaveText(['次善', '本命']);
 
   // 取り消すと食い違いに戻る → もう一度選ぶ
@@ -99,7 +51,7 @@ test('食い違い：行に印 → 定跡帳のタブに知らせ → 見るで�
   await expect(page.getByTestId('book-table')).toHaveCount(0);
   await page.getByTestId('book-branch-menu').first().click();
   await page.locator('[data-testid="conflict-main"][data-move="5a6b"]').click();
-  await expect(page.getByTestId('book-table')).toHaveText('候補・メモ');
+  await expect(page.getByTestId('book-table')).toHaveText('候補');
 
   await page.goto('./');
   await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${2} 本`);
@@ -124,10 +76,8 @@ test('手順前後：同じ局面に別の手順で来る研究手順の手は�
   await expect(page.getByTestId('study-position')).toContainText('4手目');
 });
 
-test('稽古：ほかの研究手順の手はまちがいにしない。局面メモをカードの下に出す', async ({ page }) => {
+test('稽古：ほかの研究手順の手はまちがいにしない', async ({ page }) => {
   await setup(page, [A, B]);
-  await page.goto(`./#/book/${KEY}/s-a/17`);
-  await writeMemo(page, '△6二玉と△5二玉の2つを研究');
   await page.goto('./#/practice/play/s-a');
   await expect(page.getByTestId('practice-card')).toHaveAttribute('data-phase', 'ask');
   await expect(page.getByTestId('practice-position')).toContainText('17手目');
@@ -137,7 +87,6 @@ test('稽古：ほかの研究手順の手はまちがいにしない。局面�
   await page.locator('[data-testid="practice-board"] [data-square="52"]').click();
   await expect(page.getByTestId('practice-card')).toHaveAttribute('data-phase', 'other');
   await expect(page.getByTestId('practice-other')).toContainText('青野流 △5二玉');
-  await expect(page.getByTestId('practice-memo')).toContainText('△6二玉と△5二玉の2つを研究');
   await expect(page.locator('.practice-pip.ng')).toHaveCount(0);
 
   // 正解の △6二玉 → 続く。最後まで全部正解
@@ -148,23 +97,4 @@ test('稽古：ほかの研究手順の手はまちがいにしない。局面�
   await page.locator('[data-testid="practice-board"] [data-square="71"]').click();
   await page.locator('[data-testid="practice-board"] [data-square="72"]').click();
   await expect(page.getByTestId('practice-end')).toContainText('全部正解');
-});
-
-test('局面メモは端末の保存場所（positions）に入る', async ({ page }) => {
-  await setup(page, [A]);
-  await page.goto(`./#/book/${KEY}/s-a/17`);
-  await writeMemo(page, 'メモ');
-  await openSettings(page, 'data');
-  const file = await page.evaluate(async () => {
-    const req = indexedDB.open('joban-tree');
-    const db: IDBDatabase = await new Promise((r) => (req.onsuccess = () => r(req.result)));
-    const all: unknown[] = await new Promise((r) => {
-      const g = db.transaction('positions').objectStore('positions').getAll();
-      g.onsuccess = () => r(g.result);
-    });
-    db.close();
-    return all;
-  });
-  expect(file).toHaveLength(1);
-  expect(file[0]).toMatchObject({ side: 'white', note: 'メモ' });
 });

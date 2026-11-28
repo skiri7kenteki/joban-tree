@@ -1,6 +1,4 @@
-// 段階20-3（v0.46.0、手順は v0.46.1 で青野流 3 本＋▲3六飛 に入れかえ）：基本の研究・ツリーのタブの整理（持ち主の判断 2026-11-24「全ておすすめの通りで」）
-// - 「＋ 研究手順を登録」→「基本の研究を入れる」：横歩取り △3三角（後手番）の 4 本（v0.46.2 で確認済み）。選んで入れる → 戦型の出発点で定跡帳。すでにあるものは入れない
-// - 定跡帳のタブの右上の「書き出し」は、設定の「データ」へ
+// 段階20-3：定跡帳のタブの右上の「書き出し」は、設定の「データ」へ（「基本の研究を入れる」は整理-2 で画面から隠した。計算は tests/unit/basic-studies.test.ts）
 import { openSettings } from './settings';
 import { expect, test, type Page } from '@playwright/test';
 
@@ -11,51 +9,7 @@ async function openHome(page: Page) {
   await expect(page.getByTestId('isolation')).toHaveAttribute('data-state', 'isolated', { timeout: 30_000 });
 }
 
-async function openBasic(page: Page) {
-  await page.getByTestId('study-register').click();
-  await page.getByTestId('study-register-basic').click();
-  await expect(page.getByTestId('basic-dialog')).toBeVisible();
-}
-
-test('基本の研究：4 本・確認済み →1 本外して 3 本入れる → 定跡帳の出発点 → もう一度開くと入れたものは選べない', async ({ page }) => {
-  await openHome(page);
-  await expect(page.getByTestId('study-export-open')).toHaveCount(0);
-  await openBasic(page);
-  const dialog = page.getByTestId('basic-dialog');
-  await expect(dialog.getByTestId('basic-set')).toContainText('横歩取り △3三角（後手番）');
-  // 持ち主の確認済み（v0.46.2）なので「未確認」は出ない
-  await expect(dialog.getByTestId('basic-unreviewed')).toHaveCount(0);
-  await expect(dialog.getByTestId('basic-row')).toHaveCount(4);
-  await expect(dialog.getByTestId('basic-row').first()).toContainText('26手目まで');
-  await expect(dialog.getByTestId('basic-add')).toHaveText('4 本を定跡帳に入れる');
-  // 2 本目（青野流 △2六歩）を外す
-  await expect(dialog.getByTestId('basic-row').nth(1)).toContainText('△２六歩');
-  await dialog.getByTestId('basic-check').nth(1).uncheck();
-  await expect(dialog.getByTestId('basic-add')).toHaveText('3 本を定跡帳に入れる');
-  await dialog.getByTestId('basic-add').click();
-
-  // 戦型の出発点（16手目 △３三角）で定跡帳。次の手は ▲５八玉 と ▲３六飛（2 本）
-  await expect(page).toHaveURL(/#\/book\/.+\/(t\/yokofu-33kaku-gote|[^/]+\/16)$/);
-  await expect(page.getByTestId('study-position')).toContainText('16手目');
-  await expect(page.getByTestId('study-book-head')).toHaveText('研究 3本');
-  await expect(page.getByTestId('study-book-branch')).toHaveCount(2);
-
-  // 定跡帳のタブに 3 本。もう一度開くと、入れたものは「入れてあります」
-  await page.goto('./');
-  await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${3} 本`);
-  await openBasic(page);
-  await expect(dialog.getByTestId('basic-row').filter({ hasText: '入れてあります' })).toHaveCount(3);
-  await expect(dialog.getByTestId('basic-check').nth(0)).toBeDisabled();
-  await expect(dialog.getByTestId('basic-check').nth(1)).toBeChecked();
-  await expect(dialog.getByTestId('basic-add')).toHaveText('1 本を定跡帳に入れる');
-  await dialog.getByTestId('basic-add').click();
-  await expect(page.getByTestId('study-book-head')).toHaveText('研究 4本');
-  await page.goto('./');
-  await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${4} 本`);
-  await openBasic(page);
-  await expect(dialog.getByTestId('basic-add')).toHaveText('入れるものがありません');
-  await expect(dialog.getByTestId('basic-add')).toBeDisabled();
-});
+const STUDY = { id: 's-a', name: '研究', note: '', moves: ['7g7f', '3c3d'], mySide: 'white', createdAt: 1, updatedAt: 1 };
 
 test('書き出しは設定の「データ管理」に（研究手順があるときだけ）', async ({ page }) => {
   await openHome(page);
@@ -64,10 +18,13 @@ test('書き出しは設定の「データ管理」に（研究手順がある�
   await expect(page.getByTestId('data-section')).toBeVisible();
   await expect(page.getByTestId('study-export-open')).toHaveCount(0);
   await page.getByTestId('tab-studies').click();
-  await openBasic(page);
-  await page.getByTestId('basic-add').click();
-  await expect(page.getByTestId('study-book-head')).toHaveText('研究 4本');
+  await page.getByTestId('study-import-file').setInputFiles({
+    name: 's.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify({ app: 'joban-tree', kind: 'studies', version: 1, studies: [STUDY] })),
+  });
+  await expect(page.getByTestId('study-count')).toHaveText('研究手順 1 本');
   await openSettings(page, 'data');
   await page.getByTestId('study-export-open').click();
-  await expect(page.getByTestId('study-export-count')).toContainText('4 本');
+  await expect(page.getByTestId('study-export-count')).toContainText('1 本');
 });

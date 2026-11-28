@@ -60,7 +60,6 @@ test.describe('9-2 研究手順どうしをつないで見る', () => {
     await page.getByTestId('study-next').click();
     await page.getByTestId('study-next').click();
     await expect(page.getByTestId('study-position')).toContainText('17手目');
-    await expect(page.getByTestId('study-meta')).toContainText('Aのメモ');
     await expect(page.getByTestId('study-book-head')).toHaveText('研究 3本');
     const rows = page.getByTestId('study-book-branch');
     await expect(rows).toHaveCount(2);
@@ -93,7 +92,6 @@ test.describe('9-2 研究手順どうしをつないで見る', () => {
     await expect(page.getByTestId('study-position')).toContainText('17手目');
     await rows.filter({ hasText: '研究C' }).click();
     await expect(page.getByTestId('study-title')).toHaveText('研究C');
-    await expect(page.getByTestId('study-meta')).toContainText('Cのメモ');
 
     // まとめて稽古（段階14：⋯ の中。段階19 で復習→稽古）
     await page.getByTestId('book-menu').click();

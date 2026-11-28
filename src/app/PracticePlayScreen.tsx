@@ -27,6 +27,7 @@ import { studyBookUrl } from './addToBook';
 import { boardFitProps, bottomInFrame, measureFitFrame, useBoardFit } from './boardFit';
 import { ensureGames, gameList } from './games';
 import { gameDate } from './GamesScreen';
+import { SHOW } from './hidden';
 import { ensurePractice, planNow, practiceRecords, savePractice } from './practice';
 import { correctToday, rememberAnswer, rememberWrong, wrongMemo } from './practiceMemory';
 import { settings } from './settings';
@@ -479,12 +480,12 @@ function StudyPlay({
             )}
           </section>
           {/* 悪手の理由と局面メモはカードの下（盤の大きさはカードまでで決める） */}
-          {phase.kind === 'bad' && phase.entry.reason && (
+          {SHOW.comments && phase.kind === 'bad' && phase.entry.reason && (
             <div class="practice-after">
               <p class="study-note practice-note">{phase.entry.reason}</p>
             </div>
           )}
-          {(phase.kind === 'wrong' || phase.kind === 'other' || phase.kind === 'bad') && noteAt(study.mySide, sfen) && (
+          {SHOW.comments && (phase.kind === 'wrong' || phase.kind === 'other' || phase.kind === 'bad') && noteAt(study.mySide, sfen) && (
             <div class="practice-after">
               <p class="study-note practice-note" data-testid="practice-memo">
                 <span class="practice-memo-label">局面メモ</span>
@@ -495,7 +496,7 @@ function StudyPlay({
           {/* 終わった後のメモと「定跡帳で見る」はカードの下（盤の大きさはカードまでで決める。入りきらなければ枠の中でスクロール） */}
           {phase.kind === 'end' && (
             <div class="practice-after">
-              {study.note && <p class="study-note practice-note">{study.note}</p>}
+              {SHOW.comments && study.note && <p class="study-note practice-note">{study.note}</p>}
               <button type="button" class="btn btn-wide" data-testid="practice-book" onClick={() => go(studyBookUrl(study))}>
                 定跡帳で見る
               </button>

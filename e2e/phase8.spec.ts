@@ -96,6 +96,24 @@ function lineTree(id: string, name: string, studies?: TreeStudy[]): TreeData {
 const KIF = (handicap: string, moves: string[]) =>
   [`手合割：${handicap}`, '手数----指手---------消費時間--', ...moves.map((m, i) => `${String(i + 1).padStart(4)} ${m}   ( 0:00/00:00:00)`), ''].join('\n');
 
+/** 保存場所の研究手順のメモ（欄は整理-2 で隠したので、中身で確かめる） */
+const savedNote = (page: Page, name: string) =>
+  page.evaluate(
+    (name) =>
+      new Promise<string>((resolve, reject) => {
+        const open = indexedDB.open('joban-tree');
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+          const r = open.result.transaction('studies').objectStore('studies').getAll();
+          r.onsuccess = () => {
+            open.result.close();
+            resolve((r.result as { name: string; note: string }[]).find((s) => s.name.includes(name))?.note ?? '（その名前の研究手順が無い）');
+          };
+        };
+      }),
+    name,
+  );
+
 test.describe('8-1 登録（エンジンを使わない）', () => {
   // 段階10-2：登録の画面（#/new/study）を片付けたので、棋譜を貼って 1 本登録する窓と定跡帳で確かめる
   test('棋譜を貼って 1 本登録 → 定跡帳（終わりの局面）が開く → 一覧に出る → 前後に動かす（⋯ にツリーの操作は無い。段階20-3）', async ({ page }) => {
@@ -114,14 +132,6 @@ test.describe('8-1 登録（エンジンを使わない）', () => {
     await expect(page.getByTestId('book-title')).toHaveText('定跡帳平手から（先手番）');
     await expect(page.getByTestId('study-title')).toHaveText('▲７六歩 △３四歩 ▲２六歩');
     await expect(page.getByTestId('study-position')).toHaveText('3手目 ▲２六歩');
-    // メモは ★ の行から
-    await page.getByTestId('book-head').click();
-    await page.getByTestId('study-note').fill('狙い：早めの▲2六歩\n2 行目');
-    await page.getByTestId('study-save').click();
-    // 段階14：メモの全文は ★ の行を押して開く窓で
-    await page.getByTestId('book-head').click();
-    await expect(page.getByTestId('study-note')).toHaveValue('狙い：早めの▲2六歩\n2 行目');
-    await page.locator('dialog[open]').last().getByRole('button', { name: '閉じる' }).click();
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 
     // 一覧に出る
@@ -133,12 +143,10 @@ test.describe('8-1 登録（エンジンを使わない）', () => {
     await expect(item).toHaveCount(1);
     await expect(item).toContainText('▲７六歩 △３四歩 ▲２六歩');
     await expect(item).toContainText('3 手');
-    await expect(item.getByTestId('study-item-note')).toHaveText('狙い：早めの▲2六歩');
 
     // 開く（定跡帳の、その研究手順の終わりの局面）
     await item.click();
     await expect(page.getByTestId('study-position')).toHaveText('3手目 ▲２六歩');
-    await expect(page.getByTestId('study-meta')).toContainText('狙い：早めの');
     // 段階20-3：定跡帳の ⋯ から「ツリーを作る」「ツリーで見る」と 1 本ずつの JSON・KIF で渡すを外した
     await page.getByTestId('book-menu').click();
     await expect(page.getByTestId('book-menu-dialog')).toBeVisible();
@@ -219,7 +227,6 @@ test.describe('8-1 稽古', () => {
     await expect(page.getByTestId('practice-wrong')).toContainText('△１四歩 ではありません');
     await play(page, '83', '84');
     await expect(page.getByTestId('practice-end')).toContainText('4手目 △８四歩');
-    await expect(page.locator('.practice-note')).toHaveText('メモの 1 行目\n2 行目');
     await expect(page.getByTestId('practice-next')).toHaveText('終わる');
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(360);
 
@@ -245,7 +252,7 @@ test.describe('8-1 稽古', () => {
 });
 
 test.describe('8-1 書き出し・取り込み', () => {
-  test('選んで JSON・KIF に書き出す。JSON の取り込みで同じ手順があれば、置き換える・両方残す・取り込まないを選ぶ', async ({ page }) => {
+  test('選んで KIF に書き出す。JSON の取り込みで同じ手順があれば、置き換える・両方残す・取り込まないを選ぶ', async ({ page }) => {
     await openHome(page);
     await importStudies(page, [study('s-1', '研究1', ['7g7f', '3c3d'], { note: 'メモ1' }), study('s-2', '研究2', ['2g2f', '8c8d'])]);
     await expect(page.getByTestId('study-count')).toHaveText(`研究手順 ${2} 本`);
@@ -257,14 +264,10 @@ test.describe('8-1 書き出し・取り込み', () => {
     await page.getByTestId('study-export-open').click();
     await expect(page.getByTestId('study-export-count')).toContainText('2 本');
     await page.getByTestId('study-export-none').click();
-    await expect(page.getByTestId('study-export-json')).toBeDisabled();
+    await expect(page.getByTestId('study-export-kif')).toBeDisabled();
     await page.getByTestId('study-export-check').first().click();
     await expect(page.getByTestId('study-export-count')).toContainText('1 本');
     await page.getByTestId('study-export-all').click();
-    const [json] = await Promise.all([page.waitForEvent('download'), page.getByTestId('study-export-json').click()]);
-    const file = JSON.parse(readFileSync((await json.path())!, 'utf8')) as { kind: string; studies: Study[] };
-    expect(file.kind).toBe('studies');
-    expect(file.studies.map((s) => s.name).sort()).toEqual(['研究1', '研究2']);
     const [kif] = await Promise.all([page.waitForEvent('download'), page.getByTestId('study-export-kif').click()]);
     expect(kif.suggestedFilename()).toMatch(/\.kifu$/);
     const kifText = readFileSync((await kif.path())!, 'utf8');
@@ -350,7 +353,6 @@ test.describe('8-1 移し替え（段階7の研究手順 → 独立した研究�
     await expect(page.getByTestId('study-count')).toHaveText('研究手順 2 本');
     const moved = await openStudyList(page);
     await expect(moved.getByTestId('study-item')).toHaveText([/新しい名前/, /研究2/]);
-    await expect(moved.getByTestId('study-item').first().getByTestId('study-item-note')).toHaveText('新しいメモ');
     await page.goto('./#/');
 
     // もう一度開いても増えない・知らせも出ない
@@ -359,11 +361,7 @@ test.describe('8-1 移し替え（段階7の研究手順 → 独立した研究�
     await expect(page.getByTestId('home-message')).toHaveCount(0);
 
     // メモは両方残る。記録も写っている（▲7六歩の後の △3四歩 は「覚えた」）
-    await (await openStudyList(page)).getByTestId('study-item').first().click();
-    // 段階14：メモの全文は ★ の行を押して開く窓で
-    await page.getByTestId('book-head').click();
-    await expect(page.getByTestId('study-note')).toHaveValue('新しいメモ\n――\n古いメモ');
-    await page.locator('dialog[open]').last().getByRole('button', { name: '閉じる' }).click();
+    expect(await savedNote(page, '新しい名前')).toBe('新しいメモ\n――\n古いメモ');
     // 復習の記録は研究手順用の記録へ写っている（▲7六歩の後の △3四歩）。ツリーは消えず、研究手順を外して残る
     const stored = await page.evaluate(
       () =>
@@ -451,7 +449,8 @@ test.describe('8-2 変化付き KIF からまとめて取り込む', () => {
     const rows = page.getByTestId('kif-bulk-row');
     await expect(rows).toHaveCount(3);
     await expect(rows.nth(0)).toContainText('▲７六歩 △３四歩 ▲２六歩 △８四歩');
-    await expect(rows.nth(0)).toContainText('4 手・メモあり');
+    await expect(rows.nth(0)).toContainText('4 手');
+    await expect(rows.nth(0)).not.toContainText('メモあり');
     await expect(rows.nth(0).getByTestId('kif-bulk-exists')).toHaveText('すでにあり');
     await expect(rows.nth(0).getByTestId('kif-bulk-check')).not.toBeChecked();
     await expect(rows.nth(1)).toContainText('▲７六歩 … 3手目 ▲６六歩 … ▲６八飛');
@@ -481,10 +480,8 @@ test.describe('8-2 変化付き KIF からまとめて取り込む', () => {
 
     // メモ：その変化の終わりまでの手のコメントを手数付きで。「#」の行は入らない
     await (await openStudyList(page, '先手番')).getByTestId('study-item').filter({ hasText: '3手目 ▲６六歩' }).click();
-    // 段階14：メモの全文は ★ の行を押して開く窓で
-    await page.getByTestId('book-head').click();
-    await expect(page.getByTestId('study-note')).toHaveValue('1手目 ▲７六歩：初手は角道\n4手目 △８四歩：△8四歩なら');
-    await page.locator('dialog[open]').last().getByRole('button', { name: '閉じる' }).click();
+    await expect(page.getByTestId('study-position')).toBeVisible();
+    expect(await savedNote(page, '3手目 ▲６六歩')).toBe('1手目 ▲７六歩：初手は角道\n4手目 △８四歩：△8四歩なら');
     await expect(page.getByTestId('book-title')).toContainText('平手から（先手番）');
   });
 

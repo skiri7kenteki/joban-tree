@@ -51,7 +51,7 @@ export async function saveStudies(list: readonly Study[]): Promise<void> {
 
 /** 名前・メモ（と自分の側）を直す */
 export async function updateStudyFields(study: Study, f: { name: string; note: string; mySide?: Study['mySide'] }): Promise<Study> {
-  const next: Study = { ...study, name: f.name.trim(), note: f.note.trimEnd(), mySide: f.mySide ?? study.mySide, updatedAt: Date.now() };
+  const next: Study = { ...study, name: f.name.trim(), note: f.note === study.note ? study.note : f.note.trimEnd(), mySide: f.mySide ?? study.mySide, updatedAt: Date.now() };
   await saveStudies([next]);
   return next;
 }

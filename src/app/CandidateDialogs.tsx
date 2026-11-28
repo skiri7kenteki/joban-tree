@@ -8,6 +8,7 @@ import { Dialog } from '../components/Dialog';
 import { applyUsiMove, moveText, type Side } from '../shogi/position';
 import { MARK_TEXT, PV_MAX, PV_SHOW, REASON_MAX, evalText, hardMove, markText, type Candidate, type CandidateMark } from '../tree/candidates';
 import { NOTE_MAX } from '../tree/positions';
+import { SHOW } from './hidden';
 
 /** 印の札（本命は墨の塗り、次善は木の茶、悪手は朱） */
 export function MarkTag({ mark, text, testId }: { mark: CandidateMark; text: string; testId?: string }) {
@@ -96,7 +97,7 @@ export function RowDetail({
           {entry?.mark === 'bad' ? '咎め方' : '読み筋'}：{pv}
         </p>
       )}
-      {entry?.reason && <p class="row-detail-line">理由：{entry.reason}</p>}
+      {SHOW.comments && entry?.reason && <p class="row-detail-line">理由：{entry.reason}</p>}
       {move === hardMove(table) && <HardNote />}
       {condition && <p class="muted memo-sub">{condition}</p>}
       {names.length > 0 && (
@@ -111,7 +112,7 @@ export function RowDetail({
           </ul>
         </>
       )}
-      {memo && (
+      {SHOW.comments && memo && (
         <>
           <p class="menu-section-title">局面メモ</p>
           <p class="row-detail-memo">{memo}</p>
@@ -273,7 +274,7 @@ export function CandidateWindow({
                     <span class="num">{evalText(c)}</span>
                     {pv && ` ${c.mark === 'bad' ? '咎め方：' : ''}${pv}`}
                   </span>
-                  {c.reason && <span class="cand-reason">{c.reason}</span>}
+                  {SHOW.comments && c.reason && <span class="cand-reason">{c.reason}</span>}
                 </div>
                 <button type="button" class="candidate-menu" aria-label={`${moveText(sfen, c.move, prev)} の印を変える`} data-testid="cand-item-menu" onClick={() => onMenu(c.move)}>
                   ⋯
@@ -288,10 +289,12 @@ export function CandidateWindow({
         ほかの手を盤で指して調べる
       </button>
       {condition && <p class="muted memo-sub">{condition}</p>}
-      <div class="cand-memo">
-        <p class="menu-section-title">局面メモ</p>
-        <MemoEditor initial={memo} busy={busy} rows={2} onSave={onSaveMemo} onAutoSave={onAutoSaveMemo} />
-      </div>
+      {SHOW.comments && (
+        <div class="cand-memo">
+          <p class="menu-section-title">局面メモ</p>
+          <MemoEditor initial={memo} busy={busy} rows={2} onSave={onSaveMemo} onAutoSave={onAutoSaveMemo} />
+        </div>
+      )}
     </Dialog>
   );
 }
@@ -336,7 +339,7 @@ export function MarkChooser({
           </button>
         )}
       </div>
-      {entry && (
+      {SHOW.comments && entry && (
         <div class="mark-reason">
           <input
             type="text"

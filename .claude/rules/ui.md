@@ -8,12 +8,15 @@ paths:
   - "src/app/router.ts"
   - "e2e/**"
   - "DESIGN.md"
+  - "src/app/hidden.ts"
 ---
 
 # 画面の共通部品と見た目（タブ・棋譜欄・操作バー・⋯・1 画面・駒と駒台）
 
 > CLAUDE.md から移した仕様（2026-11-24）。この機能の仕様を変えたら、このファイルを直す。
 > 下のパスのファイルを読んだときだけ読み込まれる。
+
+- **画面から隠す決まりは `src/app/hidden.ts` の 1 か所（整理-2）**：`SHOW` の `comments`（手のコメントの類）・`mergeFile`（ほかの端末のバックアップを合わせる）・`basicStudies`・`studyJson`。false は画面に出さないだけで、データとコードは残す。画面のテストは隠した状態を確かめる（`e2e/feature-cleanup.spec.ts`）
 
 - **画面の下のタブ（段階11-1、v0.25.0〜。段階19 から 定跡帳／稽古／実戦／設定。`src/components/TabBar.tsx`）**：
   - タブは 定跡帳（`#/`）／稽古（`#/practice`）／実戦（`#/games`）／設定（`#/settings`）。アイコンは手書きの SVG。アプリを開くといつも定跡帳
