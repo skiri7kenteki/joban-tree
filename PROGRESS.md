@@ -1,6 +1,8 @@
 # 進捗メモ
 
 ## 現在の状況
+**CLAUDE.md の仕上げ（番号なし。2026-11-28。依頼は `docs/claude/claude-md-finish.md`）**：その1（CLAUDE.md の直し。アプリは変えない。`rules.test.ts` 合格）ができた。次は、持ち主の了承のあと その2（`theme_color` を `#f7f5f1` に）。
+
 **CLAUDE.md と設定ファイルの整理（番号なし。2026-11-28。依頼と決まったことは `docs/claude/instructions-cleanup.md`）**：できた（アプリは変えない。型チェックと `rules.test.ts` 合格）。残り：`theme_color` が紺のまま（別の作業）。
 
 **これからの方針（2026-11-23、持ち主と機能を見直して決めた。CLAUDE.md の「これからの方針」）**：定跡帳を中心に「作る → 覚える → 実戦で確かめる」を回すアプリにする。
